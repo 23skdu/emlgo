@@ -95,10 +95,10 @@ After fixing all P0 blockers:
 - Set up CI/CD with GitHub Actions for testing on multiple platforms
 
 **Subtasks:**
-- [ ] Initialize git repository and create initial commit
-- [ ] Write README.md with usage examples
-- [ ] Configure goreleaser for releases
-- [ ] Add gofmt/gci linting configuration
+- [x] Initialize git repository and create initial commit
+- [x] Write README.md with usage examples
+- [x] Configure goreleaser for releases
+- [x] Add gofmt/gci linting configuration
 
 ---
 
@@ -219,8 +219,8 @@ After fixing all P0 blockers:
 - [x] Research SIMD-friendly reformulations of EML operator
 - [x] Add CPU feature detection in `internal/eml/simd.go`
 - [x] Create auto-switching mechanism (runtime dispatch)
-- [ ] Implement actual AVX2/AVX512 assembly (requires Go assembly)
-- [ ] Benchmark SIMD vs scalar implementations
+- [ ] Implement actual AVX2/AVX512 assembly (requires Go assembly) - Future work
+- [x] Benchmark SIMD vs scalar implementations
 - [x] Ensure SIMD implementations maintain accuracy requirements
 
 ---
@@ -240,7 +240,7 @@ After fixing all P0 blockers:
 - [x] Implement ULP (Unit in Last Place) accuracy checking
 - [x] Set up benchstat for benchmark tracking
 - [x] Add cross-platform CI testing (Linux, macOS, Windows, WASM)
-- [ ] Document performance characteristics in benchmarks/
+- [x] Document performance characteristics in benchmarks/
 
 ---
 
@@ -256,9 +256,9 @@ After fixing all P0 blockers:
 - [x] Write godoc for all public APIs
 - [x] Create `examples_test.go` with runnable examples
 - [x] Add cmd/ example programs demonstrating usage
-- [ ] Write performance report comparing to standard library
-- [ ] Tag v1.0.0 release
-- [ ] Add badge for go.dev reference
+- [x] Write performance report comparing to standard library
+- [ ] Tag v1.0.0 release - Ready for tagging
+- [x] Add badge for go.dev reference
 - [x] Publish to GitHub and verify go install works
 
 ---
