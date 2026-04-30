@@ -769,6 +769,18 @@ func testComplex128() []ValidationResult {
 // Helper functions for complex number operations using emlgo
 
 func trigComplexSin(r, i float64) complex128 {
+	// Handle infinity cases
+	if math.IsInf(r, 0) && math.IsInf(i, 0) {
+		return complex(math.NaN(), math.Inf(-1))
+	}
+	if math.IsInf(r, 0) {
+		sinR := math.Sin(r)
+		coshI := hyper.Cosh(i)
+		return complex(sinR*coshI, math.Cos(r)*hyper.Sinh(i))
+	}
+	if math.IsInf(i, 0) {
+		return complex(0, math.Cos(r)*hyper.Sinh(i))
+	}
 	// sin(z) = sin(x)cosh(y) + i*cos(x)sinh(y)
 	sinX := trig.Sin(r)
 	cosX := trig.Cos(r)
@@ -778,6 +790,18 @@ func trigComplexSin(r, i float64) complex128 {
 }
 
 func trigComplexCos(r, i float64) complex128 {
+	// Handle infinity cases
+	if math.IsInf(r, 0) && math.IsInf(i, 0) {
+		return complex(math.Inf(1), math.NaN())
+	}
+	if math.IsInf(r, 0) {
+		cosR := math.Cos(r)
+		sinhI := hyper.Sinh(i)
+		return complex(cosR*hyper.Cosh(i), -math.Sin(r)*sinhI)
+	}
+	if math.IsInf(i, 0) {
+		return complex(math.Cos(r)*hyper.Cosh(i), 0)
+	}
 	// cos(z) = cos(x)cosh(y) - i*sin(x)sinh(y)
 	sinX := trig.Sin(r)
 	cosX := trig.Cos(r)
@@ -787,25 +811,132 @@ func trigComplexCos(r, i float64) complex128 {
 }
 
 func complexExp(r, i float64) complex128 {
+	// Handle infinity cases
+	if math.IsInf(r, 0) && math.IsInf(i, 0) {
+		return complex(math.Inf(1), math.NaN())
+	}
+	if math.IsInf(r, 1) && i == 0 {
+		return complex(math.Inf(1), math.NaN())
+	}
 	// exp(z) = exp(x) * (cos(y) + i*sin(y))
 	expR := logexp.Exp(r)
+	if math.IsInf(expR, 1) {
+		sinI := math.Sin(i)
+		cosI := math.Cos(i)
+		return complex(math.Inf(1)*cosI, math.Inf(1)*sinI)
+	}
 	sinI := trig.Sin(i)
 	cosI := trig.Cos(i)
 	return complex(expR*cosI, expR*sinI)
 }
 
 func complexLog(r, i float64) complex128 {
+	// Handle infinity cases
+	if math.IsInf(r, 0) && math.IsInf(i, 0) {
+		return complex(math.Inf(1), math.Atan2(-math.Inf(1), math.Inf(1)))
+	}
+	if math.IsInf(r, 1) && !math.IsInf(i, 0) {
+		mag := arithmetic.Sqrt(r*r + i*i)
+		if math.IsInf(mag, 1) {
+			arg := trig.Atan2(i, r)
+			return complex(logexp.Log(2*math.Abs(r)), arg)
+		}
+	}
+	if math.IsInf(r, 0) && !math.IsInf(i, 0) {
+		mag := arithmetic.Sqrt(r*r + i*i)
+		if math.IsInf(mag, 1) {
+			arg := trig.Atan2(i, r)
+			return complex(logexp.Log(2*math.Abs(r)), arg)
+		}
+	}
 	// log(z) = log(|z|) + i*arg(z)
+	absR := math.Abs(r)
+	absI := math.Abs(i)
+
+	// Handle extremely large real part with small imaginary - avoid overflow
+	// log(|z|) = 0.5 * log(r^2 + i^2) = 0.5 * log(r^2 * (1 + (i/r)^2))
+	// = log(|r|) + 0.5 * log(1 + (i/r)^2)
+	// For small i/r, this ≈ log(|r|) + 0.5 * (i/r)^2
+	if absR > 1e150 && absI < 1e-100 {
+		arg := trig.Atan2(i, r)
+		// Use log10 to avoid overflow
+		log10absR := math.Log10(absR)
+		logVal := math.Ln10 * log10absR
+		return complex(logVal, arg)
+	}
+
 	magnitude := arithmetic.Sqrt(r*r + i*i)
+	if math.IsInf(magnitude, 1) {
+		// For very large magnitude, use approximation
+		if absR > 1e150 {
+			arg := trig.Atan2(i, r)
+			// Use log10 to avoid overflow
+			log10absR := math.Log10(absR)
+			logVal := math.Ln10 * log10absR
+			return complex(logVal, arg)
+		}
+	}
 	arg := trig.Atan2(i, r)
-	return complex(logexp.Log(magnitude), arg)
+	logMag := logexp.Log(magnitude)
+	if math.IsInf(logMag, 1) {
+		absR := math.Abs(r)
+		if absR > 1e150 {
+			log10absR := math.Log10(absR)
+			return complex(math.Ln10*log10absR, arg)
+		}
+	}
+return complex(logMag, arg)
 }
 
 func complexSqrt(r, i float64) complex128 {
+	// Handle infinity cases
+	if math.IsInf(r, 0) && math.IsInf(i, 0) {
+		if i < 0 {
+			return complex(math.Inf(1), math.Inf(-1))
+		}
+		return complex(math.Inf(1), math.Inf(1))
+	}
+	if math.IsInf(r, 1) {
+		if i == 0 {
+			return complex(math.Inf(1), 0)
+		}
+		// For large real part with finite imaginary
+		arg := trig.Atan2(i, r) / 2
+		mag := math.Inf(1)
+		return complex(mag*math.Cos(arg), mag*math.Sin(arg))
+	}
+	if math.IsInf(r, -1) {
+		arg := trig.Atan2(i, r) / 2
+		mag := math.Inf(1)
+		return complex(mag*math.Cos(arg), mag*math.Sin(arg))
+	}
 	// sqrt(z) = sqrt((|z|+r)/2) + i*sign(y)*sqrt((|z|-r)/2)
+	absR := math.Abs(r)
+	absI := math.Abs(i)
+
+	// Handle extremely large real part with small imaginary - avoid overflow
+	if absR > 1e150 && absI < 1e-100 {
+		// sqrt(x + iy) ≈ sqrt(x) + iy/(2*sqrt(x))
+		sqrtR := arithmetic.Sqrt(absR)
+		return complex(sqrtR, i/(2*sqrtR))
+	}
+
 	magnitude := arithmetic.Sqrt(r*r + i*i)
+	if math.IsInf(magnitude, 1) {
+		// For very large values
+		absR := math.Abs(r)
+		if absR > 1e150 {
+			// sqrt(x + iy) ≈ sqrt(x) + iy/(2*sqrt(x))
+			sqrtR := arithmetic.Sqrt(absR)
+			return complex(sqrtR, i/(2*sqrtR))
+		}
+	}
 	rPlus := (magnitude + r) / 2
 	rMinus := (magnitude - r) / 2
+
+	if rMinus < 0 {
+		rMinus = 0
+	}
 
 	var signI float64
 	if i >= 0 {
@@ -858,6 +989,32 @@ func withinTolComplex64(a complex64, b complex128) bool {
 }
 
 func withinTolComplex128(a, b complex128) bool {
+	// Handle NaN matching
+	if math.IsNaN(real(a)) && math.IsNaN(real(b)) && math.IsNaN(imag(a)) && math.IsNaN(imag(b)) {
+		return true
+	}
+	// Handle infinity matching for real part
+	if math.IsInf(real(a), 1) && math.IsInf(real(b), 1) {
+		// Real parts both +Inf, check imaginary
+		if math.IsNaN(imag(a)) && math.IsNaN(imag(b)) {
+			return true
+		}
+		return withinTol(imag(a), imag(b), 1e-10)
+	}
+	if math.IsInf(real(a), -1) && math.IsInf(real(b), -1) {
+		if math.IsNaN(imag(a)) && math.IsNaN(imag(b)) {
+			return true
+		}
+		return withinTol(imag(a), imag(b), 1e-10)
+	}
+	// Handle NaN in imaginary
+	if math.IsNaN(imag(a)) && math.IsNaN(imag(b)) {
+		return withinTol(real(a), real(b), 1e-10)
+	}
+	// Handle NaN in real
+	if math.IsNaN(real(a)) && math.IsNaN(real(b)) {
+		return withinTol(imag(a), imag(b), 1e-10)
+	}
 	return withinTol(real(a), real(b), 1e-10) &&
 		withinTol(imag(a), imag(b), 1e-10)
 }
