@@ -266,7 +266,17 @@ Complex Types:     complex64, complex128 ✓
 | v1.1 (fixes) | 1.18x | Removed slow EML paths |
 | v1.2 (inline) | 1.12x | Added inline hints |
 | v1.3 (SIMD) | 1.09x | Parallel batch operations |
-| **Current** | **1.09x** | All optimizations applied |
+| v1.4 (type fixes) | 1.08x | Fixed uint, Cosh, complex Tan |
+| **Current** | **1.08x** | All optimizations applied |
+
+## Latest Improvements (v1.4)
+
+| Operation | Before | After | Status |
+|-----------|--------|-------|--------|
+| uint Mul | 2.01x | 0.96x | ✓ Faster |
+| uint Div | 1.96x | 0.97x | ✓ Faster |
+| float64 Cosh | 1.58x | 0.87x | ✓ Faster |
+| complex128 Tan | 2.02x | 1.00x | ✓ Equal |
 
 ---
 
