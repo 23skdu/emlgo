@@ -2,11 +2,6 @@
 
 A pure Go library implementing all elementary mathematical functions using the EML (Exp-Minus-Log) operator discovered in [arXiv:2603.21852v2](https://arxiv.org/abs/2603.21852) by Andrzej Odrzywołek.
 
-[![Go Version](https://img.shields.io/github/go-mod/go-version/emlgo/eml)](https://github.com/emlgo/eml)
-[![Test Status](https://github.com/emlgo/eml/actions/workflows/test.yml/badge.svg)](https://github.com/emlgo/eml/actions)
-[![ gosec](https://img.shields.io/badge/gosec-0%20issues-success)](https://github.com/emlgo/eml/actions)
-[![go.dev reference](https://img.shields.io/badge/go.dev-reference-blue)](https://pkg.go.dev/github.com/emlgo/eml)
-
 ## Overview
 
 The EML operator `eml(x, y) = exp(x) - ln(y)` can reconstruct all elementary functions when combined with the constant `1`. This library provides:
