@@ -26,8 +26,10 @@ This document provides a cross-platform performance comparison between the `emlg
 
 ### Host A: Localhost (Apple Silicon M2 - `darwin/arm64`)
 
+
 #### Test Environment A
-*Tested with n=100,000 iterations*
+
+Tested with n=100,000 iterations
 
 | Type | Function | emlgo (s) | math (s) | Ratio |
 | :--- | :--- | :--- | :--- | :--- |
@@ -40,8 +42,10 @@ This document provides a cross-platform performance comparison between the `emlg
 
 ### Host B: Remote Host (`ancalagon` - `linux/amd64` AVX2)
 
+
 #### Test Environment B
-*Tested with n=100,000 iterations*
+
+Tested with n=100,000 iterations
 
 | Type | Function | emlgo (s) | math (s) | Ratio |
 | :--- | :--- | :--- | :--- | :--- |
@@ -65,7 +69,7 @@ This document provides a cross-platform performance comparison between the `emlg
 | Exponential/Log | ✓ PASSED | ✓ PASSED |
 | Power/Roots | ✓ PASSED | ✓ PASSED |
 
-**Accuracy Highlights**
+### Accuracy Highlights
 
 - **Exact matches:** `Exp`, `Log`, `Sin`, `Cos`, `Tan`, `Sqrt`.
 - **Near-exact:** `Pow` (within 10 ULP), `Cosh` (1 ULP).

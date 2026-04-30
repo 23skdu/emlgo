@@ -22,7 +22,6 @@ var (
 	nativeTrunc = eml.Trunc
 	nativeRound = eml.Round
 	nativeExp   = eml.Exp
-	nativePow   = eml.Pow
 )
 
 func Add(x, y float64) float64 {

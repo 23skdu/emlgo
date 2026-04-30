@@ -12,7 +12,6 @@ var (
 	hasAVX512  bool
 	hasNeon    bool
 	hasNeonDot bool
-	simdOnce   sync.Once
 )
 
 func init() {
