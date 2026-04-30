@@ -60,6 +60,7 @@ func main() {
 
 	fmt.Printf("=== Comprehensive Performance Benchmark (n=%d) ===\n", iterations)
 	results := runAllBenchmarks()
+	results = append(results, runBatchBenchmarks()...)
 	printResults(results)
 	checkRegression(results)
 }
@@ -615,6 +616,106 @@ func benchmarkComplex128(typ, name string, emlgoFunc, mathFunc func(complex128) 
 		_ = mathFunc(randData[i%len(randData)])
 	}
 	mathTime := time.Since(start).Seconds()
+
+	return BenchmarkResult{
+		Type:      typ,
+		Name:      name,
+		EmlgoTime: emlgoTime,
+		MathTime:  mathTime,
+		Ratio:     emlgoTime / mathTime,
+		Passed:    true,
+	}
+}
+
+// ==================== BATCH BENCHMARKS ====================
+
+func runBatchBenchmarks() []BenchmarkResult {
+	results := []BenchmarkResult{}
+	n := 4096 // Batch size
+
+	results = append(results, benchmarkBatch("batch", "Add", n, func(a, b []float64) {
+		_ = arithmetic.AddBatch(a, b)
+	}, func(a, b []float64) {
+		res := make([]float64, len(a))
+		for i := range a {
+			res[i] = a[i] + b[i]
+		}
+	}))
+
+	results = append(results, benchmarkBatch("batch", "Sub", n, func(a, b []float64) {
+		_ = arithmetic.SubBatch(a, b)
+	}, func(a, b []float64) {
+		res := make([]float64, len(a))
+		for i := range a {
+			res[i] = a[i] - b[i]
+		}
+	}))
+
+	results = append(results, benchmarkBatch("batch", "Mul", n, func(a, b []float64) {
+		_ = arithmetic.MulBatch(a, b)
+	}, func(a, b []float64) {
+		res := make([]float64, len(a))
+		for i := range a {
+			res[i] = a[i] * b[i]
+		}
+	}))
+
+	results = append(results, benchmarkBatch("batch", "Div", n, func(a, b []float64) {
+		_ = arithmetic.DivBatch(a, b)
+	}, func(a, b []float64) {
+		res := make([]float64, len(a))
+		for i := range a {
+			if b[i] != 0 {
+				res[i] = a[i] / b[i]
+			}
+		}
+	}))
+
+	results = append(results, benchmarkBatch("batch", "Sqrt", n, func(a, b []float64) {
+		_ = arithmetic.SqrtBatch(a)
+	}, func(a, b []float64) {
+		res := make([]float64, len(a))
+		for i := range a {
+			res[i] = math.Sqrt(a[i])
+		}
+	}))
+
+	results = append(results, benchmarkBatch("batch", "Exp", n, func(a, b []float64) {
+		_ = logexp.ExpBatch(a)
+	}, func(a, b []float64) {
+		res := make([]float64, len(a))
+		for i := range a {
+			res[i] = math.Exp(a[i])
+		}
+	}))
+
+	return results
+}
+
+func benchmarkBatch(typ, name string, n int, emlgoFunc, mathFunc func([]float64, []float64)) BenchmarkResult {
+	rand.Seed(42)
+	a := make([]float64, n)
+	b := make([]float64, n)
+	// #nosec G404 - benchmark tool uses math/rand for deterministic test data
+	for i := 0; i < n; i++ {
+		a[i] = rand.Float64()*10 - 5
+		b[i] = rand.Float64()*10 - 5
+	}
+
+	// Adjust iterations for batch benchmarks to keep runtime reasonable
+	batchIterations := 100000
+
+	start := time.Now()
+	for i := 0; i < batchIterations; i++ {
+		emlgoFunc(a, b)
+	}
+	emlgoTime := time.Since(start).Seconds() / float64(batchIterations)
+
+	start = time.Now()
+	for i := 0; i < batchIterations; i++ {
+		mathFunc(a, b)
+	}
+	mathTime := time.Since(start).Seconds() / float64(batchIterations)
 
 	return BenchmarkResult{
 		Type:      typ,
