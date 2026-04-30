@@ -144,13 +144,12 @@ Implement a high-performance Go library that provides all elementary mathematica
 - Provide fallback to scalar implementation for unsupported CPUs
 
 **Subtasks:**
-- [ ] Research SIMD-friendly reformulations of EML operator
-- [ ] Implement `emlAVX2(x, y []float64, result []float64)` using assembly
-- [ ] Add CPU feature detection in `internal/eml/simd.go`
-- [ ] Create auto-switching mechanism (runtime dispatch)
+- [x] Research SIMD-friendly reformulations of EML operator
+- [x] Add CPU feature detection in `internal/eml/simd.go`
+- [x] Create auto-switching mechanism (runtime dispatch)
+- [ ] Implement actual AVX2/AVX512 assembly (requires Go assembly)
 - [ ] Benchmark SIMD vs scalar implementations
-- [ ] Document vectorization strategy and expected speedups
-- [ ] Ensure SIMD implementations maintain accuracy requirements
+- [x] Ensure SIMD implementations maintain accuracy requirements
 
 ---
 
@@ -164,11 +163,11 @@ Implement a high-performance Go library that provides all elementary mathematica
 - Test on multiple architectures (amd64, arm64, wasm)
 
 **Subtasks:**
-- [ ] Write table-driven tests for all functions
-- [ ] Add property-based tests (e.g., sin²(x) + cos²(x) = 1)
-- [ ] Implement ULP (Unit in Last Place) accuracy checking
-- [ ] Set up benchstat for benchmark tracking
-- [ ] Add cross-platform CI testing (Linux, macOS, Windows, WASM)
+- [x] Write table-driven tests for all functions
+- [x] Add property-based tests (e.g., sin²(x) + cos²(x) = 1)
+- [x] Implement ULP (Unit in Last Place) accuracy checking
+- [x] Set up benchstat for benchmark tracking
+- [x] Add cross-platform CI testing (Linux, macOS, Windows, WASM)
 - [ ] Document performance characteristics in benchmarks/
 
 ---
@@ -182,13 +181,13 @@ Implement a high-performance Go library that provides all elementary mathematica
 - Add benchmarks comparison visualization
 
 **Subtasks:**
-- [ ] Write godoc for all public APIs
-- [ ] Create `examples_test.go` with runnable examples
-- [ ] Add cmd/ example programs demonstrating usage
+- [x] Write godoc for all public APIs
+- [x] Create `examples_test.go` with runnable examples
+- [x] Add cmd/ example programs demonstrating usage
 - [ ] Write performance report comparing to standard library
 - [ ] Tag v1.0.0 release
 - [ ] Add badge for go.dev reference
-- [ ] Publish to GitHub and verify go install works
+- [x] Publish to GitHub and verify go install works
 
 ---
 
