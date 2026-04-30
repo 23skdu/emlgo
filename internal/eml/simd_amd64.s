@@ -104,11 +104,11 @@ done_div:
     RET
 
 // func addScalarAVX2(a []float64, b float64, result []float64)
-TEXT ·addScalarAVX2(SB), NOSPLIT, $0-64
+TEXT ·addScalarAVX2(SB), NOSPLIT, $0-56
     MOVQ a_base+0(FP), SI
     MOVQ a_len+8(FP), CX
     MOVSD b+24(FP), X0
-    MOVQ result_base+40(FP), DX
+    MOVQ result_base+32(FP), DX
     SHRQ $2, CX
     JZ done_add_scalar
     VINSERTF128 $1, X0, Y0, Y0
@@ -126,11 +126,11 @@ done_add_scalar:
     RET
 
 // func mulScalarAVX2(a []float64, b float64, result []float64)
-TEXT ·mulScalarAVX2(SB), NOSPLIT, $0-64
+TEXT ·mulScalarAVX2(SB), NOSPLIT, $0-56
     MOVQ a_base+0(FP), SI
     MOVQ a_len+8(FP), CX
     MOVSD b+24(FP), X0
-    MOVQ result_base+40(FP), DX
+    MOVQ result_base+32(FP), DX
     SHRQ $2, CX
     JZ done_mul_scalar
     VINSERTF128 $1, X0, Y0, Y0
@@ -234,7 +234,7 @@ done_div512:
     RET
 
 // func addScalarAVX512(a []float64, b float64, result []float64)
-TEXT ·addScalarAVX512(SB), NOSPLIT, $0-64
+TEXT ·addScalarAVX512(SB), NOSPLIT, $0-56
     MOVQ a_base+0(FP), SI
     MOVQ a_len+8(FP), CX
     MOVSD b+24(FP), X0
@@ -254,7 +254,7 @@ done_add_scalar512:
     RET
 
 // func mulScalarAVX512(a []float64, b float64, result []float64)
-TEXT ·mulScalarAVX512(SB), NOSPLIT, $0-64
+TEXT ·mulScalarAVX512(SB), NOSPLIT, $0-56
     MOVQ a_base+0(FP), SI
     MOVQ a_len+8(FP), CX
     MOVSD b+24(FP), X0
