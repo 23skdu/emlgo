@@ -8,35 +8,60 @@ func TestSIMDStubs(t *testing.T) {
 	// Explicitly call all internal functions to get coverage on stubs and implementations
 	a, b, res := make([]float64, 8), make([]float64, 8), make([]float64, 8)
 	
-	// AMD64 related (stubs or real)
-	addAVX2(a, b, res)
-	subAVX2(a, b, res)
-	mulAVX2(a, b, res)
-	divAVX2(a, b, res)
-	addScalarAVX2(a, 1.0, res)
-	mulScalarAVX2(a, 1.0, res)
-	sqrtAVX2(a, res)
+	// If we are on ARM64, calling AVX functions will hit the stubs in simd_amd64_stub.go
+	if runtime.GOARCH == "arm64" {
+		addAVX2(a, b, res)
+		subAVX2(a, b, res)
+		mulAVX2(a, b, res)
+		divAVX2(a, b, res)
+		addScalarAVX2(a, 1.0, res)
+		mulScalarAVX2(a, 1.0, res)
+		sqrtAVX2(a, res)
+		
+		addAVX512(a, b, res)
+		subAVX512(a, b, res)
+		mulAVX512(a, b, res)
+		divAVX512(a, b, res)
+		addScalarAVX512(a, 1.0, res)
+		mulScalarAVX512(a, 1.0, res)
+		sqrtAVX512(a, res)
+		
+		detectAMD64SIMD()
+		// cpuid is also a stub on arm64
+		_, _, _, _ = cpuid(0, 0)
+	}
 	
-	addAVX512(a, b, res)
-	subAVX512(a, b, res)
-	mulAVX512(a, b, res)
-	divAVX512(a, b, res)
-	addScalarAVX512(a, 1.0, res)
-	mulScalarAVX512(a, 1.0, res)
-	sqrtAVX512(a, res)
-	
-	detectAMD64SIMD()
-	_, _, _, _ = cpuid(0, 0)
-	
-	// ARM64 related (stubs or real)
-	addNEON(a, b, res)
-	subNEON(a, b, res)
-	mulNEON(a, b, res)
-	divNEON(a, b, res)
-	addScalarNEON(a, 1.0, res)
-	mulScalarNEON(a, 1.0, res)
-	sqrtNEON(a, res)
-	detectARM64SIMD()
+	// If we are on AMD64, calling Neon functions will hit the stubs in simd_arm64_stub.go
+	if runtime.GOARCH == "amd64" {
+		addNEON(a, b, res)
+		subNEON(a, b, res)
+		mulNEON(a, b, res)
+		divNEON(a, b, res)
+		addScalarNEON(a, 1.0, res)
+		mulScalarNEON(a, 1.0, res)
+		sqrtNEON(a, res)
+		detectARM64SIMD()
+		
+		// Also call the real AMD64 functions IF the hardware supports them
+		if hasAVX2 {
+			addAVX2(a, b, res)
+			subAVX2(a, b, res)
+			mulAVX2(a, b, res)
+			divAVX2(a, b, res)
+			addScalarAVX2(a, 1.0, res)
+			mulScalarAVX2(a, 1.0, res)
+			sqrtAVX2(a, res)
+		}
+		if hasAVX512 {
+			addAVX512(a, b, res)
+			subAVX512(a, b, res)
+			mulAVX512(a, b, res)
+			divAVX512(a, b, res)
+			addScalarAVX512(a, 1.0, res)
+			mulScalarAVX512(a, 1.0, res)
+			sqrtAVX512(a, res)
+		}
+	}
 }
 
 func TestSIMDEdgeCases(t *testing.T) {
