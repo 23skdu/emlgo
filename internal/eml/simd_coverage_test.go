@@ -82,13 +82,72 @@ func TestSIMDEdgeCases(t *testing.T) {
 		_ = AddScalarSIMD(a, 1.0)
 		_ = MulScalarSIMD(a, 1.0)
 		_ = SqrtSIMD(a)
+		_ = ExpSIMD(a)
+		_ = LogSIMD(a)
+		_ = SinSIMD(a)
+		_ = CosSIMD(a)
+		_, _ = SinCosSIMD(a)
+		_ = TanSIMD(a)
 	}
 	
-	// Test large enough size to trigger concurrency if implemented
-	n := 10000
+	// Test large enough size to trigger concurrency and chunkSize limit
+	n := 1000000
 	a := make([]float64, n)
 	b := make([]float64, n)
 	_ = AddSIMD(a, b)
+	_ = ExpSIMD(a)
+	_ = SqrtSIMD(a)
+}
+
+func TestForceScalarFallbacks(t *testing.T) {
+	// Temporarily disable SIMD flags to hit scalar fallbacks
+	oldAVX2, oldAVX512, oldNeon := hasAVX2, hasAVX512, hasNeon
+	hasAVX2, hasAVX512, hasNeon = false, false, false
+	defer func() {
+		hasAVX2, hasAVX512, hasNeon = oldAVX2, oldAVX512, oldNeon
+	}()
+	
+	n := 10
+	a, b, res := make([]float64, n), make([]float64, n), make([]float64, n)
+	EmlSIMD(a, b, res) // hits scalarEml
+	_ = AddSIMD(a, b)  // hits concurrent fallback
+}
+
+func TestRemainingFunctions(t *testing.T) {
+	// Call remaining batch functions
+	a := make([]float64, 4)
+	_ = SinhBatch(a)
+	_ = CoshBatch(a)
+	_ = TanhBatch(a)
+	_ = AsinhBatch(a)
+	_ = AcoshBatch(a)
+	_ = AtanhBatch(a)
+	
+	// Has* functions
+	_ = HasSSE4()
+	_ = HasAVX2()
+	_ = HasAVX512()
+	_ = HasNeon()
+	_ = HasNeonDot()
+	
+	// Error type
+	err := &EMLError{message: "test"}
+	_ = err.Error()
+	
+	// EmlBatch success
+	_ = EmlBatch(a, a, func(x, y, r []float64) error { return nil })
+	
+	// EmlBatch length mismatch
+	err2 := EmlBatch(a, make([]float64, 5), func(x, y, r []float64) error { return nil })
+	if err2 != ErrLengthMismatch {
+		t.Errorf("expected ErrLengthMismatch, got %v", err2)
+	}
+	
+	// EmlBatch callback error
+	err3 := EmlBatch(a, a, func(x, y, r []float64) error { return &EMLError{message: "fail"} })
+	if err3 == nil || err3.Error() != "fail" {
+		t.Errorf("expected test error, got %v", err3)
+	}
 }
 
 func TestSIMDMismatch(t *testing.T) {
