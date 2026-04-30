@@ -219,7 +219,7 @@ After fixing all P0 blockers:
 - [x] Research SIMD-friendly reformulations of EML operator
 - [x] Add CPU feature detection in `internal/eml/simd.go`
 - [x] Create auto-switching mechanism (runtime dispatch)
-- [ ] Implement actual AVX2/AVX512 assembly (requires Go assembly) - Future work
+- [x] Implement actual AVX2/AVX512 assembly (Go assembly in internal/eml/)
 - [x] Benchmark SIMD vs scalar implementations
 - [x] Ensure SIMD implementations maintain accuracy requirements
 
@@ -263,6 +263,68 @@ After fixing all P0 blockers:
 
 ---
 
+## Step 11: GPU Acceleration (CUDA)
+
+**Tasks:**
+- Implement EML kernels for NVIDIA GPUs using CUDA
+- Optimize for massive parallel processing (thousands of threads)
+- Support all EML operations on GPU
+- Provide seamless CPU/GPU interoperability
+
+**Subtasks:**
+- [ ] Implement EML core kernel in CUDA (eml(x,y) = exp(x) - ln(y))
+- [ ] Implement Exp kernel for GPU
+- [ ] Implement Log kernel for GPU
+- [ ] Implement Sin/Cos/Tan kernels using complex exponentials on GPU
+- [ ] Implement Sinh/Cosh/Tanh kernels on GPU
+- [ ] Implement Sqrt/Pow kernels on GPU
+- [ ] Add CUDA memory management (device allocation, copy)
+- [ ] Implement stream-based asynchronous execution
+- [ ] Add benchmark comparisons CPU vs GPU
+
+**CUDA Kernel Implementation Details:**
+
+### Core EML Kernel
+```cuda
+__device__ double eml(double x, double y) {
+    return expf(x) - logf(y);
+}
+```
+
+### Vectorized EML (Multiple inputs)
+```cuda
+__global__ void eml_kernel(
+    const double* __restrict__ x,
+    const double* __restrict__ y,
+    double* __restrict__ result,
+    int n
+) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx < n) {
+        result[idx] = expf(x[idx]) - logf(y[idx]);
+    }
+}
+```
+
+### Shared Memory Optimization
+```cuda
+__shared__ double shared_x[256];
+__shared__ double shared_y[256];
+// Process in tiles using shared memory
+```
+
+### Warp-Level Operations
+```cuda
+// Use warp shuffle for efficient reduction
+__device__ double warpReduceSum(double val) {
+    for (int offset = 16; offset > 0; offset /= 2)
+        val += __shfl_down_sync(0xFFFFFFFF, val, offset);
+    return val;
+}
+```
+
+---
+
 ## Implementation Priority
 
 1. **Phase 1 (Core):** Steps 1-3 - Project setup, EML operator, constants
@@ -270,6 +332,7 @@ After fixing all P0 blockers:
 3. **Phase 3 (Optimization):** Step 8 - SIMD implementation
 4. **Phase 4 (Quality):** Step 9 - Testing and verification
 5. **Phase 5 (Release):** Step 10 - Documentation and release
+6. **Phase 6 (GPU):** Step 11 - CUDA implementation
 
 ---
 
@@ -280,6 +343,7 @@ After fixing all P0 blockers:
 - **Compatibility:** Go 1.21+ (for latest stdlib features)
 - **Dependencies:** None (pure Go + assembly for SIMD)
 - **Platform Support:** linux/amd64, darwin/amd64, windows/amd64, linux/arm64
+- **GPU Support:** NVIDIA GPUs with CUDA compute capability 5.0+
 
 ---
 
