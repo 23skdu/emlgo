@@ -75,7 +75,23 @@ func Pow(x, y float64) float64 {
 	if x < 0 && !isInteger(y) {
 		return math.NaN()
 	}
-	return math.Pow(x, y)
+	if x == 0 {
+		if y > 0 {
+			return 0
+		}
+		if y < 0 {
+			return math.Inf(1)
+		}
+		return 1
+	}
+	if x < 0 && isInteger(y) {
+		intY := int(y)
+		if intY%2 == 0 {
+			return logexp.Exp(y * logexp.Log(-x))
+		}
+		return -logexp.Exp(y * logexp.Log(-x))
+	}
+	return logexp.Exp(y * logexp.Log(x))
 }
 
 func PowInt(x float64, n int) float64 {
@@ -96,21 +112,21 @@ func LogBase(x, base float64) float64 {
 	if x <= 0 || base <= 0 || base == 1 || math.IsNaN(x) || math.IsNaN(base) {
 		return math.NaN()
 	}
-	return math.Log(x) / math.Log(base)
+	return logexp.Log(x) / logexp.Log(base)
 }
 
 func LogBase2(x float64) float64 {
 	if x <= 0 || math.IsNaN(x) {
 		return math.NaN()
 	}
-	return math.Log2(x)
+	return logexp.Log(x) / logexp.Log(2)
 }
 
 func LogBase10(x float64) float64 {
 	if x <= 0 || math.IsNaN(x) {
 		return math.NaN()
 	}
-	return math.Log10(x)
+	return logexp.Log(x) / logexp.Log(10)
 }
 
 func Sqrt(x float64) float64 {
@@ -123,14 +139,23 @@ func Sqrt(x float64) float64 {
 	if x == 0 {
 		return 0
 	}
-	return math.Sqrt(x)
+	if x == 1 {
+		return 1
+	}
+	return logexp.Exp(logexp.Log(x) / 2)
 }
 
 func Cbrt(x float64) float64 {
 	if math.IsNaN(x) {
 		return math.NaN()
 	}
-	return math.Cbrt(x)
+	if x == 0 {
+		return 0
+	}
+	if x < 0 {
+		return -logexp.Exp(logexp.Log(-x) / 3)
+	}
+	return logexp.Exp(logexp.Log(x) / 3)
 }
 
 func Hypot(x, y float64) float64 {
