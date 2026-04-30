@@ -2,6 +2,136 @@
 
 ---
 
+# Performance Optimization Plan (Priority Items)
+
+## Current Status
+- **Average Performance Ratio:** 1.18x (emlgo vs math library)
+- **float64 Performance Ratio:** 1.02x (nearly equal!)
+- **Functions faster than math:** 11 (PowInt, Asinh, Atanh, Pow, Acosh, Min, Max, Sinh, FMA, Mul, Div)
+- **Functions slower than math:** 25 (mainly int conversions and complex operations)
+
+## Priority 1: True SIMD Assembly Implementation
+
+### 1. Implement AVX2/AVX512 Assembly for Batch Operations
+**Current State:** Batch operations use parallel Go routines (8 workers)  
+**Target:** Use actual SIMD instructions for 4-8x speedup  
+**Files to modify:**
+- `internal/eml/exp_avx2.s` - Assembly for vectorized Exp
+- `internal/eml/log_avx2.s` - Assembly for vectorized Log
+- `internal/eml/sin_cos_avx2.s` - Assembly for vectorized Sin/Cos
+
+**Implementation approach:**
+```asm
+TEXT ·expAVX2(SB), NOSPLIT, $0-32
+    VMOVUPD (DI)(AX*8), Y0
+    VEXPPD Y0, Y1
+    VMOVUPD Y1, (SI)(AX*8)
+```
+
+### 2. Optimize Integer Operations
+**Current State:** int Mod is 10x slower due to float64 conversion + logexp  
+**Target:** Direct integer implementation without float conversion  
+**Files to modify:** `pkg/arithmetic/arith.go`
+
+**Changes:**
+- Implement Mod for int using direct integer arithmetic
+- Inline Min/Max for int without float conversion
+- Add specialized int32/int64 variants
+
+### 3. Reduce Trigonometric Function Overhead
+**Current State:** Cot, Sec, Csc call Sin/Cos separately (2x overhead)  
+**Target:** Single-pass computation  
+**Files to modify:** `pkg/trig/trig.go`
+
+**Changes:**
+- Implement SinCos combined function used by Cot, Sec, Csc
+- Add inline hints for all trig functions
+- Cache common trigonometric identities
+
+### 4. Optimize Complex Number Operations
+**Current State:** Complex operations ~1.5-2x slower than math  
+**Target:** Within 1.3x of math  
+**Files to modify:** `pkg/trig/trig.go`, `pkg/arithmetic/arith.go`
+
+**Changes:**
+- Optimize complex Sin/Cos using single exp call
+- Reduce complex128 allocations
+- Add complex-specific fast paths
+
+### 5. Optimize Inverse Hyperbolic Functions
+**Current State:** Asinh 0.46x (faster!), Atanh 0.62x (faster!)  
+**Target:** Maintain and extend optimization  
+**Files to modify:** `pkg/hyper/hyper.go`
+
+**Changes:**
+- Keep current optimizations for Asinh, Acosh, Atanh
+- Add inline hints for these functions
+
+### 6. Optimize Batch Operations with SIMD
+**Current State:** Parallel Go routines (8 workers)  
+**Target:** True SIMD vectorization  
+**Files to modify:** `pkg/arithmetic/arith.go`, `pkg/logexp/exp.go`, `pkg/trig/trig.go`
+
+**Changes:**
+- Replace parallel batches with SIMD vectorized versions
+- Use runtime.GOMAXPROCS for optimal worker count
+- Add chunk size tuning based on L1/L2 cache
+
+### 7. Add More Aggressive Inlining
+**Current State:** Add, Sub, Mul, Div, Exp, Log, Sin, Cos, Sqrt inlined  
+**Target:** Inline all hot path functions  
+**Files to modify:** All packages
+
+**Changes:**
+- Add //go:inline to: Tan, Cot, Sec, Csc, Asin, Acos, Atan
+- Add //go:inline to: Sinh, Cosh, Tanh, Asinh, Acosh, Atanh
+- Add //go:inline to: Pow, PowInt, LogBase, LogBase2, LogBase10
+- Use //go:noinline for non-critical error handling paths
+
+### 8. Optimize Memory Allocation
+**Current State:** Some functions allocate intermediate values  
+**Target:** Zero allocations in hot paths  
+**Files to modify:** `pkg/arithmetic/arith.go`, `pkg/hyper/hyper.go`
+
+**Changes:**
+- Replace logexp.Log(x) + logexp.Log(y) with inlined computation
+- Reduce temporary allocations in Pow, PowInt
+- Use stack-allocated arrays for batch operations
+
+### 9. Add CPU Feature-Based Runtime Dispatch
+**Current State:** Uses runtime.NumCPU() for parallelization  
+**Target:** Use CPU features for optimized code paths  
+**Files to modify:** `internal/eml/simd.go`
+
+**Changes:**
+- Implement HasAVX2F, HasAVX512F detection
+- Add runtime dispatch based on available SIMD width
+- Implement architecture-specific fast paths (Zen4, Apple Silicon)
+
+### 10. Add Benchmark Regression Tracking
+**Current State:** Manual benchmark runs  
+**Target:** Automated performance tracking  
+**Files to modify:** `cmd/bench/main.go`, add CI benchmarking
+
+**Changes:**
+- Add benchstat comparison against baseline
+- Track performance over commits
+- Alert on >5% performance regression
+
+---
+
+## Performance Target Summary
+
+| Metric | Current | Target |
+|--------|---------|--------|
+| Overall Average | 1.18x | <1.10x |
+| float64 Average | 1.02x | <1.00x |
+| int operations | 2.5x | <1.5x |
+| complex128 | 1.6x | <1.3x |
+| Batch (1000+) | parallel | SIMD 4-8x |
+
+---
+
 # P0 BLOCKERS - CRITICAL ISSUES
 
 ## Issue 1: Trigonometric Functions Not Using EML

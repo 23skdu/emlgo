@@ -162,34 +162,43 @@ func (e *EMLError) Error() string {
 	return e.message
 }
 
+// Optimized batch operations with parallel processing and cache-friendly chunk sizes
+
 func ExpSIMD(x []float64) []float64 {
 	n := len(x)
 	if n == 0 {
 		return x
 	}
-
 	result := make([]float64, n)
 
-	initSIMD()
-	if n >= 4 && (hasNeon || hasAVX2 || hasAVX512) {
-		chunk := 4
-		if hasAVX512 {
-			chunk = 8
-		}
-		for i := 0; i < n; i += chunk {
-			end := i + chunk
-			if end > n {
-				end = n
-			}
-			for j := i; j < end; j++ {
-				result[j] = math.Exp(x[j])
-			}
-		}
-	} else {
+	if n < 256 {
 		for i := 0; i < n; i++ {
 			result[i] = math.Exp(x[i])
 		}
+		return result
 	}
+
+	numWorkers := runtime.GOMAXPROCS(0)
+	chunkSize := (n + numWorkers - 1) / numWorkers
+	if chunkSize > 4096 {
+		chunkSize = 4096
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < n; i += chunkSize {
+		end := i + chunkSize
+		if end > n {
+			end = n
+		}
+		wg.Add(1)
+		go func(start, end int) {
+			defer wg.Done()
+			for j := start; j < end; j++ {
+				result[j] = math.Exp(x[j])
+			}
+		}(i, end)
+	}
+	wg.Wait()
 	return result
 }
 
@@ -198,29 +207,9 @@ func LogSIMD(x []float64) []float64 {
 	if n == 0 {
 		return x
 	}
-
 	result := make([]float64, n)
 
-	initSIMD()
-	if n >= 4 && (hasNeon || hasAVX2 || hasAVX512) {
-		chunk := 4
-		if hasAVX512 {
-			chunk = 8
-		}
-		for i := 0; i < n; i += chunk {
-			end := i + chunk
-			if end > n {
-				end = n
-			}
-			for j := i; j < end; j++ {
-				if x[j] > 0 {
-					result[j] = math.Log(x[j])
-				} else {
-					result[j] = math.NaN()
-				}
-			}
-		}
-	} else {
+	if n < 256 {
 		for i := 0; i < n; i++ {
 			if x[i] > 0 {
 				result[i] = math.Log(x[i])
@@ -228,155 +217,34 @@ func LogSIMD(x []float64) []float64 {
 				result[i] = math.NaN()
 			}
 		}
-	}
-	return result
-}
-
-func AddSIMD(a, b []float64) []float64 {
-	if len(a) != len(b) {
-		panic("length mismatch")
+		return result
 	}
 
-	n := len(a)
-	if n == 0 {
-		return a
+	numWorkers := runtime.GOMAXPROCS(0)
+	chunkSize := (n + numWorkers - 1) / numWorkers
+	if chunkSize > 4096 {
+		chunkSize = 4096
 	}
 
-	result := make([]float64, n)
-
-	initSIMD()
-	if n >= 4 && (hasNeon || hasAVX2 || hasAVX512) {
-		chunk := 4
-		if hasAVX512 {
-			chunk = 8
+	var wg sync.WaitGroup
+	for i := 0; i < n; i += chunkSize {
+		end := i + chunkSize
+		if end > n {
+			end = n
 		}
-		for i := 0; i < n; i += chunk {
-			end := i + chunk
-			if end > n {
-				end = n
-			}
-			for j := i; j < end; j++ {
-				result[j] = a[j] + b[j]
-			}
-		}
-	} else {
-		for i := 0; i < n; i++ {
-			result[i] = a[i] + b[i]
-		}
-	}
-	return result
-}
-
-func MulSIMD(a, b []float64) []float64 {
-	if len(a) != len(b) {
-		panic("length mismatch")
-	}
-
-	n := len(a)
-	if n == 0 {
-		return a
-	}
-
-	result := make([]float64, n)
-
-	initSIMD()
-	if n >= 4 && (hasNeon || hasAVX2 || hasAVX512) {
-		chunk := 4
-		if hasAVX512 {
-			chunk = 8
-		}
-		for i := 0; i < n; i += chunk {
-			end := i + chunk
-			if end > n {
-				end = n
-			}
-			for j := i; j < end; j++ {
-				result[j] = a[j] * b[j]
-			}
-		}
-	} else {
-		for i := 0; i < n; i++ {
-			result[i] = a[i] * b[i]
-		}
-	}
-	return result
-}
-
-func SubSIMD(a, b []float64) []float64 {
-	if len(a) != len(b) {
-		panic("length mismatch")
-	}
-
-	n := len(a)
-	if n == 0 {
-		return a
-	}
-
-	result := make([]float64, n)
-
-	initSIMD()
-	if n >= 4 && (hasNeon || hasAVX2 || hasAVX512) {
-		chunk := 4
-		if hasAVX512 {
-			chunk = 8
-		}
-		for i := 0; i < n; i += chunk {
-			end := i + chunk
-			if end > n {
-				end = n
-			}
-			for j := i; j < end; j++ {
-				result[j] = a[j] - b[j]
-			}
-		}
-	} else {
-		for i := 0; i < n; i++ {
-			result[i] = a[i] - b[i]
-		}
-	}
-	return result
-}
-
-func DivSIMD(a, b []float64) []float64 {
-	if len(a) != len(b) {
-		panic("length mismatch")
-	}
-
-	n := len(a)
-	if n == 0 {
-		return a
-	}
-
-	result := make([]float64, n)
-
-	initSIMD()
-	if n >= 4 && (hasNeon || hasAVX2 || hasAVX512) {
-		chunk := 4
-		if hasAVX512 {
-			chunk = 8
-		}
-		for i := 0; i < n; i += chunk {
-			end := i + chunk
-			if end > n {
-				end = n
-			}
-			for j := i; j < end; j++ {
-				if b[j] != 0 {
-					result[j] = a[j] / b[j]
+		wg.Add(1)
+		go func(start, end int) {
+			defer wg.Done()
+			for j := start; j < end; j++ {
+				if x[j] > 0 {
+					result[j] = math.Log(x[j])
 				} else {
-					result[j] = math.Inf(1)
+					result[j] = math.NaN()
 				}
 			}
-		}
-	} else {
-		for i := 0; i < n; i++ {
-			if b[i] != 0 {
-				result[i] = a[i] / b[i]
-			} else {
-				result[i] = math.Inf(1)
-			}
-		}
+		}(i, end)
 	}
+	wg.Wait()
 	return result
 }
 
@@ -385,36 +253,198 @@ func SqrtSIMD(x []float64) []float64 {
 	if n == 0 {
 		return x
 	}
-
 	result := make([]float64, n)
 
-	initSIMD()
-	if n >= 4 && (hasNeon || hasAVX2 || hasAVX512) {
-		chunk := 4
-		if hasAVX512 {
-			chunk = 8
-		}
-		for i := 0; i < n; i += chunk {
-			end := i + chunk
-			if end > n {
-				end = n
-			}
-			for j := i; j < end; j++ {
-				if x[j] >= 0 {
-					result[j] = math.Sqrt(x[j])
-				} else {
-					result[j] = math.NaN()
-				}
-			}
-		}
-	} else {
+	if n < 256 {
 		for i := 0; i < n; i++ {
-			if x[i] >= 0 {
-				result[i] = math.Sqrt(x[i])
-			} else {
-				result[i] = math.NaN()
-			}
+			result[i] = math.Sqrt(x[i])
 		}
+		return result
+	}
+
+	numWorkers := runtime.GOMAXPROCS(0)
+	chunkSize := (n + numWorkers - 1) / numWorkers
+	if chunkSize > 4096 {
+		chunkSize = 4096
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < n; i += chunkSize {
+		end := i + chunkSize
+		if end > n {
+			end = n
+		}
+		wg.Add(1)
+		go func(start, end int) {
+			defer wg.Done()
+			for j := start; j < end; j++ {
+				result[j] = math.Sqrt(x[j])
+			}
+		}(i, end)
+	}
+	wg.Wait()
+	return result
+}
+
+func SinSIMD(x []float64) []float64 {
+	n := len(x)
+	if n == 0 {
+		return x
+	}
+	result := make([]float64, n)
+
+	if n < 256 {
+		for i := 0; i < n; i++ {
+			result[i] = math.Sin(x[i])
+		}
+		return result
+	}
+
+	numWorkers := runtime.GOMAXPROCS(0)
+	chunkSize := (n + numWorkers - 1) / numWorkers
+	if chunkSize > 4096 {
+		chunkSize = 4096
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < n; i += chunkSize {
+		end := i + chunkSize
+		if end > n {
+			end = n
+		}
+		wg.Add(1)
+		go func(start, end int) {
+			defer wg.Done()
+			for j := start; j < end; j++ {
+				result[j] = math.Sin(x[j])
+			}
+		}(i, end)
+	}
+	wg.Wait()
+	return result
+}
+
+func CosSIMD(x []float64) []float64 {
+	n := len(x)
+	if n == 0 {
+		return x
+	}
+	result := make([]float64, n)
+
+	if n < 256 {
+		for i := 0; i < n; i++ {
+			result[i] = math.Cos(x[i])
+		}
+		return result
+	}
+
+	numWorkers := runtime.GOMAXPROCS(0)
+	chunkSize := (n + numWorkers - 1) / numWorkers
+	if chunkSize > 4096 {
+		chunkSize = 4096
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < n; i += chunkSize {
+		end := i + chunkSize
+		if end > n {
+			end = n
+		}
+		wg.Add(1)
+		go func(start, end int) {
+			defer wg.Done()
+			for j := start; j < end; j++ {
+				result[j] = math.Cos(x[j])
+			}
+		}(i, end)
+	}
+	wg.Wait()
+	return result
+}
+
+func SinCosSIMD(x []float64) (sin, cos []float64) {
+	n := len(x)
+	if n == 0 {
+		return x, x
+	}
+
+	sin = make([]float64, n)
+	cos = make([]float64, n)
+
+	if n < 256 {
+		for i := 0; i < n; i++ {
+			sin[i], cos[i] = math.Sincos(x[i])
+		}
+		return
+	}
+
+	numWorkers := runtime.GOMAXPROCS(0)
+	chunkSize := (n + numWorkers - 1) / numWorkers
+	if chunkSize > 4096 {
+		chunkSize = 4096
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < n; i += chunkSize {
+		end := i + chunkSize
+		if end > n {
+			end = n
+		}
+		wg.Add(1)
+		go func(start, end int) {
+			defer wg.Done()
+			for j := start; j < end; j++ {
+				sin[j], cos[j] = math.Sincos(x[j])
+			}
+		}(i, end)
+	}
+	wg.Wait()
+	return
+}
+
+// Legacy functions for backward compatibility (simple implementations)
+
+func AddSIMD(a, b []float64) []float64 {
+	if len(a) != len(b) {
+		panic("length mismatch")
+	}
+	n := len(a)
+	if n == 0 {
+		return a
+	}
+	result := make([]float64, n)
+	for i := 0; i < n; i++ {
+		result[i] = a[i] + b[i]
+	}
+	return result
+}
+
+func SubSIMD(a, b []float64) []float64 {
+	if len(a) != len(b) {
+		panic("length mismatch")
+	}
+	n := len(a)
+	if n == 0 {
+		return a
+	}
+	result := make([]float64, n)
+	for i := 0; i < n; i++ {
+		result[i] = a[i] - b[i]
+	}
+	return result
+}
+
+func MulSIMD(a, b []float64) []float64 {
+	if len(a) != len(b) {
+		panic("length mismatch")
+	}
+	n := len(a)
+	if n == 0 {
+		return a
+	}
+	result := make([]float64, n)
+	for i := 0; i < n; i++ {
+		result[i] = a[i] * b[i]
 	}
 	return result
 }

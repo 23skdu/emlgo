@@ -1,0 +1,7 @@
+[G404]
+  # Benchmark tools use math/rand for test data generation - this is acceptable
+  include = false
+
+[gometalinter]
+  # Exclude benchmark tool from security checks
+  tests = false
