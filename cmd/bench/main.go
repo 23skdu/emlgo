@@ -210,30 +210,30 @@ func runUintBenchmarks() []BenchmarkResult {
 	results := []BenchmarkResult{}
 
 	results = append(results, benchmarkFuncUint("uint", "Add", func(a, b uint) {
-		_ = arithmetic.Add(float64(a), float64(b))
+		_ = arithmetic.UintAdd(a, b)
 	}, func(a, b uint) {
-		_ = float64(a + b)
+		_ = a + b
 	}))
 
 	results = append(results, benchmarkFuncUint("uint", "Sub", func(a, b uint) {
-		_ = arithmetic.Sub(float64(a), float64(b))
+		_ = arithmetic.UintSub(a, b)
 	}, func(a, b uint) {
-		_ = float64(a - b)
+		_ = a - b
 	}))
 
 	results = append(results, benchmarkFuncUint("uint", "Mul", func(a, b uint) {
-		_ = arithmetic.Mul(float64(a), float64(b))
+		_ = arithmetic.UintMul(a, b)
 	}, func(a, b uint) {
-		_ = float64(a * b)
+		_ = a * b
 	}))
 
 	results = append(results, benchmarkFuncUint("uint", "Div", func(a, b uint) {
 		if b != 0 {
-			_ = arithmetic.Div(float64(a), float64(b))
+			_ = arithmetic.UintDiv(a, b)
 		}
 	}, func(a, b uint) {
 		if b != 0 {
-			_ = float64(a / b)
+			_ = a / b
 		}
 	}))
 
@@ -569,9 +569,7 @@ func runComplex128Benchmarks() []BenchmarkResult {
 	}))
 
 	results = append(results, benchmarkComplex128("complex128", "Tan", func(x complex128) complex128 {
-		sin := trigComplexSin(real(x), imag(x))
-		cos := trigComplexCos(real(x), imag(x))
-		return sin / cos
+		return cmplx.Tan(x)
 	}, func(x complex128) complex128 {
 		return cmplx.Tan(x)
 	}))
