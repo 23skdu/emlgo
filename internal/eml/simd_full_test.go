@@ -7,8 +7,6 @@ import (
 )
 
 func TestSIMDDetection(t *testing.T) {
-	initSIMD()
-
 	switch runtime.GOARCH {
 	case "amd64":
 		t.Logf("AMD64: AVX2=%v, AVX512=%v", hasAVX2, hasAVX512)
