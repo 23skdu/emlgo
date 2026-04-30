@@ -1,0 +1,42 @@
+# .golangci.yml
+# Configuration file for golangci-lint
+
+run:
+  timeout: 5m
+
+linters:
+  enable:
+    - gofmt
+    - govet
+    - errcheck
+    - staticcheck
+    - unused
+    - gosimple
+    - structcheck
+    - varcheck
+    - ineffassign
+    - typecheck
+    - stylecheck
+    - gosec
+
+linters-settings:
+  gofmt:
+    simplify: true
+  govet:
+    check-shadowing: true
+  errcheck:
+    check-type-assertions: true
+    check-printf: true
+  stylecheck:
+    checks: ["all"]
+  gosec:
+    excludes:
+      - G104 # Audit errors not checked
+
+issues:
+  exclude-use-default: false
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+output:
+  format: colored-line-number

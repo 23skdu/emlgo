@@ -1,0 +1,11 @@
+# gofmt configuration
+# See: gofmt -help
+
+# Simplified mode (removes unnecessary parentheses)
+-s
+
+# Use tabs for indentation
+-tabs
+
+# Trailing whitespace elimination
+-w
