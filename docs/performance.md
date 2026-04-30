@@ -26,7 +26,6 @@ This document provides a cross-platform performance comparison between the `emlg
 
 ### Host A: Localhost (Apple Silicon M2 - `darwin/arm64`)
 
-
 #### Test Environment A
 
 Tested with n=1,000,000 iterations
@@ -40,7 +39,6 @@ Tested with n=1,000,000 iterations
 | **Batch** | **AddBatch** | 0.0002 | 0.0003 | **0.84x** |
 
 ### Host B: Remote Host (`ancalagon` - `linux/amd64` AVX2)
-
 
 #### Test Environment B
 
