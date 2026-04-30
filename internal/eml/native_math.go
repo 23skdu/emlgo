@@ -52,14 +52,7 @@ func f64frombits(b uint64) float64 {
 }
 
 func nativeSqrt(x float64) float64 {
-	if x < 0 {
-		return nan()
-	}
-	if x == 0 {
-		return 0
-	}
-	// sqrt(x) = exp(0.5 * ln(x))
-	return nativeExp(0.5 * nativeLog(x))
+	return sqrtScalar(x)
 }
 
 
@@ -85,46 +78,15 @@ func nativeLog(x float64) float64 {
 }
 
 func nativeSin(x float64) float64 {
-	if isNaN(x) || isInf(x, 0) {
-		return nan()
-	}
-	if x == 0 {
-		return x
-	}
-	// sin(x) = (e^(ix) - e^(-ix)) / 2i
-	ix := complex(0, x)
-	eix := EmlComplex(ix, 1)
-	enix := EmlComplex(-ix, 1)
-	return real((eix - enix) / (2 * complex(0, 1)))
+	return math.Sin(x)
 }
 
 func nativeCos(x float64) float64 {
-	if isNaN(x) || isInf(x, 0) {
-		return nan()
-	}
-	if x == 0 {
-		return 1
-	}
-	// cos(x) = (e^(ix) + e^(-ix)) / 2
-	ix := complex(0, x)
-	eix := EmlComplex(ix, 1)
-	enix := EmlComplex(-ix, 1)
-	return real((eix + enix) / 2)
+	return math.Cos(x)
 }
 
 func nativeSincos(x float64) (sin, cos float64) {
-	if isNaN(x) || isInf(x, 0) {
-		return nan(), nan()
-	}
-	if x == 0 {
-		return 0, 1
-	}
-	ix := complex(0, x)
-	eix := EmlComplex(ix, 1)
-	enix := EmlComplex(-ix, 1)
-	sin = real((eix - enix) / (2 * complex(0, 1)))
-	cos = real((eix + enix) / 2)
-	return
+	return math.Sincos(x)
 }
 
 
