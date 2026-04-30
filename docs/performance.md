@@ -8,7 +8,7 @@ This document provides a cross-platform performance comparison between the `emlg
 
 | Metric | emlgo | math | Winner |
 | :--- | :--- | :--- | :--- |
-| **Scalar Speed** | 1.0x - 4.0x slower | **Baseline** | **math** (Intrinsics) |
+| **Scalar Speed** | **0.9x - 2.0x slower** | Baseline | **math** (Intrinsics) |
 | **Batch Speed (SIMD)** | **1.2x - 15.0x faster** | Baseline | **emlgo** (SIMD) |
 | **Memory (Scalar)** | 0 allocations | 0 allocations | **Tie** |
 | **Memory (Batch)** | 1 allocation (Result) | 1 allocation (Result) | **Tie** |
@@ -16,8 +16,8 @@ This document provides a cross-platform performance comparison between the `emlg
 
 **Key Findings:**
 
-- **Go `math` is faster for single scalar operations** because the compiler often replaces them with direct assembly instructions (intrinsics). `emlgo` introduces overhead for NaN/Inf checks and dispatching.
-- **`emlgo` is significantly faster for batch operations** where SIMD optimizations (AVX2/AVX512/NEON) and concurrency can be leveraged.
+- **Go `math` is generally faster for single scalar operations** due to compiler intrinsics. However, the new `emlgo/pkg/fastmath` package now achieves **10% faster performance** for functions like `Sin`.
+- **`emlgo` is significantly faster for batch operations** (Add, Sub, Mul, Exp) across all architectures by leveraging optimized SIMD kernels (AVX2/AVX512/NEON).
 - **Memory usage is identical** for performance-critical paths; both libraries avoid heap allocations for scalar math.
 
 ---
@@ -29,31 +29,30 @@ This document provides a cross-platform performance comparison between the `emlg
 
 #### Test Environment A
 
-Tested with n=100,000 iterations
+Tested with n=1,000,000 iterations
 
 | Type | Function | emlgo (s) | math (s) | Ratio |
 | :--- | :--- | :--- | :--- | :--- |
-| float64 | Exp | 0.0007 | 0.0007 | 1.04x |
-| float64 | PowInt | 0.0003 | 0.0017 | **0.19x** (5x Faster) |
-| **Batch** | **ExpBatch** | 0.00004 | 0.00005 | **0.81x** |
-| **Batch** | **AddBatch** | 0.00002 | 0.00001 | 2.14x* |
-
-*\*Note: On ARM64, AddBatch currently uses a scalar fallback loop. Combined with allocation overhead, it is slower than a direct loop for small batches.*
+| float64 | Exp | 0.0065 | 0.0058 | 1.13x |
+| float64 | PowInt | 0.0031 | 0.0162 | **0.19x** (5x Faster) |
+| float64 | fastmath.Sin | 0.0154 | 0.0170 | **0.90x** (10% Faster) |
+| **Batch** | **ExpBatch** | 0.0004 | 0.0005 | **0.91x** |
+| **Batch** | **AddBatch** | 0.0002 | 0.0003 | **0.84x** |
 
 ### Host B: Remote Host (`ancalagon` - `linux/amd64` AVX2)
 
 
 #### Test Environment B
 
-Tested with n=100,000 iterations
+Tested with n=1,000,000 iterations
 
 | Type | Function | emlgo (s) | math (s) | Ratio |
 | :--- | :--- | :--- | :--- | :--- |
-| float64 | Exp | 0.0006 | 0.0006 | 1.06x |
-| float64 | Atanh | 0.0015 | 0.0019 | **0.82x** |
-| float64 | Pow | 0.0016 | 0.0021 | **0.76x** |
-| **Batch** | **ExpBatch** | 0.00003 | 0.00004 | **0.75x** |
-| **Batch** | **AddBatch** | 0.00001 | 0.000005 | 2.40x* |
+| float64 | Exp | 0.0060 | 0.0058 | 1.05x |
+| float64 | PowInt | 0.0031 | 0.0202 | **0.15x** (6x Faster) |
+| float64 | fastmath.Sin | 0.0189 | 0.0205 | **0.92x** (8% Faster) |
+| **Batch** | **ExpBatch** | 0.0003 | 0.0004 | **0.98x** |
+| **Batch** | **AddBatch** | 0.0001 | 0.0002 | **0.75x** |
 
 ---
 
@@ -71,9 +70,13 @@ Tested with n=100,000 iterations
 
 ### Accuracy Highlights
 
-- **Exact matches:** `Exp`, `Log`, `Sin`, `Cos`, `Tan`, `Sqrt`.
-- **Near-exact:** `Pow` (within 10 ULP), `Cosh` (1 ULP).
-- **Acceptable:** Inverse hyperbolic functions (within 100 ULP).
+- **Standard API (`pkg/arithmetic`):**
+  - **Exact matches:** `Exp`, `Log`, `Sin`, `Cos`, `Tan`, `Sqrt`.
+  - **Near-exact:** `Pow` (within 10 ULP), `Cosh` (1 ULP).
+  - **Acceptable:** Inverse hyperbolic functions (within 100 ULP).
+- **FastMath API (`pkg/fastmath`):**
+  - **Relaxed Accuracy:** Targeted at ~1e-7 absolute error (roughly 24-bit precision).
+  - **Optimized for Speed:** Achieves performance gains by using FMA-based polynomial approximations and skipping IEEE 754 edge-case handling (NaN/Inf) in the primary calculation path.
 
 ---
 
