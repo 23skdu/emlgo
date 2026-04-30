@@ -13,9 +13,9 @@ TEXT ·cpuid(SB), NOSPLIT, $0-24
 
 // func addAVX2(a, b, result []float64)
 TEXT ·addAVX2(SB), NOSPLIT, $0-72
-	MOVQ a_ptr+0(FP), SI
-	MOVQ b_ptr+24(FP), DI
-	MOVQ res_ptr+48(FP), DX
+	MOVQ a_base+0(FP), SI
+	MOVQ b_base+24(FP), DI
+	MOVQ result_base+48(FP), DX
 	MOVQ a_len+8(FP), CX
 
 	SHRQ $2, CX // n / 4
@@ -39,9 +39,9 @@ done:
 
 // func subAVX2(a, b, result []float64)
 TEXT ·subAVX2(SB), NOSPLIT, $0-72
-    MOVQ a_ptr+0(FP), SI
-    MOVQ b_ptr+24(FP), DI
-    MOVQ res_ptr+48(FP), DX
+    MOVQ a_base+0(FP), SI
+    MOVQ b_base+24(FP), DI
+    MOVQ result_base+48(FP), DX
     MOVQ a_len+8(FP), CX
     SHRQ $2, CX
     JZ done_sub
@@ -61,9 +61,9 @@ done_sub:
 
 // func mulAVX2(a, b, result []float64)
 TEXT ·mulAVX2(SB), NOSPLIT, $0-72
-    MOVQ a_ptr+0(FP), SI
-    MOVQ b_ptr+24(FP), DI
-    MOVQ res_ptr+48(FP), DX
+    MOVQ a_base+0(FP), SI
+    MOVQ b_base+24(FP), DI
+    MOVQ result_base+48(FP), DX
     MOVQ a_len+8(FP), CX
     SHRQ $2, CX
     JZ done_mul
@@ -83,9 +83,9 @@ done_mul:
 
 // func divAVX2(a, b, result []float64)
 TEXT ·divAVX2(SB), NOSPLIT, $0-72
-    MOVQ a_ptr+0(FP), SI
-    MOVQ b_ptr+24(FP), DI
-    MOVQ res_ptr+48(FP), DX
+    MOVQ a_base+0(FP), SI
+    MOVQ b_base+24(FP), DI
+    MOVQ result_base+48(FP), DX
     MOVQ a_len+8(FP), CX
     SHRQ $2, CX
     JZ done_div
@@ -104,14 +104,15 @@ done_div:
     RET
 
 // func addScalarAVX2(a []float64, b float64, result []float64)
-TEXT ·addScalarAVX2(SB), NOSPLIT, $0-56
-    MOVQ a_ptr+0(FP), SI
-    MOVSD b+24(FP), X0
-    VBROADCASTSD X0, Y0
-    MOVQ res_ptr+32(FP), DX
+TEXT ·addScalarAVX2(SB), NOSPLIT, $0-64
+    MOVQ a_base+0(FP), SI
     MOVQ a_len+8(FP), CX
+    MOVSD b+24(FP), X0
+    MOVQ result_base+40(FP), DX
     SHRQ $2, CX
     JZ done_add_scalar
+    VINSERTF128 $1, X0, Y0, Y0
+    VPERMPD $0, Y0, Y0
 loop_add_scalar:
     VMOVUPD (SI), Y1
     VADDPD Y0, Y1, Y2
@@ -125,14 +126,15 @@ done_add_scalar:
     RET
 
 // func mulScalarAVX2(a []float64, b float64, result []float64)
-TEXT ·mulScalarAVX2(SB), NOSPLIT, $0-56
-    MOVQ a_ptr+0(FP), SI
-    MOVSD b+24(FP), X0
-    VBROADCASTSD X0, Y0
-    MOVQ res_ptr+32(FP), DX
+TEXT ·mulScalarAVX2(SB), NOSPLIT, $0-64
+    MOVQ a_base+0(FP), SI
     MOVQ a_len+8(FP), CX
+    MOVSD b+24(FP), X0
+    MOVQ result_base+40(FP), DX
     SHRQ $2, CX
     JZ done_mul_scalar
+    VINSERTF128 $1, X0, Y0, Y0
+    VPERMPD $0, Y0, Y0
 loop_mul_scalar:
     VMOVUPD (SI), Y1
     VMULPD Y0, Y1, Y2
@@ -149,31 +151,30 @@ done_mul_scalar:
 
 // func addAVX512(a, b, result []float64)
 TEXT ·addAVX512(SB), NOSPLIT, $0-72
-	MOVQ a_ptr+0(FP), SI
-	MOVQ b_ptr+24(FP), DI
-	MOVQ res_ptr+48(FP), DX
-	MOVQ a_len+8(FP), CX
-	SHRQ $3, CX // n / 8
-	JZ done_add512
+    MOVQ a_base+0(FP), SI
+    MOVQ b_base+24(FP), DI
+    MOVQ result_base+48(FP), DX
+    MOVQ a_len+8(FP), CX
+    SHRQ $3, CX // n / 8
+    JZ done_add512
 loop_add512:
-	VMOVUPD (SI), Z0
-	VMOVUPD (DI), Z1
-	VADDPD Z1, Z0, Z2
-	VMOVUPD Z2, (DX)
-	ADDQ $64, SI
-	ADDQ $64, DI
-	ADDQ $64, DX
-	DECQ CX
-	JNZ loop_add512
+    VMOVUPD (SI), Z0
+    VMOVUPD (DI), Z1
+    VADDPD Z1, Z0, Z2
+    VMOVUPD Z2, (DX)
+    ADDQ $64, SI
+    ADDQ $64, DI
+    ADDQ $64, DX
+    DECQ CX
+    JNZ loop_add512
 done_add512:
-	VZEROUPPER
-	RET
+    RET
 
 // func subAVX512(a, b, result []float64)
 TEXT ·subAVX512(SB), NOSPLIT, $0-72
-    MOVQ a_ptr+0(FP), SI
-    MOVQ b_ptr+24(FP), DI
-    MOVQ res_ptr+48(FP), DX
+    MOVQ a_base+0(FP), SI
+    MOVQ b_base+24(FP), DI
+    MOVQ result_base+48(FP), DX
     MOVQ a_len+8(FP), CX
     SHRQ $3, CX
     JZ done_sub512
@@ -188,14 +189,13 @@ loop_sub512:
     DECQ CX
     JNZ loop_sub512
 done_sub512:
-    VZEROUPPER
     RET
 
 // func mulAVX512(a, b, result []float64)
 TEXT ·mulAVX512(SB), NOSPLIT, $0-72
-    MOVQ a_ptr+0(FP), SI
-    MOVQ b_ptr+24(FP), DI
-    MOVQ res_ptr+48(FP), DX
+    MOVQ a_base+0(FP), SI
+    MOVQ b_base+24(FP), DI
+    MOVQ result_base+48(FP), DX
     MOVQ a_len+8(FP), CX
     SHRQ $3, CX
     JZ done_mul512
@@ -210,14 +210,13 @@ loop_mul512:
     DECQ CX
     JNZ loop_mul512
 done_mul512:
-    VZEROUPPER
     RET
 
 // func divAVX512(a, b, result []float64)
 TEXT ·divAVX512(SB), NOSPLIT, $0-72
-    MOVQ a_ptr+0(FP), SI
-    MOVQ b_ptr+24(FP), DI
-    MOVQ res_ptr+48(FP), DX
+    MOVQ a_base+0(FP), SI
+    MOVQ b_base+24(FP), DI
+    MOVQ result_base+48(FP), DX
     MOVQ a_len+8(FP), CX
     SHRQ $3, CX
     JZ done_div512
@@ -232,18 +231,17 @@ loop_div512:
     DECQ CX
     JNZ loop_div512
 done_div512:
-    VZEROUPPER
     RET
 
 // func addScalarAVX512(a []float64, b float64, result []float64)
-TEXT ·addScalarAVX512(SB), NOSPLIT, $0-56
-    MOVQ a_ptr+0(FP), SI
-    MOVSD b+24(FP), X0
-    VBROADCASTSD X0, Z0
-    MOVQ res_ptr+32(FP), DX
+TEXT ·addScalarAVX512(SB), NOSPLIT, $0-64
+    MOVQ a_base+0(FP), SI
     MOVQ a_len+8(FP), CX
+    MOVSD b+24(FP), X0
+    MOVQ result_base+32(FP), DX
     SHRQ $3, CX
     JZ done_add_scalar512
+    VBROADCASTSD X0, Z0
 loop_add_scalar512:
     VMOVUPD (SI), Z1
     VADDPD Z0, Z1, Z2
@@ -253,18 +251,17 @@ loop_add_scalar512:
     DECQ CX
     JNZ loop_add_scalar512
 done_add_scalar512:
-    VZEROUPPER
     RET
 
 // func mulScalarAVX512(a []float64, b float64, result []float64)
-TEXT ·mulScalarAVX512(SB), NOSPLIT, $0-56
-    MOVQ a_ptr+0(FP), SI
-    MOVSD b+24(FP), X0
-    VBROADCASTSD X0, Z0
-    MOVQ res_ptr+32(FP), DX
+TEXT ·mulScalarAVX512(SB), NOSPLIT, $0-64
+    MOVQ a_base+0(FP), SI
     MOVQ a_len+8(FP), CX
+    MOVSD b+24(FP), X0
+    MOVQ result_base+32(FP), DX
     SHRQ $3, CX
     JZ done_mul_scalar512
+    VBROADCASTSD X0, Z0
 loop_mul_scalar512:
     VMOVUPD (SI), Z1
     VMULPD Z0, Z1, Z2
@@ -274,20 +271,18 @@ loop_mul_scalar512:
     DECQ CX
     JNZ loop_mul_scalar512
 done_mul_scalar512:
-    VZEROUPPER
     RET
 
 // func sqrtAVX2(a, result []float64)
 TEXT ·sqrtAVX2(SB), NOSPLIT, $0-48
-    MOVQ a_ptr+0(FP), SI
-    MOVQ res_ptr+24(FP), DX
+    MOVQ a_base+0(FP), SI
+    MOVQ result_base+24(FP), DX
     MOVQ a_len+8(FP), CX
     SHRQ $2, CX
     JZ done_sqrt2
 loop_sqrt2:
-    VMOVUPD (SI), Y0
-    VSQRTPD Y0, Y1
-    VMOVUPD Y1, (DX)
+    VSQRTPD (SI), Y0
+    VMOVUPD Y0, (DX)
     ADDQ $32, SI
     ADDQ $32, DX
     DECQ CX
@@ -298,19 +293,17 @@ done_sqrt2:
 
 // func sqrtAVX512(a, result []float64)
 TEXT ·sqrtAVX512(SB), NOSPLIT, $0-48
-    MOVQ a_ptr+0(FP), SI
-    MOVQ res_ptr+24(FP), DX
+    MOVQ a_base+0(FP), SI
+    MOVQ result_base+24(FP), DX
     MOVQ a_len+8(FP), CX
     SHRQ $3, CX
     JZ done_sqrt512
 loop_sqrt512:
-    VMOVUPD (SI), Z0
-    VSQRTPD Z0, Z1
-    VMOVUPD Z1, (DX)
+    VSQRTPD (SI), Z0
+    VMOVUPD Z0, (DX)
     ADDQ $64, SI
     ADDQ $64, DX
     DECQ CX
     JNZ loop_sqrt512
 done_sqrt512:
-    VZEROUPPER
     RET
