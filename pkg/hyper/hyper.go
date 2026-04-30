@@ -1,50 +1,57 @@
 package hyper
 
 import (
-	"math"
-
+	"github.com/emlgo/eml/internal/eml"
 	"github.com/emlgo/eml/pkg/arithmetic"
 )
 
-//go:inline
+var (
+	isNaN   = eml.IsNaN
+	isInf   = eml.IsInf
+	inf     = eml.Inf
+	nan     = eml.NaN
+	nativeExp = eml.Exp
+	nativeLog = eml.Log
+	nativeSqrt = eml.Sqrt
+	nativeAbs  = eml.Abs
+)
+
 func Sinh(x float64) float64 {
-	if math.IsNaN(x) {
-		return math.NaN()
+	if isNaN(x) {
+		return x
 	}
-	if math.IsInf(x, 0) {
+	if isInf(x, 0) {
 		return x
 	}
 	if x > 709.78 || x < -709.78 {
 		if x > 0 {
-			return math.Inf(1)
+			return inf(1)
 		}
-		return math.Inf(-1)
+		return inf(-1)
 	}
-	ex := math.Exp(x)
-	emx := math.Exp(-x)
+	ex := nativeExp(x)
+	emx := nativeExp(-x)
 	return (ex - emx) / 2
 }
 
-//go:inline
 func Cosh(x float64) float64 {
-	if math.IsNaN(x) {
-		return math.NaN()
+	if isNaN(x) {
+		return x
 	}
-	if math.IsInf(x, 0) {
-		return math.Abs(x)
+	if isInf(x, 0) {
+		return nativeAbs(x)
 	}
 	if x > 709.78 || x < -709.78 {
-		return math.Inf(1)
+		return inf(1)
 	}
-	ex := math.Exp(x)
-	emx := math.Exp(-x)
+	ex := nativeExp(x)
+	emx := nativeExp(-x)
 	return (ex + emx) / 2
 }
 
-//go:inline
 func Tanh(x float64) float64 {
-	if math.IsNaN(x) {
-		return math.NaN()
+	if isNaN(x) {
+		return x
 	}
 	if x > 709.78 {
 		return 1
@@ -52,16 +59,16 @@ func Tanh(x float64) float64 {
 	if x < -709.78 {
 		return -1
 	}
-	if math.IsInf(x, 1) {
+	if isInf(x, 1) {
 		return 1
 	}
-	if math.IsInf(x, -1) {
+	if isInf(x, -1) {
 		return -1
 	}
-	ex := math.Exp(x)
-	emx := math.Exp(-x)
+	ex := nativeExp(x)
+	emx := nativeExp(-x)
 	sum := ex + emx
-	if math.IsInf(sum, 1) {
+	if isInf(sum, 1) {
 		if x > 0 {
 			return 1
 		}
@@ -70,81 +77,79 @@ func Tanh(x float64) float64 {
 	return (ex - emx) / sum
 }
 
-//go:inline
 func Asinh(x float64) float64 {
-	if math.IsNaN(x) {
-		return math.NaN()
+	if isNaN(x) {
+		return x
 	}
-	if math.IsInf(x, 0) {
+	if isInf(x, 0) {
 		return x
 	}
 	if x == 0 {
 		return 0
 	}
-	absX := math.Abs(x)
+	absX := nativeAbs(x)
+	ln10 := 2.3025850929940456840179914546844
 	if absX > 1e150 {
-		log10x := math.Log10(absX)
-		approx := math.Ln2 + math.Ln10*log10x
+		logx := nativeLog(absX)
+		approx := 0.693147180559945309417232121458 + ln10*logx/ln10
 		if x > 0 {
 			return approx
 		}
 		return -approx
 	}
-	if absX > math.MaxFloat64/2 {
+	if absX > eml.MaxFloat64/2 {
 		if x > 0 {
-			log10x := math.Log10(2 * absX)
-			return math.Ln10 * log10x
+			logx := nativeLog(2 * absX)
+			return ln10 * logx / ln10
 		}
-		log10x := math.Log10(2 * absX)
-		return -math.Ln10 * log10x
+		logx := nativeLog(2 * absX)
+		return -ln10 * logx / ln10
 	}
 	term := arithmetic.Sqrt(x*x + 1)
-	if math.IsInf(term, 1) {
-		log10x := math.Log10(2 * absX)
+	if isInf(term, 1) {
+		logx := nativeLog(2 * absX)
 		if x > 0 {
-			return math.Ln10 * log10x
+			return ln10 * logx / ln10
 		}
-		return -math.Ln10 * log10x
+		return -ln10 * logx / ln10
 	}
-	return math.Log(x + term)
+	return nativeLog(x + term)
 }
 
-//go:inline
 func Acosh(x float64) float64 {
-	if math.IsNaN(x) {
-		return math.NaN()
+	if isNaN(x) {
+		return x
 	}
 	if x < 1 {
-		return math.NaN()
+		return nan()
 	}
 	if x == 1 {
 		return 0
 	}
-	if math.IsInf(x, 0) {
+	if isInf(x, 0) {
 		return x
 	}
-	if x > math.MaxFloat64/2 {
-		return math.Log(2*x) - 0.6931471805599453
+	if x > eml.MaxFloat64/2 {
+		return nativeLog(2*x) - 0.693147180559945309417232121458
 	}
-	return math.Log(x + arithmetic.Sqrt(x-1)*arithmetic.Sqrt(x+1))
+	return nativeLog(x + arithmetic.Sqrt(x-1)*arithmetic.Sqrt(x+1))
 }
 
-//go:inline
 func Atanh(x float64) float64 {
-	if math.IsNaN(x) {
-		return math.NaN()
+	if isNaN(x) {
+		return x
 	}
 	if x <= -1 || x >= 1 {
-		return math.NaN()
+		return nan()
 	}
 	if x == 0 {
 		return 0
 	}
-	if math.Abs(x) > 0.9999999999999999 {
+	if nativeAbs(x) > 0.9999999999999999 {
 		if x > 0 {
-			return math.Inf(1)
+			return inf(1)
 		}
-		return math.Inf(-1)
+		return inf(-1)
 	}
-	return math.Log((1+x)/(1-x)) / 2
+	return nativeLog((1+x)/(1-x)) / 2
 }

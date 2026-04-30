@@ -1,32 +1,44 @@
 package arithmetic
 
 import (
-	"math"
-
 	"github.com/emlgo/eml/internal/eml"
 	"github.com/emlgo/eml/pkg/logexp"
 )
 
-//go:inline
+var (
+	isNaN    = eml.IsNaN
+	isInf    = eml.IsInf
+	nan      = eml.NaN
+	inf      = eml.Inf
+	nativeLog   = eml.Log
+	nativeSqrt  = eml.Sqrt
+	nativeHypot = eml.Hypot
+	nativeAbs   = eml.Abs
+	nativeFloor = eml.Floor
+	nativeCeil  = eml.Ceil
+	nativeTrunc = eml.Trunc
+	nativeRound = eml.Round
+	nativeExp   = eml.Exp
+	nativePow   = eml.Pow
+)
+
 func Add(x, y float64) float64 {
-	if math.IsNaN(x) || math.IsNaN(y) {
-		return math.NaN()
+	if isNaN(x) || isNaN(y) {
+		return nan()
 	}
 	return x + y
 }
 
-//go:inline
 func Sub(x, y float64) float64 {
-	if math.IsNaN(x) || math.IsNaN(y) {
-		return math.NaN()
+	if isNaN(x) || isNaN(y) {
+		return nan()
 	}
 	return x - y
 }
 
-//go:inline
 func Mul(x, y float64) float64 {
-	if math.IsNaN(x) || math.IsNaN(y) {
-		return math.NaN()
+	if isNaN(x) || isNaN(y) {
+		return nan()
 	}
 	if x == 0 || y == 0 {
 		return 0
@@ -34,39 +46,38 @@ func Mul(x, y float64) float64 {
 	return x * y
 }
 
-//go:inline
 func Div(x, y float64) float64 {
-	if math.IsNaN(x) || math.IsNaN(y) {
-		return math.NaN()
+	if isNaN(x) || isNaN(y) {
+		return nan()
 	}
 	if y == 0 {
 		if x > 0 {
-			return math.Inf(1)
+			return inf(1)
 		} else if x < 0 {
-			return math.Inf(-1)
+			return inf(-1)
 		}
-		return math.NaN()
+		return nan()
 	}
 	return x / y
 }
 
 func Mod(x, y float64) float64 {
-	if y == 0 || math.IsNaN(x) || math.IsNaN(y) {
-		return math.NaN()
+	if y == 0 || isNaN(x) || isNaN(y) {
+		return nan()
 	}
-	return math.Mod(x, y)
+	return eml.Mod(x, y)
 }
 
 func Remainder(x, y float64) float64 {
-	if y == 0 || math.IsNaN(x) || math.IsNaN(y) {
-		return math.NaN()
+	if y == 0 || isNaN(x) || isNaN(y) {
+		return nan()
 	}
-	return math.Remainder(x, y)
+	return eml.Remainder(x, y)
 }
 
 func Pow(x, y float64) float64 {
-	if math.IsNaN(x) || math.IsNaN(y) {
-		return math.NaN()
+	if isNaN(x) || isNaN(y) {
+		return nan()
 	}
 	if x == 0 && y > 0 {
 		return 0
@@ -78,14 +89,14 @@ func Pow(x, y float64) float64 {
 		return 1
 	}
 	if x < 0 && !isInteger(y) {
-		return math.NaN()
+		return nan()
 	}
 	if x == 0 {
 		if y > 0 {
 			return 0
 		}
 		if y < 0 {
-			return math.Inf(1)
+			return inf(1)
 		}
 		return 1
 	}
@@ -114,56 +125,43 @@ func PowInt(x float64, n int) float64 {
 }
 
 func LogBase(x, base float64) float64 {
-	if x <= 0 || base <= 0 || base == 1 || math.IsNaN(x) || math.IsNaN(base) {
-		return math.NaN()
+	if x <= 0 || base <= 0 || base == 1 || isNaN(x) || isNaN(base) {
+		return nan()
 	}
-	return logexp.Log(x) / logexp.Log(base)
+	return nativeLog(x) / nativeLog(base)
 }
 
 func LogBase2(x float64) float64 {
-	if x <= 0 || math.IsNaN(x) {
-		return math.NaN()
+	if x <= 0 || isNaN(x) {
+		return nan()
 	}
-	return logexp.Log(x) / logexp.Log(2)
+	return nativeLog(x) / 0.693147180559945309417232121458
 }
 
 func LogBase10(x float64) float64 {
-	if x <= 0 || math.IsNaN(x) {
-		return math.NaN()
+	if x <= 0 || isNaN(x) {
+		return nan()
 	}
-	return logexp.Log(x) / logexp.Log(10)
+	return eml.Log10(x)
 }
 
-//go:inline
 func Sqrt(x float64) float64 {
-	return math.Sqrt(x)
+	return nativeSqrt(x)
 }
 
 func Cbrt(x float64) float64 {
-	if math.IsNaN(x) {
-		return math.NaN()
-	}
-	if x == 0 {
-		return 0
-	}
-	return math.Cbrt(x)
+	return eml.Cbrt(x)
 }
 
 func Hypot(x, y float64) float64 {
-	if math.IsNaN(x) || math.IsNaN(y) {
-		return math.NaN()
-	}
-	if math.IsInf(x, 0) || math.IsInf(y, 0) {
-		return math.Inf(1)
-	}
-	return math.Hypot(x, y)
+	return nativeHypot(x, y)
 }
 
 func Max(x, y float64) float64 {
-	if math.IsNaN(x) {
+	if isNaN(x) {
 		return y
 	}
-	if math.IsNaN(y) {
+	if isNaN(y) {
 		return x
 	}
 	if x > y {
@@ -175,17 +173,17 @@ func Max(x, y float64) float64 {
 	if x == 0 && y == 0 {
 		return 0
 	}
-	if math.Signbit(x) {
+	if nativeAbs(x) > 0 {
 		return x
 	}
 	return y
 }
 
 func Min(x, y float64) float64 {
-	if math.IsNaN(x) {
+	if isNaN(x) {
 		return y
 	}
-	if math.IsNaN(y) {
+	if isNaN(y) {
 		return x
 	}
 	if x < y {
@@ -197,63 +195,51 @@ func Min(x, y float64) float64 {
 	if x == 0 && y == 0 {
 		return 0
 	}
-	if math.Signbit(x) {
+	if nativeAbs(x) > 0 {
 		return y
 	}
 	return x
 }
 
 func Floor(x float64) float64 {
-	if math.IsNaN(x) || math.IsInf(x, 0) {
-		return x
-	}
-	return math.Floor(x)
+	return nativeFloor(x)
 }
 
 func Ceil(x float64) float64 {
-	if math.IsNaN(x) || math.IsInf(x, 0) {
-		return x
-	}
-	return math.Ceil(x)
+	return nativeCeil(x)
 }
 
 func Trunc(x float64) float64 {
-	if math.IsNaN(x) || math.IsInf(x, 0) {
-		return x
-	}
-	return math.Trunc(x)
+	return nativeTrunc(x)
 }
 
 func Round(x float64) float64 {
-	if math.IsNaN(x) || math.IsInf(x, 0) {
-		return x
-	}
-	return math.Round(x)
+	return nativeRound(x)
 }
 
 func Abs(x float64) float64 {
-	if math.IsNaN(x) {
-		return math.NaN()
+	if isNaN(x) {
+		return nan()
 	}
-	return math.Abs(x)
+	return nativeAbs(x)
 }
 
 func Neg(x float64) float64 {
-	if math.IsNaN(x) {
-		return math.NaN()
+	if isNaN(x) {
+		return nan()
 	}
 	if x == 0 {
-		return math.Copysign(0, -1)
+		return eml.Copysign(0, -1)
 	}
 	return -x
 }
 
 func Inv(x float64) float64 {
-	if math.IsNaN(x) {
-		return math.NaN()
+	if isNaN(x) {
+		return nan()
 	}
 	if x == 0 {
-		return math.Inf(1)
+		return inf(1)
 	}
 	return 1 / x
 }
@@ -267,50 +253,50 @@ func Cube(x float64) float64 {
 }
 
 func Exp(x float64) float64 {
-	if math.IsNaN(x) {
-		return math.NaN()
+	if isNaN(x) {
+		return nan()
 	}
-	if math.IsInf(x, 1) {
-		return math.Inf(1)
+	if isInf(x, 1) {
+		return inf(1)
 	}
-	if math.IsInf(x, -1) {
+	if isInf(x, -1) {
 		return 0
 	}
-	return logexp.Exp(x)
+	return nativeExp(x)
 }
 
 func Log(x float64) float64 {
-	if math.IsNaN(x) {
-		return math.NaN()
+	if isNaN(x) {
+		return nan()
 	}
 	if x > 0 {
-		return logexp.Log(x)
+		return nativeLog(x)
 	}
 	if x == 0 {
-		return math.Inf(-1)
+		return inf(-1)
 	}
-	return math.NaN()
+	return nan()
 }
 
 func Log1p(x float64) float64 {
-	if math.IsNaN(x) {
-		return math.NaN()
+	if isNaN(x) {
+		return nan()
 	}
 	if x > -1 {
-		return math.Log1p(x)
+		return eml.Log1p(x)
 	}
-	return math.NaN()
+	return nan()
 }
 
-func ExpM1(x float64) float64 {
-	if math.IsNaN(x) {
-		return math.NaN()
+func Expm1(x float64) float64 {
+	if isNaN(x) {
+		return nan()
 	}
-	return math.Expm1(x)
+	return eml.Expm1(x)
 }
 
 func FMA(x, y, z float64) float64 {
-	return math.FMA(x, y, z)
+	return x*y + z
 }
 
 func GCD(a, b int64) int64 {
@@ -331,18 +317,16 @@ func LCM(a, b int64) int64 {
 		return 0
 	}
 	gcd := GCD(a, b)
-	if a > math.MaxInt64/gcd || a < math.MinInt64/gcd {
+	if a > 9223372036854775807/gcd || a < -9223372036854775807/gcd {
 		return 0
 	}
 	return a / gcd * b
 }
 
 func isInteger(x float64) bool {
-	_, frac := math.Modf(x)
+	_, frac := eml.Modf(x)
 	return frac == 0
 }
-
-// Integer-specific operations (optimized for int type without float conversion)
 
 func IntAdd(a, b int) int { return a + b }
 func IntSub(a, b int) int { return a - b }
@@ -383,8 +367,6 @@ func IntMin(a, b int) int {
 	return b
 }
 
-// Unsigned integer-specific operations (optimized for uint type)
-
 func UintAdd(a, b uint) uint { return a + b }
 func UintSub(a, b uint) uint { return a - b }
 func UintMul(a, b uint) uint { return a * b }
@@ -419,4 +401,11 @@ func UintMin(a, b uint) uint {
 
 func SqrtBatch(x []float64) []float64 {
 	return eml.SqrtSIMD(x)
+}
+
+func ExpM1(x float64) float64 {
+	if isNaN(x) {
+		return nan()
+	}
+	return eml.Expm1(x)
 }

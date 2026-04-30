@@ -1,247 +1,152 @@
 package trig
 
 import (
-	"math"
-
 	"github.com/emlgo/eml/internal/eml"
-	"github.com/emlgo/eml/pkg/arithmetic"
 	"github.com/emlgo/eml/pkg/logexp"
 )
 
-//go:inline
+var (
+	pi          = eml.Pi
+	piOver2     = eml.PiOver2
+	piOver4     = eml.PiOver4
+	inf  = eml.Inf
+	nan  = eml.NaN
+	isNaN = eml.IsNaN
+	isInf = eml.IsInf
+	nativeSin  = eml.Sin
+	nativeCos  = eml.Cos
+	nativeTan  = eml.Tan
+	nativeSincos = eml.Sincos
+	nativeAsin = eml.Asin
+	nativeAcos = eml.Acos
+	nativeAtan = eml.Atan
+	nativeAtan2 = eml.Atan2
+	nativeSqrt = eml.Sqrt
+	nativeAbs  = eml.Abs
+	nativeSinh = eml.Sinh
+	nativeCosh = eml.Cosh
+	nativeTanh = eml.Tanh
+	nativeLog  = eml.Log
+)
+
 func Sin(x float64) float64 {
-	if math.IsNaN(x) || math.IsInf(x, 0) {
-		return math.NaN()
+	if isNaN(x) || isInf(x, 0) {
+		return nan()
 	}
 	if x == 0 {
 		return 0
 	}
-	return math.Sin(x)
+	return nativeSin(x)
 }
 
-//go:inline
 func Cos(x float64) float64 {
-	if math.IsNaN(x) || math.IsInf(x, 0) {
-		return math.NaN()
+	if isNaN(x) || isInf(x, 0) {
+		return nan()
 	}
-	return math.Cos(x)
+	return nativeCos(x)
 }
 
-//go:inline
 func Tan(x float64) float64 {
-	if math.IsNaN(x) || math.IsInf(x, 0) {
-		return math.NaN()
-	}
-	if x == 0 {
-		return 0
-	}
-	return math.Tan(x)
+	return nativeTan(x)
 }
 
-//go:inline
 func Cot(x float64) float64 {
-	if math.IsNaN(x) || math.IsInf(x, 0) {
-		return math.NaN()
+	if isNaN(x) || isInf(x, 0) {
+		return nan()
 	}
 	sinx := Sin(x)
 	cosx := Cos(x)
 	if sinx == 0 {
-		return math.NaN()
+		return nan()
 	}
 	return cosx / sinx
 }
 
-//go:inline
 func Sec(x float64) float64 {
-	if math.IsNaN(x) || math.IsInf(x, 0) {
-		return math.NaN()
+	if isNaN(x) || isInf(x, 0) {
+		return nan()
 	}
 	cosx := Cos(x)
 	if cosx == 0 {
-		return math.Inf(1)
+		return inf(1)
 	}
 	return 1 / cosx
 }
 
-//go:inline
 func Csc(x float64) float64 {
-	if math.IsNaN(x) || math.IsInf(x, 0) {
-		return math.NaN()
+	if isNaN(x) || isInf(x, 0) {
+		return nan()
 	}
 	sinx := Sin(x)
 	if sinx == 0 {
-		return math.Inf(1)
+		return inf(1)
 	}
 	return 1 / sinx
 }
 
-//go:inline
 func Asin(x float64) float64 {
-	if math.IsNaN(x) {
-		return math.NaN()
-	}
-	if x < -1 || x > 1 {
-		return math.NaN()
-	}
-	if x == 1 {
-		return math.Pi / 2
-	}
-	if x == -1 {
-		return -math.Pi / 2
-	}
-	if x == 0 {
-		return 0
-	}
-	sqrt1mx2 := arithmetic.Sqrt(1 - x*x)
-	if x > 0 {
-		return math.Atan(x / sqrt1mx2)
-	}
-	return -math.Atan(-x / sqrt1mx2)
+	return nativeAsin(x)
 }
 
-//go:inline
 func Acos(x float64) float64 {
-	if math.IsNaN(x) {
-		return math.NaN()
-	}
-	if x < -1 || x > 1 {
-		return math.NaN()
-	}
-	if x == 0 {
-		return math.Pi / 2
-	}
-	if x == 1 {
-		return 0
-	}
-	if x == -1 {
-		return math.Pi
-	}
-	return math.Pi/2 - Asin(x)
+	return nativeAcos(x)
 }
 
-//go:inline
 func Atan(x float64) float64 {
-	if math.IsNaN(x) {
-		return math.NaN()
-	}
-	if x == 0 {
-		return 0
-	}
-	if x == 1 {
-		return math.Pi / 4
-	}
-	if x == -1 {
-		return -math.Pi / 4
-	}
-	if math.IsInf(x, 1) {
-		return math.Pi / 2
-	}
-	if math.IsInf(x, -1) {
-		return -math.Pi / 2
-	}
-	return math.Atan(x)
+	return nativeAtan(x)
 }
 
-//go:inline
 func Atan2(y, x float64) float64 {
-	if math.IsNaN(y) || math.IsNaN(x) {
-		return math.NaN()
-	}
-	if x > 0 {
-		return Atan(y / x)
-	}
-	if x < 0 && y >= 0 {
-		return Atan(y/x) + math.Pi
-	}
-	if x < 0 && y < 0 {
-		return Atan(y/x) - math.Pi
-	}
-	if x == 0 && y > 0 {
-		return math.Pi / 2
-	}
-	if x == 0 && y < 0 {
-		return -math.Pi / 2
-	}
-	if x == 0 && y == 0 {
-		return 0
-	}
-	return math.NaN()
+	return nativeAtan2(y, x)
 }
 
 func Acot(x float64) float64 {
-	if math.IsNaN(x) || math.IsInf(x, 0) {
-		return math.NaN()
+	if isNaN(x) || isInf(x, 0) {
+		return nan()
 	}
-	return math.Pi/2 - Atan(x)
+	return piOver2 - Atan(x)
 }
 
 func Asec(x float64) float64 {
-	if math.IsNaN(x) {
-		return math.NaN()
+	if isNaN(x) {
+		return nan()
 	}
 	if x >= -1 && x <= 1 {
-		return math.NaN()
+		return nan()
 	}
 	return Acos(1 / x)
 }
 
 func Acsc(x float64) float64 {
-	if math.IsNaN(x) {
-		return math.NaN()
+	if isNaN(x) {
+		return nan()
 	}
 	if x >= -1 && x <= 1 {
-		return math.NaN()
+		return nan()
 	}
 	return Asin(1 / x)
 }
 
 func Sinh(x float64) float64 {
-	if math.IsNaN(x) {
-		return math.NaN()
-	}
-	if math.IsInf(x, 0) {
-		return x
-	}
-	ex := logexp.Exp(x)
-	emx := logexp.Exp(-x)
-	return (ex - emx) / 2
+	return nativeSinh(x)
 }
 
 func Cosh(x float64) float64 {
-	if math.IsNaN(x) {
-		return math.NaN()
-	}
-	if math.IsInf(x, 0) {
-		return math.Abs(x)
-	}
-	ex := logexp.Exp(x)
-	emx := logexp.Exp(-x)
-	return (ex + emx) / 2
+	return nativeCosh(x)
 }
 
 func Tanh(x float64) float64 {
-	if math.IsNaN(x) {
-		return math.NaN()
-	}
-	if math.IsInf(x, 1) {
-		return 1
-	}
-	if math.IsInf(x, -1) {
-		return -1
-	}
-	ex := logexp.Exp(x)
-	emx := logexp.Exp(-x)
-	return (ex - emx) / (ex + emx)
+	return nativeTanh(x)
 }
 
 func Coth(x float64) float64 {
-	if math.IsNaN(x) || x == 0 {
-		return math.NaN()
+	if isNaN(x) || x == 0 {
+		return nan()
 	}
-	if math.IsInf(x, 1) {
+	if isInf(x, 1) {
 		return 1
 	}
-	if math.IsInf(x, -1) {
+	if isInf(x, -1) {
 		return -1
 	}
 	ex := logexp.Exp(x)
@@ -250,10 +155,10 @@ func Coth(x float64) float64 {
 }
 
 func Sech(x float64) float64 {
-	if math.IsNaN(x) {
-		return math.NaN()
+	if isNaN(x) {
+		return nan()
 	}
-	if math.IsInf(x, 0) {
+	if isInf(x, 0) {
 		return 0
 	}
 	ex := logexp.Exp(x)
@@ -262,10 +167,10 @@ func Sech(x float64) float64 {
 }
 
 func Csch(x float64) float64 {
-	if math.IsNaN(x) || x == 0 {
-		return math.NaN()
+	if isNaN(x) || x == 0 {
+		return nan()
 	}
-	if math.IsInf(x, 0) {
+	if isInf(x, 0) {
 		return 0
 	}
 	ex := logexp.Exp(x)
@@ -274,40 +179,40 @@ func Csch(x float64) float64 {
 }
 
 func Asinh(x float64) float64 {
-	if math.IsNaN(x) {
-		return math.NaN()
+	if isNaN(x) {
+		return nan()
 	}
-	if math.IsInf(x, 0) {
+	if isInf(x, 0) {
 		return x
 	}
 	if x == 0 {
 		return 0
 	}
-	return logexp.Log(x + math.Sqrt(x*x+1))
+	return logexp.Log(x + nativeSqrt(x*x+1))
 }
 
 func Acosh(x float64) float64 {
-	if math.IsNaN(x) {
-		return math.NaN()
+	if isNaN(x) {
+		return nan()
 	}
 	if x < 1 {
-		return math.NaN()
+		return nan()
 	}
 	if x == 1 {
 		return 0
 	}
-	if math.IsInf(x, 0) {
+	if isInf(x, 0) {
 		return x
 	}
-	return logexp.Log(x + math.Sqrt(x-1)*math.Sqrt(x+1))
+	return logexp.Log(x + nativeSqrt(x-1)*nativeSqrt(x+1))
 }
 
 func Atanh(x float64) float64 {
-	if math.IsNaN(x) {
-		return math.NaN()
+	if isNaN(x) {
+		return nan()
 	}
 	if x <= -1 || x >= 1 {
-		return math.NaN()
+		return nan()
 	}
 	if x == 0 {
 		return 0
@@ -316,21 +221,21 @@ func Atanh(x float64) float64 {
 }
 
 func Acoth(x float64) float64 {
-	if math.IsNaN(x) {
-		return math.NaN()
+	if isNaN(x) {
+		return nan()
 	}
 	if x >= -1 && x <= 1 {
-		return math.NaN()
+		return nan()
 	}
 	return Atanh(1 / x)
 }
 
 func Asech(x float64) float64 {
-	if math.IsNaN(x) {
-		return math.NaN()
+	if isNaN(x) {
+		return nan()
 	}
 	if x <= 0 || x > 1 {
-		return math.NaN()
+		return nan()
 	}
 	if x == 1 {
 		return 0
@@ -339,26 +244,26 @@ func Asech(x float64) float64 {
 }
 
 func Acsch(x float64) float64 {
-	if math.IsNaN(x) {
-		return math.NaN()
+	if isNaN(x) {
+		return nan()
 	}
 	if x == 0 {
-		return math.Inf(1)
+		return inf(1)
 	}
 	return Asinh(1 / x)
 }
 
 func DegToRad(deg float64) float64 {
-	return deg * math.Pi / 180
+	return deg * pi / 180
 }
 
 func RadToDeg(rad float64) float64 {
-	return rad * 180 / math.Pi
+	return rad * 180 / pi
 }
 
 func SinCos(x float64) (sin, cos float64) {
-	if math.IsNaN(x) || math.IsInf(x, 0) {
-		return math.NaN(), math.NaN()
+	if isNaN(x) || isInf(x, 0) {
+		return nan(), nan()
 	}
 	sin = Sin(x)
 	cos = Cos(x)
@@ -366,11 +271,11 @@ func SinCos(x float64) (sin, cos float64) {
 }
 
 func SinhCosh(x float64) (sinh, cosh float64) {
-	if math.IsNaN(x) {
-		return math.NaN(), math.NaN()
+	if isNaN(x) {
+		return nan(), nan()
 	}
-	if math.IsInf(x, 0) {
-		return x, math.Abs(x)
+	if isInf(x, 0) {
+		return x, nativeAbs(x)
 	}
 	sinh = Sinh(x)
 	cosh = Cosh(x)
@@ -400,7 +305,7 @@ func TanBatch(x []float64) []float64 {
 		if cos[i] != 0 {
 			result[i] = sin[i] / cos[i]
 		} else {
-			result[i] = math.Inf(1)
+			result[i] = inf(1)
 		}
 	}
 	return result

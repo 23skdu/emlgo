@@ -1,45 +1,69 @@
 package eml
 
 import (
-	"math"
 	"runtime"
 	"sync"
-
-	"golang.org/x/sys/cpu"
 )
 
 var (
-	hasSSE4   bool
-	hasAVX2   bool
-	hasAVX512 bool
-	hasNeon   bool
+	hasSSE4    bool
+	hasAVX2    bool
+	hasAVX512  bool
+	hasNeon    bool
 	hasNeonDot bool
-	simdOnce  sync.Once
+	simdOnce   sync.Once
 )
 
 func initSIMD() {
 	simdOnce.Do(func() {
-		switch runtime.GOARCH {
-		case "amd64":
-			hasSSE4 = cpu.X86.HasSSE41
-			hasAVX2 = cpu.X86.HasAVX2
-			hasAVX512 = cpu.X86.HasAVX512F
-			hasNeon = false
-			hasNeonDot = false
-		case "arm64":
-			hasSSE4 = false
-			hasAVX2 = false
-			hasAVX512 = false
-			hasNeon = cpu.ARM64.HasASIMD
-			hasNeonDot = cpu.ARM64.HasASIMDDP
-		default:
-			hasSSE4 = false
-			hasAVX2 = false
-			hasAVX512 = false
-			hasNeon = false
-			hasNeonDot = false
-		}
+		detectSIMD()
 	})
+}
+
+func detectSIMD() {
+	switch runtime.GOARCH {
+	case "amd64":
+		detectAMD64SIMD()
+	case "arm64":
+		detectARM64SIMD()
+	default:
+		hasSSE4 = false
+		hasAVX2 = false
+		hasAVX512 = false
+		hasNeon = false
+		hasNeonDot = false
+	}
+}
+
+func detectAMD64SIMD() {
+	hasSSE4 = true
+	hasAVX2 = true
+	hasAVX512 = true
+	hasNeon = false
+	hasNeonDot = false
+}
+
+func detectARM64SIMD() {
+	switch runtime.GOOS {
+	case "darwin":
+		hasSSE4 = false
+		hasAVX2 = false
+		hasAVX512 = false
+		hasNeon = true
+		hasNeonDot = true
+	case "linux":
+		hasSSE4 = false
+		hasAVX2 = false
+		hasAVX512 = false
+		hasNeon = true
+		hasNeonDot = true
+	default:
+		hasSSE4 = false
+		hasAVX2 = false
+		hasAVX512 = false
+		hasNeon = true
+		hasNeonDot = true
+	}
 }
 
 func HasSSE4() bool {
@@ -78,7 +102,6 @@ func EmlSIMD(x, y, result []float64) {
 		return
 	}
 
-	// Use SIMD-optimized path if available
 	if n >= 8 && hasNeon {
 		neonEml(x, y, result)
 	} else if n >= 8 && hasAVX512 {
@@ -92,7 +115,6 @@ func EmlSIMD(x, y, result []float64) {
 
 func avx2Eml(x, y, result []float64) {
 	n := len(x)
-	// Process in chunks of 4 using AVX2-like operations
 	chunk := 4
 	for i := 0; i < n; i += chunk {
 		end := i + chunk
@@ -100,14 +122,13 @@ func avx2Eml(x, y, result []float64) {
 			end = n
 		}
 		for j := i; j < end; j++ {
-			result[j] = math.Exp(x[j]) - math.Log(y[j])
+			result[j] = nativeExp(x[j]) - nativeLog(y[j])
 		}
 	}
 }
 
 func avx512Eml(x, y, result []float64) {
 	n := len(x)
-	// Process in chunks of 8
 	chunk := 8
 	for i := 0; i < n; i += chunk {
 		end := i + chunk
@@ -115,14 +136,13 @@ func avx512Eml(x, y, result []float64) {
 			end = n
 		}
 		for j := i; j < end; j++ {
-			result[j] = math.Exp(x[j]) - math.Log(y[j])
+			result[j] = nativeExp(x[j]) - nativeLog(y[j])
 		}
 	}
 }
 
 func neonEml(x, y, result []float64) {
 	n := len(x)
-	// Process in chunks of 4 (Neon 128-bit = 4 float64)
 	chunk := 4
 	for i := 0; i < n; i += chunk {
 		end := i + chunk
@@ -130,7 +150,7 @@ func neonEml(x, y, result []float64) {
 			end = n
 		}
 		for j := i; j < end; j++ {
-			result[j] = math.Exp(x[j]) - math.Log(y[j])
+			result[j] = nativeExp(x[j]) - nativeLog(y[j])
 		}
 	}
 }
@@ -138,7 +158,7 @@ func neonEml(x, y, result []float64) {
 func scalarEml(x, y, result []float64) {
 	n := len(x)
 	for i := 0; i < n; i++ {
-		result[i] = math.Exp(x[i]) - math.Log(y[i])
+		result[i] = nativeExp(x[i]) - nativeLog(y[i])
 	}
 }
 
@@ -162,8 +182,6 @@ func (e *EMLError) Error() string {
 	return e.message
 }
 
-// Optimized batch operations with parallel processing and cache-friendly chunk sizes
-
 func ExpSIMD(x []float64) []float64 {
 	n := len(x)
 	if n == 0 {
@@ -173,7 +191,7 @@ func ExpSIMD(x []float64) []float64 {
 
 	if n < 256 {
 		for i := 0; i < n; i++ {
-			result[i] = math.Exp(x[i])
+			result[i] = nativeExp(x[i])
 		}
 		return result
 	}
@@ -194,7 +212,7 @@ func ExpSIMD(x []float64) []float64 {
 		go func(start, end int) {
 			defer wg.Done()
 			for j := start; j < end; j++ {
-				result[j] = math.Exp(x[j])
+				result[j] = nativeExp(x[j])
 			}
 		}(i, end)
 	}
@@ -212,9 +230,9 @@ func LogSIMD(x []float64) []float64 {
 	if n < 256 {
 		for i := 0; i < n; i++ {
 			if x[i] > 0 {
-				result[i] = math.Log(x[i])
+				result[i] = nativeLog(x[i])
 			} else {
-				result[i] = math.NaN()
+				result[i] = nan()
 			}
 		}
 		return result
@@ -237,9 +255,9 @@ func LogSIMD(x []float64) []float64 {
 			defer wg.Done()
 			for j := start; j < end; j++ {
 				if x[j] > 0 {
-					result[j] = math.Log(x[j])
+					result[j] = nativeLog(x[j])
 				} else {
-					result[j] = math.NaN()
+					result[j] = nan()
 				}
 			}
 		}(i, end)
@@ -257,7 +275,7 @@ func SqrtSIMD(x []float64) []float64 {
 
 	if n < 256 {
 		for i := 0; i < n; i++ {
-			result[i] = math.Sqrt(x[i])
+			result[i] = nativeSqrt(x[i])
 		}
 		return result
 	}
@@ -278,7 +296,7 @@ func SqrtSIMD(x []float64) []float64 {
 		go func(start, end int) {
 			defer wg.Done()
 			for j := start; j < end; j++ {
-				result[j] = math.Sqrt(x[j])
+				result[j] = nativeSqrt(x[j])
 			}
 		}(i, end)
 	}
@@ -295,7 +313,7 @@ func SinSIMD(x []float64) []float64 {
 
 	if n < 256 {
 		for i := 0; i < n; i++ {
-			result[i] = math.Sin(x[i])
+			result[i] = nativeSin(x[i])
 		}
 		return result
 	}
@@ -316,7 +334,7 @@ func SinSIMD(x []float64) []float64 {
 		go func(start, end int) {
 			defer wg.Done()
 			for j := start; j < end; j++ {
-				result[j] = math.Sin(x[j])
+				result[j] = nativeSin(x[j])
 			}
 		}(i, end)
 	}
@@ -333,7 +351,7 @@ func CosSIMD(x []float64) []float64 {
 
 	if n < 256 {
 		for i := 0; i < n; i++ {
-			result[i] = math.Cos(x[i])
+			result[i] = nativeCos(x[i])
 		}
 		return result
 	}
@@ -354,7 +372,7 @@ func CosSIMD(x []float64) []float64 {
 		go func(start, end int) {
 			defer wg.Done()
 			for j := start; j < end; j++ {
-				result[j] = math.Cos(x[j])
+				result[j] = nativeCos(x[j])
 			}
 		}(i, end)
 	}
@@ -373,7 +391,7 @@ func SinCosSIMD(x []float64) (sin, cos []float64) {
 
 	if n < 256 {
 		for i := 0; i < n; i++ {
-			sin[i], cos[i] = math.Sincos(x[i])
+			sin[i], cos[i] = nativeSincos(x[i])
 		}
 		return
 	}
@@ -394,15 +412,13 @@ func SinCosSIMD(x []float64) (sin, cos []float64) {
 		go func(start, end int) {
 			defer wg.Done()
 			for j := start; j < end; j++ {
-				sin[j], cos[j] = math.Sincos(x[j])
+				sin[j], cos[j] = nativeSincos(x[j])
 			}
 		}(i, end)
 	}
 	wg.Wait()
 	return
 }
-
-// Legacy functions for backward compatibility (simple implementations)
 
 func AddSIMD(a, b []float64) []float64 {
 	if len(a) != len(b) {
@@ -445,6 +461,45 @@ func MulSIMD(a, b []float64) []float64 {
 	result := make([]float64, n)
 	for i := 0; i < n; i++ {
 		result[i] = a[i] * b[i]
+	}
+	return result
+}
+
+func DivSIMD(a, b []float64) []float64 {
+	if len(a) != len(b) {
+		panic("length mismatch")
+	}
+	n := len(a)
+	if n == 0 {
+		return a
+	}
+	result := make([]float64, n)
+	for i := 0; i < n; i++ {
+		result[i] = a[i] / b[i]
+	}
+	return result
+}
+
+func AddScalarSIMD(a []float64, b float64) []float64 {
+	n := len(a)
+	if n == 0 {
+		return a
+	}
+	result := make([]float64, n)
+	for i := 0; i < n; i++ {
+		result[i] = a[i] + b
+	}
+	return result
+}
+
+func MulScalarSIMD(a []float64, b float64) []float64 {
+	n := len(a)
+	if n == 0 {
+		return a
+	}
+	result := make([]float64, n)
+	for i := 0; i < n; i++ {
+		result[i] = a[i] * b
 	}
 	return result
 }
