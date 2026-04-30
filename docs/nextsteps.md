@@ -36,9 +36,9 @@ Standard `math` performs extensive checks for signed zeros, subnormal numbers, a
 
 ---
 
-### Implementation Priority:
+### Implementation Status:
 
-1. **Scalar Sqrt:** Map directly to `SQRTSD` / `FSQRT`.
-2. **Scalar FMA:** Implement `FMA(a, b, c)` as a single instruction.
-3. **Scalar Exp/Log:** Optimized polynomial implementation using FMA.
-4. **FastScalar Package:** Initial release with relaxed error handling for maximum throughput.
+1. `[x]` **Scalar Sqrt:** Map directly to `SQRTSD` / `FSQRT`.
+2. `[x]` **Scalar FMA:** Implement `FMA(a, b, c)` as a single instruction.
+3. `[x]` **Scalar Exp/Log:** Optimized polynomial implementation using FMA.
+4. `[x]` **FastScalar Package:** Initial release with relaxed error handling for maximum throughput.
