@@ -446,6 +446,15 @@ func AddSIMD(a, b []float64) []float64 {
 		return result
 	}
 
+	if hasAVX512 && runtime.GOARCH == "amd64" {
+		simdLen := (n / 8) * 8
+		addAVX512(a[:simdLen], b[:simdLen], result[:simdLen])
+		for i := simdLen; i < n; i++ {
+			result[i] = a[i] + b[i]
+		}
+		return result
+	}
+
 	if hasAVX2 && runtime.GOARCH == "amd64" {
 		simdLen := (n / 4) * 4
 		addAVX2(a[:simdLen], b[:simdLen], result[:simdLen])
@@ -500,6 +509,15 @@ func SubSIMD(a, b []float64) []float64 {
 
 	if n < 4 {
 		for i := 0; i < n; i++ {
+			result[i] = a[i] - b[i]
+		}
+		return result
+	}
+
+	if hasAVX512 && runtime.GOARCH == "amd64" {
+		simdLen := (n / 8) * 8
+		subAVX512(a[:simdLen], b[:simdLen], result[:simdLen])
+		for i := simdLen; i < n; i++ {
 			result[i] = a[i] - b[i]
 		}
 		return result
@@ -564,6 +582,15 @@ func MulSIMD(a, b []float64) []float64 {
 		return result
 	}
 
+	if hasAVX512 && runtime.GOARCH == "amd64" {
+		simdLen := (n / 8) * 8
+		mulAVX512(a[:simdLen], b[:simdLen], result[:simdLen])
+		for i := simdLen; i < n; i++ {
+			result[i] = a[i] * b[i]
+		}
+		return result
+	}
+
 	if hasAVX2 && runtime.GOARCH == "amd64" {
 		simdLen := (n / 4) * 4
 		mulAVX2(a[:simdLen], b[:simdLen], result[:simdLen])
@@ -618,6 +645,15 @@ func DivSIMD(a, b []float64) []float64 {
 
 	if n < 4 {
 		for i := 0; i < n; i++ {
+			result[i] = a[i] / b[i]
+		}
+		return result
+	}
+
+	if hasAVX512 && runtime.GOARCH == "amd64" {
+		simdLen := (n / 8) * 8
+		divAVX512(a[:simdLen], b[:simdLen], result[:simdLen])
+		for i := simdLen; i < n; i++ {
 			result[i] = a[i] / b[i]
 		}
 		return result
@@ -679,6 +715,15 @@ func AddScalarSIMD(a []float64, b float64) []float64 {
 		return result
 	}
 
+	if hasAVX512 && runtime.GOARCH == "amd64" {
+		simdLen := (n / 8) * 8
+		addScalarAVX512(a[:simdLen], b, result[:simdLen])
+		for i := simdLen; i < n; i++ {
+			result[i] = a[i] + b
+		}
+		return result
+	}
+
 	if hasAVX2 && runtime.GOARCH == "amd64" {
 		simdLen := (n / 4) * 4
 		addScalarAVX2(a[:simdLen], b, result[:simdLen])
@@ -730,6 +775,15 @@ func MulScalarSIMD(a []float64, b float64) []float64 {
 
 	if n < 4 {
 		for i := 0; i < n; i++ {
+			result[i] = a[i] * b
+		}
+		return result
+	}
+
+	if hasAVX512 && runtime.GOARCH == "amd64" {
+		simdLen := (n / 8) * 8
+		mulScalarAVX512(a[:simdLen], b, result[:simdLen])
+		for i := simdLen; i < n; i++ {
 			result[i] = a[i] * b
 		}
 		return result
