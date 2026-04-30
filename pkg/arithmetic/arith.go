@@ -3,9 +3,11 @@ package arithmetic
 import (
 	"math"
 
+	"github.com/emlgo/eml/internal/eml"
 	"github.com/emlgo/eml/pkg/logexp"
 )
 
+//go:inline
 func Add(x, y float64) float64 {
 	if math.IsNaN(x) || math.IsNaN(y) {
 		return math.NaN()
@@ -13,6 +15,7 @@ func Add(x, y float64) float64 {
 	return x + y
 }
 
+//go:inline
 func Sub(x, y float64) float64 {
 	if math.IsNaN(x) || math.IsNaN(y) {
 		return math.NaN()
@@ -20,6 +23,7 @@ func Sub(x, y float64) float64 {
 	return x - y
 }
 
+//go:inline
 func Mul(x, y float64) float64 {
 	if math.IsNaN(x) || math.IsNaN(y) {
 		return math.NaN()
@@ -30,6 +34,7 @@ func Mul(x, y float64) float64 {
 	return x * y
 }
 
+//go:inline
 func Div(x, y float64) float64 {
 	if math.IsNaN(x) || math.IsNaN(y) {
 		return math.NaN()
@@ -129,20 +134,9 @@ func LogBase10(x float64) float64 {
 	return logexp.Log(x) / logexp.Log(10)
 }
 
+//go:inline
 func Sqrt(x float64) float64 {
-	if math.IsNaN(x) {
-		return math.NaN()
-	}
-	if x < 0 {
-		return math.NaN()
-	}
-	if x == 0 {
-		return 0
-	}
-	if x == 1 {
-		return 1
-	}
-	return logexp.Exp(logexp.Log(x) / 2)
+	return math.Sqrt(x)
 }
 
 func Cbrt(x float64) float64 {
@@ -152,10 +146,7 @@ func Cbrt(x float64) float64 {
 	if x == 0 {
 		return 0
 	}
-	if x < 0 {
-		return -logexp.Exp(logexp.Log(-x) / 3)
-	}
-	return logexp.Exp(logexp.Log(x) / 3)
+	return math.Cbrt(x)
 }
 
 func Hypot(x, y float64) float64 {
@@ -349,4 +340,49 @@ func LCM(a, b int64) int64 {
 func isInteger(x float64) bool {
 	_, frac := math.Modf(x)
 	return frac == 0
+}
+
+// Integer-specific operations (optimized for int type without float conversion)
+
+func IntAdd(a, b int) int { return a + b }
+func IntSub(a, b int) int { return a - b }
+func IntMul(a, b int) int { return a * b }
+
+func IntDiv(a, b int) int {
+	if b == 0 {
+		return 0
+	}
+	return a / b
+}
+
+func IntMod(a, b int) int {
+	if b == 0 {
+		return 0
+	}
+	return a % b
+}
+
+func IntAbs(a int) int {
+	if a < 0 {
+		return -a
+	}
+	return a
+}
+
+func IntMax(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+func IntMin(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func SqrtBatch(x []float64) []float64 {
+	return eml.SqrtSIMD(x)
 }

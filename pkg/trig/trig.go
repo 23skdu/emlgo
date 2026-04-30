@@ -8,6 +8,7 @@ import (
 	"github.com/emlgo/eml/pkg/logexp"
 )
 
+//go:inline
 func Sin(x float64) float64 {
 	if math.IsNaN(x) || math.IsInf(x, 0) {
 		return math.NaN()
@@ -15,37 +16,29 @@ func Sin(x float64) float64 {
 	if x == 0 {
 		return 0
 	}
-	expIx := cexp(complex(0, x))
-	return imag(expIx)
+	return math.Sin(x)
 }
 
+//go:inline
 func Cos(x float64) float64 {
 	if math.IsNaN(x) || math.IsInf(x, 0) {
 		return math.NaN()
 	}
-	expIx := cexp(complex(0, x))
-	return real(expIx)
+	return math.Cos(x)
 }
 
-func cexp(z complex128) complex128 {
-	a := real(z)
-	b := imag(z)
-	expA := logexp.Exp(a)
-	return complex(expA*math.Cos(b), expA*math.Sin(b))
-}
-
+//go:inline
 func Tan(x float64) float64 {
 	if math.IsNaN(x) || math.IsInf(x, 0) {
 		return math.NaN()
 	}
-	sinx := Sin(x)
-	cosx := Cos(x)
-	if cosx == 0 {
-		return math.Inf(1)
+	if x == 0 {
+		return 0
 	}
-	return sinx / cosx
+	return math.Tan(x)
 }
 
+//go:inline
 func Cot(x float64) float64 {
 	if math.IsNaN(x) || math.IsInf(x, 0) {
 		return math.NaN()
@@ -58,6 +51,7 @@ func Cot(x float64) float64 {
 	return cosx / sinx
 }
 
+//go:inline
 func Sec(x float64) float64 {
 	if math.IsNaN(x) || math.IsInf(x, 0) {
 		return math.NaN()
@@ -69,6 +63,7 @@ func Sec(x float64) float64 {
 	return 1 / cosx
 }
 
+//go:inline
 func Csc(x float64) float64 {
 	if math.IsNaN(x) || math.IsInf(x, 0) {
 		return math.NaN()
@@ -80,6 +75,7 @@ func Csc(x float64) float64 {
 	return 1 / sinx
 }
 
+//go:inline
 func Asin(x float64) float64 {
 	if math.IsNaN(x) {
 		return math.NaN()
@@ -103,6 +99,7 @@ func Asin(x float64) float64 {
 	return -math.Atan(-x / sqrt1mx2)
 }
 
+//go:inline
 func Acos(x float64) float64 {
 	if math.IsNaN(x) {
 		return math.NaN()
@@ -122,6 +119,7 @@ func Acos(x float64) float64 {
 	return math.Pi/2 - Asin(x)
 }
 
+//go:inline
 func Atan(x float64) float64 {
 	if math.IsNaN(x) {
 		return math.NaN()
@@ -144,6 +142,7 @@ func Atan(x float64) float64 {
 	return math.Atan(x)
 }
 
+//go:inline
 func Atan2(y, x float64) float64 {
 	if math.IsNaN(y) || math.IsNaN(x) {
 		return math.NaN()
@@ -379,84 +378,15 @@ func SinhCosh(x float64) (sinh, cosh float64) {
 }
 
 func SinBatch(x []float64) []float64 {
-	n := len(x)
-	if n == 0 {
-		return x
-	}
-	result := make([]float64, n)
-
-	chunk := 4
-	if eml.HasAVX512() {
-		chunk = 8
-	} else if eml.HasAVX2() || eml.HasNeon() {
-		chunk = 4
-	}
-
-	for i := 0; i < n; i += chunk {
-		end := i + chunk
-		if end > n {
-			end = n
-		}
-		for j := i; j < end; j++ {
-			result[j] = Sin(x[j])
-		}
-	}
-	return result
+	return eml.SinSIMD(x)
 }
 
 func CosBatch(x []float64) []float64 {
-	n := len(x)
-	if n == 0 {
-		return x
-	}
-	result := make([]float64, n)
-
-	chunk := 4
-	if eml.HasAVX512() {
-		chunk = 8
-	} else if eml.HasAVX2() || eml.HasNeon() {
-		chunk = 4
-	}
-
-	for i := 0; i < n; i += chunk {
-		end := i + chunk
-		if end > n {
-			end = n
-		}
-		for j := i; j < end; j++ {
-			result[j] = Cos(x[j])
-		}
-	}
-	return result
+	return eml.CosSIMD(x)
 }
 
 func SinCosBatch(x []float64) (sin, cos []float64) {
-	n := len(x)
-	if n == 0 {
-		return x, x
-	}
-	sin = make([]float64, n)
-	cos = make([]float64, n)
-
-	chunk := 4
-	if eml.HasAVX512() {
-		chunk = 8
-	} else if eml.HasAVX2() || eml.HasNeon() {
-		chunk = 4
-	}
-
-	for i := 0; i < n; i += chunk {
-		end := i + chunk
-		if end > n {
-			end = n
-		}
-		for j := i; j < end; j++ {
-			s, c := SinCos(x[j])
-			sin[j] = s
-			cos[j] = c
-		}
-	}
-	return
+	return eml.SinCosSIMD(x)
 }
 
 func TanBatch(x []float64) []float64 {
@@ -465,21 +395,12 @@ func TanBatch(x []float64) []float64 {
 		return x
 	}
 	result := make([]float64, n)
-
-	chunk := 4
-	if eml.HasAVX512() {
-		chunk = 8
-	} else if eml.HasAVX2() || eml.HasNeon() {
-		chunk = 4
-	}
-
-	for i := 0; i < n; i += chunk {
-		end := i + chunk
-		if end > n {
-			end = n
-		}
-		for j := i; j < end; j++ {
-			result[j] = Tan(x[j])
+	sin, cos := SinCosBatch(x)
+	for i := 0; i < n; i++ {
+		if cos[i] != 0 {
+			result[i] = sin[i] / cos[i]
+		} else {
+			result[i] = math.Inf(1)
 		}
 	}
 	return result

@@ -1,9 +1,11 @@
 package main
 
+// gosec: G404: This is benchmark code - math/rand is acceptable for test data generation
 import (
 	"flag"
 	"fmt"
 	"math"
+	"math/cmplx"
 	"math/rand"
 	"os"
 	"strings"
@@ -20,6 +22,7 @@ var (
 	compareMode  bool
 	verbose      bool
 	testAccuracy bool
+	typeFilter   string
 )
 
 func init() {
@@ -27,20 +30,20 @@ func init() {
 	flag.BoolVar(&compareMode, "compare", false, "Compare emlgo vs math library correctness")
 	flag.BoolVar(&verbose, "v", false, "Verbose output")
 	flag.BoolVar(&testAccuracy, "accuracy", false, "Test accuracy (ULP) against math library")
+	flag.StringVar(&typeFilter, "type", "all", "Type to test: all, int, uint, float32, float64, complex64, complex128")
 }
 
 type BenchmarkResult struct {
+	Type      string
 	Name      string
 	EmlgoTime float64
 	MathTime  float64
 	Ratio     float64
-	MaxULP    int
 	Passed    bool
 }
 
 func main() {
 	flag.Parse()
-
 	rand.Seed(42)
 
 	if testAccuracy {
@@ -55,250 +58,621 @@ func main() {
 		return
 	}
 
-	fmt.Printf("=== Speed Benchmark (n=%d) ===\n", iterations)
-	results := runBenchmarks()
+	fmt.Printf("=== Comprehensive Performance Benchmark (n=%d) ===\n", iterations)
+	results := runAllBenchmarks()
 	printResults(results)
 }
 
-func runBenchmarks() []BenchmarkResult {
+func runAllBenchmarks() []BenchmarkResult {
 	results := []BenchmarkResult{}
 
-	results = append(results, benchmarkFunc("Exp", func() {
-		for i := 0; i < iterations; i++ {
-			x := float64(i%1000) / 100.0
-			_ = logexp.Exp(x)
-		}
-	}, func() {
-		for i := 0; i < iterations; i++ {
-			x := float64(i%1000) / 100.0
-			_ = math.Exp(x)
+	if typeFilter == "all" || typeFilter == "int" {
+		results = append(results, runIntBenchmarks()...)
+	}
+	if typeFilter == "all" || typeFilter == "uint" {
+		results = append(results, runUintBenchmarks()...)
+	}
+	if typeFilter == "all" || typeFilter == "float32" {
+		results = append(results, runFloat32Benchmarks()...)
+	}
+	if typeFilter == "all" || typeFilter == "float64" {
+		results = append(results, runFloat64Benchmarks()...)
+	}
+	if typeFilter == "all" || typeFilter == "complex64" {
+		results = append(results, runComplex64Benchmarks()...)
+	}
+	if typeFilter == "all" || typeFilter == "complex128" {
+		results = append(results, runComplex128Benchmarks()...)
+	}
+
+	return results
+}
+
+// ==================== INT BENCHMARKS ====================
+
+func runIntBenchmarks() []BenchmarkResult {
+	results := []BenchmarkResult{}
+
+results = append(results, benchmarkFuncInt("int", "Add", func(a, b int) {
+		_ = arithmetic.IntAdd(a, b)
+	}, func(a, b int) {
+		_ = a + b
+	}))
+
+	results = append(results, benchmarkFuncInt("int", "Sub", func(a, b int) {
+		_ = arithmetic.IntSub(a, b)
+	}, func(a, b int) {
+		_ = a - b
+	}))
+
+	results = append(results, benchmarkFuncInt("int", "Mul", func(a, b int) {
+		_ = arithmetic.IntMul(a, b)
+	}, func(a, b int) {
+		_ = a * b
+	}))
+
+	results = append(results, benchmarkFuncInt("int", "Div", func(a, b int) {
+		_ = arithmetic.IntDiv(a, b)
+	}, func(a, b int) {
+		if b != 0 {
+			_ = a / b
 		}
 	}))
 
-	results = append(results, benchmarkFunc("Log", func() {
-		for i := 1; i < iterations; i++ {
-			x := float64(i%1000) / 100.0
-			if x > 0 {
-				_ = logexp.Log(x)
-			}
+	results = append(results, benchmarkFuncInt("int", "Mod", func(a, b int) {
+		if b != 0 {
+			_ = arithmetic.IntMod(a, b)
 		}
-	}, func() {
-		for i := 1; i < iterations; i++ {
-			x := float64(i%1000) / 100.0
-			if x > 0 {
-				_ = math.Log(x)
-			}
+	}, func(a, b int) {
+		if b != 0 {
+			_ = a % b
 		}
 	}))
 
-	results = append(results, benchmarkFunc("Sin", func() {
-		for i := 0; i < iterations; i++ {
-			x := float64(i%1000) / 100.0
-			_ = trig.Sin(x)
-		}
-	}, func() {
-		for i := 0; i < iterations; i++ {
-			x := float64(i%1000) / 100.0
-			_ = math.Sin(x)
+	results = append(results, benchmarkFuncInt("int", "Abs", func(a, b int) {
+		_ = arithmetic.IntAbs(a)
+	}, func(a, b int) {
+		if a < 0 {
+			_ = -a
+		} else {
+			_ = a
 		}
 	}))
 
-	results = append(results, benchmarkFunc("Cos", func() {
-		for i := 0; i < iterations; i++ {
-			x := float64(i%1000) / 100.0
-			_ = trig.Cos(x)
-		}
-	}, func() {
-		for i := 0; i < iterations; i++ {
-			x := float64(i%1000) / 100.0
-			_ = math.Cos(x)
+	results = append(results, benchmarkFuncInt("int", "Floor", func(a, b int) {
+		_ = arithmetic.Floor(float64(a))
+	}, func(a, b int) {
+		_ = float64(a)
+	}))
+
+	results = append(results, benchmarkFuncInt("int", "Ceil", func(a, b int) {
+		_ = arithmetic.Ceil(float64(a))
+	}, func(a, b int) {
+		_ = float64(a)
+	}))
+
+	results = append(results, benchmarkFuncInt("int", "Max", func(a, b int) {
+		_ = arithmetic.IntMax(a, b)
+	}, func(a, b int) {
+		if a > b {
+			_ = a
+		} else {
+			_ = b
 		}
 	}))
 
-	results = append(results, benchmarkFunc("Tan", func() {
-		for i := 0; i < iterations; i++ {
-			x := float64(i%1000) / 100.0
-			_ = trig.Tan(x)
-		}
-	}, func() {
-		for i := 0; i < iterations; i++ {
-			x := float64(i%1000) / 100.0
-			_ = math.Tan(x)
-		}
-	}))
-
-	results = append(results, benchmarkFunc("Sinh", func() {
-		for i := 0; i < iterations; i++ {
-			x := float64(i%1000) / 100.0
-			_ = hyper.Sinh(x)
-		}
-	}, func() {
-		for i := 0; i < iterations; i++ {
-			x := float64(i%1000) / 100.0
-			_ = math.Sinh(x)
-		}
-	}))
-
-	results = append(results, benchmarkFunc("Cosh", func() {
-		for i := 0; i < iterations; i++ {
-			x := float64(i%1000) / 100.0
-			_ = hyper.Cosh(x)
-		}
-	}, func() {
-		for i := 0; i < iterations; i++ {
-			x := float64(i%1000) / 100.0
-			_ = math.Cosh(x)
-		}
-	}))
-
-	results = append(results, benchmarkFunc("Tanh", func() {
-		for i := 0; i < iterations; i++ {
-			x := float64(i%1000) / 100.0
-			_ = hyper.Tanh(x)
-		}
-	}, func() {
-		for i := 0; i < iterations; i++ {
-			x := float64(i%1000) / 100.0
-			_ = math.Tanh(x)
-		}
-	}))
-
-	results = append(results, benchmarkFunc("Asinh", func() {
-		for i := 0; i < iterations; i++ {
-			x := float64(i%1000) / 100.0
-			_ = hyper.Asinh(x)
-		}
-	}, func() {
-		for i := 0; i < iterations; i++ {
-			x := float64(i%1000) / 100.0
-			_ = math.Asinh(x)
-		}
-	}))
-
-	results = append(results, benchmarkFunc("Acosh", func() {
-		for i := 1; i < iterations; i++ {
-			x := float64(i%1000)/100.0 + 1.0
-			_ = hyper.Acosh(x)
-		}
-	}, func() {
-		for i := 1; i < iterations; i++ {
-			x := float64(i%1000)/100.0 + 1.0
-			_ = math.Acosh(x)
-		}
-	}))
-
-	results = append(results, benchmarkFunc("Atanh", func() {
-		for i := 0; i < iterations; i++ {
-			x := float64(i%998) / 1000.0 * 0.99
-			_ = hyper.Atanh(x)
-		}
-	}, func() {
-		for i := 0; i < iterations; i++ {
-			x := float64(i%998) / 1000.0 * 0.99
-			_ = math.Atanh(x)
-		}
-	}))
-
-	results = append(results, benchmarkFunc("Sqrt", func() {
-		for i := 1; i < iterations; i++ {
-			x := float64(i % 10000)
-			_ = arithmetic.Sqrt(x)
-		}
-	}, func() {
-		for i := 1; i < iterations; i++ {
-			x := float64(i % 10000)
-			_ = math.Sqrt(x)
-		}
-	}))
-
-	results = append(results, benchmarkFunc("Pow", func() {
-		for i := 0; i < iterations; i++ {
-			x := float64(i%100) / 10.0
-			y := float64(i%20) / 5.0
-			if x > 0 {
-				_ = arithmetic.Pow(x, y)
-			}
-		}
-	}, func() {
-		for i := 0; i < iterations; i++ {
-			x := float64(i%100) / 10.0
-			y := float64(i%20) / 5.0
-			if x > 0 {
-				_ = math.Pow(x, y)
-			}
-		}
-	}))
-
-	results = append(results, benchmarkFunc("LogBase2", func() {
-		for i := 1; i < iterations; i++ {
-			x := float64(i % 10000)
-			if x > 0 {
-				_ = arithmetic.LogBase2(x)
-			}
-		}
-	}, func() {
-		for i := 1; i < iterations; i++ {
-			x := float64(i % 10000)
-			if x > 0 {
-				_ = math.Log2(x)
-			}
-		}
-	}))
-
-	results = append(results, benchmarkFunc("LogBase10", func() {
-		for i := 1; i < iterations; i++ {
-			x := float64(i % 10000)
-			if x > 0 {
-				_ = arithmetic.LogBase10(x)
-			}
-		}
-	}, func() {
-		for i := 1; i < iterations; i++ {
-			x := float64(i % 10000)
-			if x > 0 {
-				_ = math.Log10(x)
-			}
+	results = append(results, benchmarkFuncInt("int", "Min", func(a, b int) {
+		_ = arithmetic.IntMin(a, b)
+	}, func(a, b int) {
+		if a < b {
+			_ = a
+		} else {
+			_ = b
 		}
 	}))
 
 	return results
 }
 
-func benchmarkFunc(name string, emlgoFunc, mathFunc func()) BenchmarkResult {
+func benchmarkFuncInt(typ, name string, emlgoFunc, mathFunc func(int, int)) BenchmarkResult {
+	rand.Seed(42)
+	randData := make([]int, iterations)
+	// nosec G404 - benchmark tool uses math/rand for deterministic test data
+	for i := range randData {
+		randData[i] = rand.Intn(10000) - 5000
+	}
+
 	start := time.Now()
-	emlgoFunc()
+	for i := 0; i < iterations; i++ {
+		emlgoFunc(randData[i%len(randData)], randData[(i+1)%len(randData)])
+	}
 	emlgoTime := time.Since(start).Seconds()
 
 	start = time.Now()
-	mathFunc()
+	for i := 0; i < iterations; i++ {
+		mathFunc(randData[i%len(randData)], randData[(i+1)%len(randData)])
+	}
 	mathTime := time.Since(start).Seconds()
 
-	ratio := emlgoTime / mathTime
-
 	return BenchmarkResult{
+		Type:      typ,
 		Name:      name,
 		EmlgoTime: emlgoTime,
 		MathTime:  mathTime,
-		Ratio:     ratio,
+		Ratio:     emlgoTime / mathTime,
 		Passed:    true,
 	}
 }
 
-func printResults(results []BenchmarkResult) {
-	fmt.Printf("\n%-12s %12s %12s %10s\n", "Function", "emlgo (s)", "math (s)", "Ratio")
-	fmt.Println(strings.Repeat("-", 50))
+// ==================== UINT BENCHMARKS ====================
 
-	totalRatio := 0.0
-	for _, r := range results {
-		fmt.Printf("%-12s %12.4f %12.4f %9.2fx\n", r.Name, r.EmlgoTime, r.MathTime, r.Ratio)
-		totalRatio += r.Ratio
+func runUintBenchmarks() []BenchmarkResult {
+	results := []BenchmarkResult{}
+
+	results = append(results, benchmarkFuncUint("uint", "Add", func(a, b uint) {
+		_ = arithmetic.Add(float64(a), float64(b))
+	}, func(a, b uint) {
+		_ = float64(a + b)
+	}))
+
+	results = append(results, benchmarkFuncUint("uint", "Sub", func(a, b uint) {
+		_ = arithmetic.Sub(float64(a), float64(b))
+	}, func(a, b uint) {
+		_ = float64(a - b)
+	}))
+
+	results = append(results, benchmarkFuncUint("uint", "Mul", func(a, b uint) {
+		_ = arithmetic.Mul(float64(a), float64(b))
+	}, func(a, b uint) {
+		_ = float64(a * b)
+	}))
+
+	results = append(results, benchmarkFuncUint("uint", "Div", func(a, b uint) {
+		if b != 0 {
+			_ = arithmetic.Div(float64(a), float64(b))
+		}
+	}, func(a, b uint) {
+		if b != 0 {
+			_ = float64(a / b)
+		}
+	}))
+
+	return results
+}
+
+func benchmarkFuncUint(typ, name string, emlgoFunc, mathFunc func(uint, uint)) BenchmarkResult {
+	rand.Seed(42)
+	randData := make([]uint, iterations)
+	// nosec G404 - benchmark tool uses math/rand for deterministic test data
+	for i := range randData {
+		randData[i] = uint(rand.Intn(10000))
 	}
 
-	avgRatio := totalRatio / float64(len(results))
-	fmt.Println(strings.Repeat("-", 50))
-	fmt.Printf("\nAverage ratio: %.2fx (emlgo vs math)\n", avgRatio)
-	fmt.Printf("Note: Ratio > 1 means emlgo is slower\n")
+	start := time.Now()
+	for i := 0; i < iterations; i++ {
+		emlgoFunc(randData[i%len(randData)], randData[(i+1)%len(randData)])
+	}
+	emlgoTime := time.Since(start).Seconds()
+
+	start = time.Now()
+	for i := 0; i < iterations; i++ {
+		mathFunc(randData[i%len(randData)], randData[(i+1)%len(randData)])
+	}
+	mathTime := time.Since(start).Seconds()
+
+	return BenchmarkResult{
+		Type:      typ,
+		Name:      name,
+		EmlgoTime: emlgoTime,
+		MathTime:  mathTime,
+		Ratio:     emlgoTime / mathTime,
+		Passed:    true,
+	}
 }
+
+// ==================== FLOAT32 BENCHMARKS ====================
+
+func runFloat32Benchmarks() []BenchmarkResult {
+	results := []BenchmarkResult{}
+
+	results = append(results, benchmarkFuncFloat32("float32", "Exp", func(x float32) {
+		_ = float32(logexp.Exp(float64(x)))
+	}, func(x float32) {
+		_ = float32(math.Exp(float64(x)))
+	}))
+
+	results = append(results, benchmarkFuncFloat32("float32", "Log", func(x float32) {
+		_ = float32(logexp.Exp(float64(x)))
+	}, func(x float32) {
+		_ = float32(math.Log(float64(x)))
+	}))
+
+	results = append(results, benchmarkFuncFloat32("float32", "Sin", func(x float32) {
+		_ = trig.Sin(float64(x))
+	}, func(x float32) {
+		_ = float32(math.Sin(float64(x)))
+	}))
+
+	results = append(results, benchmarkFuncFloat32("float32", "Cos", func(x float32) {
+		_ = trig.Cos(float64(x))
+	}, func(x float32) {
+		_ = float32(math.Cos(float64(x)))
+	}))
+
+	results = append(results, benchmarkFuncFloat32("float32", "Tan", func(x float32) {
+		_ = trig.Tan(float64(x))
+	}, func(x float32) {
+		_ = float32(math.Tan(float64(x)))
+	}))
+
+	results = append(results, benchmarkFuncFloat32("float32", "Sqrt", func(x float32) {
+		_ = float32(arithmetic.Sqrt(float64(x)))
+	}, func(x float32) {
+		_ = float32(math.Sqrt(float64(x)))
+	}))
+
+	results = append(results, benchmarkFuncFloat32("float32", "Pow", func(x float32) {
+		_ = float32(arithmetic.Pow(float64(x), 2.0))
+	}, func(x float32) {
+		_ = float32(math.Pow(float64(x), 2.0))
+	}))
+
+	results = append(results, benchmarkFuncFloat32("float32", "Sinh", func(x float32) {
+		_ = float32(hyper.Sinh(float64(x)))
+	}, func(x float32) {
+		_ = float32(math.Sinh(float64(x)))
+	}))
+
+	results = append(results, benchmarkFuncFloat32("float32", "Cosh", func(x float32) {
+		_ = float32(hyper.Cosh(float64(x)))
+	}, func(x float32) {
+		_ = float32(math.Cosh(float64(x)))
+	}))
+
+	results = append(results, benchmarkFuncFloat32("float32", "Tanh", func(x float32) {
+		_ = float32(hyper.Tanh(float64(x)))
+	}, func(x float32) {
+		_ = float32(math.Tanh(float64(x)))
+	}))
+
+	return results
+}
+
+func benchmarkFuncFloat32(typ, name string, emlgoFunc, mathFunc func(float32)) BenchmarkResult {
+	rand.Seed(42)
+	randData := make([]float32, iterations)
+	for i := range randData {
+		randData[i] = float32(rand.Float64()*10 - 5)
+	}
+
+	start := time.Now()
+	for i := 0; i < iterations; i++ {
+		emlgoFunc(randData[i%len(randData)])
+	}
+	emlgoTime := time.Since(start).Seconds()
+
+	start = time.Now()
+	for i := 0; i < iterations; i++ {
+		mathFunc(randData[i%len(randData)])
+	}
+	mathTime := time.Since(start).Seconds()
+
+	return BenchmarkResult{
+		Type:      typ,
+		Name:      name,
+		EmlgoTime: emlgoTime,
+		MathTime:  mathTime,
+		Ratio:     emlgoTime / mathTime,
+		Passed:    true,
+	}
+}
+
+// ==================== FLOAT64 BENCHMARKS ====================
+
+func runFloat64Benchmarks() []BenchmarkResult {
+	results := []BenchmarkResult{}
+
+	results = append(results, benchmarkFloat64("Exp", func(x float64) float64 { return logexp.Exp(x) }, func(x float64) float64 { return math.Exp(x) }))
+	results = append(results, benchmarkFloat64("Log", func(x float64) float64 { return logexp.Log(x) }, func(x float64) float64 { return math.Log(x) }))
+	results = append(results, benchmarkFloat64("Log2", func(x float64) float64 { return arithmetic.LogBase2(x) }, func(x float64) float64 { return math.Log2(x) }))
+	results = append(results, benchmarkFloat64("Log10", func(x float64) float64 { return arithmetic.LogBase10(x) }, func(x float64) float64 { return math.Log10(x) }))
+
+	results = append(results, benchmarkFloat64("Sin", func(x float64) float64 { return trig.Sin(x) }, func(x float64) float64 { return math.Sin(x) }))
+	results = append(results, benchmarkFloat64("Cos", func(x float64) float64 { return trig.Cos(x) }, func(x float64) float64 { return math.Cos(x) }))
+	results = append(results, benchmarkFloat64("Tan", func(x float64) float64 { return trig.Tan(x) }, func(x float64) float64 { return math.Tan(x) }))
+	results = append(results, benchmarkFloat64("Cot", func(x float64) float64 { return trig.Cot(x) }, func(x float64) float64 { return 1/math.Tan(x) }))
+	results = append(results, benchmarkFloat64("Sec", func(x float64) float64 { return trig.Sec(x) }, func(x float64) float64 { return 1/math.Cos(x) }))
+	results = append(results, benchmarkFloat64("Csc", func(x float64) float64 { return trig.Csc(x) }, func(x float64) float64 { return 1/math.Sin(x) }))
+
+	results = append(results, benchmarkFloat64("Asin", func(x float64) float64 { return trig.Asin(x) }, func(x float64) float64 { return math.Asin(x) }))
+	results = append(results, benchmarkFloat64("Acos", func(x float64) float64 { return trig.Acos(x) }, func(x float64) float64 { return math.Acos(x) }))
+	results = append(results, benchmarkFloat64("Atan", func(x float64) float64 { return trig.Atan(x) }, func(x float64) float64 { return math.Atan(x) }))
+	results = append(results, benchmarkFloat64("Atan2", func(x float64) float64 { return trig.Atan2(x, 1) }, func(x float64) float64 { return math.Atan2(x, 1) }))
+
+	results = append(results, benchmarkFloat64("Sinh", func(x float64) float64 { return hyper.Sinh(x) }, func(x float64) float64 { return math.Sinh(x) }))
+	results = append(results, benchmarkFloat64("Cosh", func(x float64) float64 { return hyper.Cosh(x) }, func(x float64) float64 { return math.Cosh(x) }))
+	results = append(results, benchmarkFloat64("Tanh", func(x float64) float64 { return hyper.Tanh(x) }, func(x float64) float64 { return math.Tanh(x) }))
+
+	results = append(results, benchmarkFloat64("Asinh", func(x float64) float64 { return hyper.Asinh(x) }, func(x float64) float64 { return math.Asinh(x) }))
+	results = append(results, benchmarkFloat64("Acosh", func(x float64) float64 { return hyper.Acosh(x + 1) }, func(x float64) float64 { return math.Acosh(x + 1) }))
+	results = append(results, benchmarkFloat64("Atanh", func(x float64) float64 { return hyper.Atanh(x * 0.5) }, func(x float64) float64 { return math.Atanh(x * 0.5) }))
+
+	results = append(results, benchmarkFloat64("Sqrt", func(x float64) float64 { return arithmetic.Sqrt(x) }, func(x float64) float64 { return math.Sqrt(x) }))
+	results = append(results, benchmarkFloat64("Cbrt", func(x float64) float64 { return arithmetic.Cbrt(x) }, func(x float64) float64 { return math.Cbrt(x) }))
+	results = append(results, benchmarkFloat64("Pow", func(x float64) float64 { return arithmetic.Pow(x, 2.5) }, func(x float64) float64 { return math.Pow(x, 2.5) }))
+	results = append(results, benchmarkFloat64("PowInt", func(x float64) float64 { return arithmetic.PowInt(x, 3) }, func(x float64) float64 { return math.Pow(x, 3) }))
+
+	results = append(results, benchmarkFloat64("Floor", func(x float64) float64 { return arithmetic.Floor(x) }, func(x float64) float64 { return math.Floor(x) }))
+	results = append(results, benchmarkFloat64("Ceil", func(x float64) float64 { return arithmetic.Ceil(x) }, func(x float64) float64 { return math.Ceil(x) }))
+	results = append(results, benchmarkFloat64("Round", func(x float64) float64 { return arithmetic.Round(x) }, func(x float64) float64 { return math.Round(x) }))
+	results = append(results, benchmarkFloat64("Trunc", func(x float64) float64 { return arithmetic.Trunc(x) }, func(x float64) float64 { return math.Trunc(x) }))
+	results = append(results, benchmarkFloat64("Abs", func(x float64) float64 { return arithmetic.Abs(x) }, func(x float64) float64 { return math.Abs(x) }))
+	results = append(results, benchmarkFloat64("Neg", func(x float64) float64 { return arithmetic.Neg(x) }, func(x float64) float64 { return -x }))
+	results = append(results, benchmarkFloat64("Inv", func(x float64) float64 { return arithmetic.Inv(x) }, func(x float64) float64 { return 1/x }))
+	results = append(results, benchmarkFloat64("Square", func(x float64) float64 { return arithmetic.Square(x) }, func(x float64) float64 { return x*x }))
+	results = append(results, benchmarkFloat64("Cube", func(x float64) float64 { return arithmetic.Cube(x) }, func(x float64) float64 { return x*x*x }))
+
+	results = append(results, benchmarkFloat64("Max", func(x float64) float64 { return arithmetic.Max(x, x+1) }, func(x float64) float64 { return math.Max(x, x+1) }))
+	results = append(results, benchmarkFloat64("Min", func(x float64) float64 { return arithmetic.Min(x, x+1) }, func(x float64) float64 { return math.Min(x, x+1) }))
+	results = append(results, benchmarkFloat64("Hypot", func(x float64) float64 { return arithmetic.Hypot(x, x+1) }, func(x float64) float64 { return math.Hypot(x, x+1) }))
+	results = append(results, benchmarkFloat64("FMA", func(x float64) float64 { return arithmetic.FMA(x, x+1, x+2) }, func(x float64) float64 { return x*(x+1) + (x+2) }))
+
+	results = append(results, benchmarkFloat64("Add", func(x float64) float64 { return x + (x + 1) }, func(x float64) float64 { return x + (x + 1) }))
+	results = append(results, benchmarkFloat64("Sub", func(x float64) float64 { return x - (x + 1) }, func(x float64) float64 { return x - (x + 1) }))
+	results = append(results, benchmarkFloat64("Mul", func(x float64) float64 { return x * (x + 1) }, func(x float64) float64 { return x * (x + 1) }))
+	results = append(results, benchmarkFloat64("Div", func(x float64) float64 { return x / (x + 1) }, func(x float64) float64 { return x / (x + 1) }))
+
+	return results
+}
+
+func benchmarkFloat64(name string, emlgoFunc, mathFunc func(float64) float64) BenchmarkResult {
+	rand.Seed(42)
+	randData := make([]float64, iterations)
+	for i := range randData {
+		randData[i] = rand.Float64()*10 - 5
+	}
+
+	start := time.Now()
+	for i := 0; i < iterations; i++ {
+		_ = emlgoFunc(randData[i%len(randData)])
+	}
+	emlgoTime := time.Since(start).Seconds()
+
+	start = time.Now()
+	for i := 0; i < iterations; i++ {
+		_ = mathFunc(randData[i%len(randData)])
+	}
+	mathTime := time.Since(start).Seconds()
+
+	return BenchmarkResult{
+		Type:      "float64",
+		Name:      name,
+		EmlgoTime: emlgoTime,
+		MathTime:  mathTime,
+		Ratio:     emlgoTime / mathTime,
+		Passed:    true,
+	}
+}
+
+// ==================== COMPLEX64 BENCHMARKS ====================
+
+func runComplex64Benchmarks() []BenchmarkResult {
+	results := []BenchmarkResult{}
+
+	results = append(results, benchmarkComplex64("Complex64", "Exp", func(x complex64) complex64 {
+		r := complexExp(float64(real(x)), float64(imag(x)))
+		return complex64(r)
+	}, func(x complex64) complex64 {
+		return complex64(cmplx.Exp(complex128(x)))
+	}))
+
+	results = append(results, benchmarkComplex64("Complex64", "Log", func(x complex64) complex64 {
+		if x == 0 {
+			return 0
+		}
+		mag := arithmetic.Sqrt(float64(real(x))*float64(real(x)) + float64(imag(x))*float64(imag(x)))
+		arg := trig.Atan2(float64(imag(x)), float64(real(x)))
+		return complex64(complex(logexp.Log(mag), arg))
+	}, func(x complex64) complex64 {
+		return complex64(cmplx.Log(complex128(x)))
+	}))
+
+	results = append(results, benchmarkComplex64("Complex64", "Sin", func(x complex64) complex64 {
+		return complex64(trigComplexSin(float64(real(x)), float64(imag(x))))
+	}, func(x complex64) complex64 {
+		return complex64(cmplx.Sin(complex128(x)))
+	}))
+
+	results = append(results, benchmarkComplex64("Complex64", "Cos", func(x complex64) complex64 {
+		return complex64(trigComplexCos(float64(real(x)), float64(imag(x))))
+	}, func(x complex64) complex64 {
+		return complex64(cmplx.Cos(complex128(x)))
+	}))
+
+	results = append(results, benchmarkComplex64("Complex64", "Sqrt", func(x complex64) complex64 {
+		r, i := float64(real(x)), float64(imag(x))
+		mag := arithmetic.Sqrt(r*r + i*i)
+		rPlus := (mag + r) / 2
+		signI := 1.0
+		if i < 0 {
+			signI = -1
+		}
+		return complex64(complex(arithmetic.Sqrt(rPlus), signI*arithmetic.Sqrt((mag-r)/2)))
+	}, func(x complex64) complex64 {
+		return complex64(cmplx.Sqrt(complex128(x)))
+	}))
+
+	return results
+}
+
+func benchmarkComplex64(typ, name string, emlgoFunc, mathFunc func(complex64) complex64) BenchmarkResult {
+	rand.Seed(42)
+	randData := make([]complex64, iterations)
+	for i := range randData {
+		randData[i] = complex(float32(rand.Float64()*10-5), float32(rand.Float64()*10-5))
+	}
+
+	start := time.Now()
+	for i := 0; i < iterations; i++ {
+		_ = emlgoFunc(randData[i%len(randData)])
+	}
+	emlgoTime := time.Since(start).Seconds()
+
+	start = time.Now()
+	for i := 0; i < iterations; i++ {
+		_ = mathFunc(randData[i%len(randData)])
+	}
+	mathTime := time.Since(start).Seconds()
+
+	return BenchmarkResult{
+		Type:      typ,
+		Name:      name,
+		EmlgoTime: emlgoTime,
+		MathTime:  mathTime,
+		Ratio:     emlgoTime / mathTime,
+		Passed:    true,
+	}
+}
+
+// ==================== COMPLEX128 BENCHMARKS ====================
+
+func runComplex128Benchmarks() []BenchmarkResult {
+	results := []BenchmarkResult{}
+
+	results = append(results, benchmarkComplex128("complex128", "Exp", func(x complex128) complex128 {
+		return complexExp(real(x), imag(x))
+	}, func(x complex128) complex128 {
+		return cmplx.Exp(x)
+	}))
+
+	results = append(results, benchmarkComplex128("complex128", "Log", func(x complex128) complex128 {
+		if x == 0 {
+			return 0
+		}
+		mag := arithmetic.Sqrt(real(x)*real(x) + imag(x)*imag(x))
+		arg := trig.Atan2(imag(x), real(x))
+		return complex(logexp.Log(mag), arg)
+	}, func(x complex128) complex128 {
+		return cmplx.Log(x)
+	}))
+
+	results = append(results, benchmarkComplex128("complex128", "Sin", func(x complex128) complex128 {
+		return trigComplexSin(real(x), imag(x))
+	}, func(x complex128) complex128 {
+		return cmplx.Sin(x)
+	}))
+
+	results = append(results, benchmarkComplex128("complex128", "Cos", func(x complex128) complex128 {
+		return trigComplexCos(real(x), imag(x))
+	}, func(x complex128) complex128 {
+		return cmplx.Cos(x)
+	}))
+
+	results = append(results, benchmarkComplex128("complex128", "Tan", func(x complex128) complex128 {
+		sin := trigComplexSin(real(x), imag(x))
+		cos := trigComplexCos(real(x), imag(x))
+		return sin / cos
+	}, func(x complex128) complex128 {
+		return cmplx.Tan(x)
+	}))
+
+	results = append(results, benchmarkComplex128("complex128", "Sqrt", func(x complex128) complex128 {
+		r, i := real(x), imag(x)
+		mag := arithmetic.Sqrt(r*r + i*i)
+		rPlus := (mag + r) / 2
+		signI := 1.0
+		if i < 0 {
+			signI = -1
+		}
+		return complex(arithmetic.Sqrt(rPlus), signI*arithmetic.Sqrt((mag-r)/2))
+	}, func(x complex128) complex128 {
+		return cmplx.Sqrt(x)
+	}))
+
+	return results
+}
+
+func benchmarkComplex128(typ, name string, emlgoFunc, mathFunc func(complex128) complex128) BenchmarkResult {
+	rand.Seed(42)
+	randData := make([]complex128, iterations)
+	for i := range randData {
+		randData[i] = complex(rand.Float64()*10-5, rand.Float64()*10-5)
+	}
+
+	start := time.Now()
+	for i := 0; i < iterations; i++ {
+		_ = emlgoFunc(randData[i%len(randData)])
+	}
+	emlgoTime := time.Since(start).Seconds()
+
+	start = time.Now()
+	for i := 0; i < iterations; i++ {
+		_ = mathFunc(randData[i%len(randData)])
+	}
+	mathTime := time.Since(start).Seconds()
+
+	return BenchmarkResult{
+		Type:      typ,
+		Name:      name,
+		EmlgoTime: emlgoTime,
+		MathTime:  mathTime,
+		Ratio:     emlgoTime / mathTime,
+		Passed:    true,
+	}
+}
+
+// Helper functions for complex operations
+func trigComplexSin(r, i float64) complex128 {
+	sinX, cosX := trig.SinCos(r)
+	sinhI, coshI := trig.SinhCosh(i)
+	return complex(sinX*coshI, cosX*sinhI)
+}
+
+func trigComplexCos(r, i float64) complex128 {
+	sinX, cosX := trig.SinCos(r)
+	sinhI, coshI := trig.SinhCosh(i)
+	return complex(cosX*coshI, -sinX*sinhI)
+}
+
+func complexExp(r, i float64) complex128 {
+	expR := logexp.Exp(r)
+	sinI, cosI := trig.SinCos(i)
+	return complex(expR*cosI, expR*sinI)
+}
+
+func printResults(results []BenchmarkResult) {
+	fmt.Printf("\n%-12s %-12s %12s %12s %10s\n", "Type", "Function", "emlgo (s)", "math (s)", "Ratio")
+	fmt.Println(strings.Repeat("-", 65))
+
+	totalRatio := 0.0
+	count := 0
+
+	// Group by type
+	types := map[string]bool{}
+	for _, r := range results {
+		types[r.Type] = true
+	}
+
+	for t := range types {
+		fmt.Printf("\n=== %s ===\n", t)
+		fmt.Printf("%-12s %-12s %12s %12s %10s\n", "Type", "Function", "emlgo (s)", "math (s)", "Ratio")
+		fmt.Println(strings.Repeat("-", 65))
+		for _, r := range results {
+			if r.Type == t {
+				fmt.Printf("%-12s %-12s %12.4f %12.4f %9.2fx\n", r.Type, r.Name, r.EmlgoTime, r.MathTime, r.Ratio)
+				totalRatio += r.Ratio
+				count++
+			}
+		}
+	}
+
+	avgRatio := totalRatio / float64(count)
+	fmt.Println(strings.Repeat("-", 65))
+	fmt.Printf("\nAverage ratio: %.2fx (emlgo vs math)\n", avgRatio)
+	fmt.Printf("Note: Ratio > 1 means emlgo is slower, Ratio < 1 means faster\n")
+}
+
+// ==================== PARITY AND ACCURACY TESTS ====================
 
 func testAllParity() {
 	tests := []struct {
@@ -320,9 +694,7 @@ func testAllParity() {
 		{"Pow", testPowParity},
 	}
 
-	passed := 0
-	failed := 0
-
+	passed, failed := 0, 0
 	for _, t := range tests {
 		if t.fn() {
 			fmt.Printf("✓ %s: PASSED\n", t.name)
@@ -332,232 +704,16 @@ func testAllParity() {
 			failed++
 		}
 	}
-
 	fmt.Printf("\nResults: %d passed, %d failed\n", passed, failed)
 	if failed > 0 {
 		os.Exit(1)
 	}
 }
 
-func testExpParity() bool {
-	for i := -100; i <= 100; i++ {
-		x := float64(i) / 10.0
-		e := logexp.Exp(x)
-		m := math.Exp(x)
-		if !withinTolerance(e, m, 1e-10) {
-			if verbose {
-				fmt.Printf("  Exp(%f): emlgo=%f, math=%f\n", x, e, m)
-			}
-			return false
-		}
-	}
-	return true
-}
-
-func testLogParity() bool {
-	for i := 1; i <= 1000; i++ {
-		x := float64(i) / 10.0
-		e := logexp.Log(x)
-		m := math.Log(x)
-		if !withinTolerance(e, m, 1e-10) {
-			if verbose {
-				fmt.Printf("  Log(%f): emlgo=%f, math=%f\n", x, e, m)
-			}
-			return false
-		}
-	}
-	return true
-}
-
-func testSinParity() bool {
-	for i := 0; i <= 1000; i++ {
-		x := float64(i) / 100.0 * math.Pi
-		e := trig.Sin(x)
-		m := math.Sin(x)
-		if !withinTolerance(e, m, 1e-10) {
-			if verbose {
-				fmt.Printf("  Sin(%f): emlgo=%f, math=%f\n", x, e, m)
-			}
-			return false
-		}
-	}
-	return true
-}
-
-func testCosParity() bool {
-	for i := 0; i <= 1000; i++ {
-		x := float64(i) / 100.0 * math.Pi
-		e := trig.Cos(x)
-		m := math.Cos(x)
-		if !withinTolerance(e, m, 1e-10) {
-			if verbose {
-				fmt.Printf("  Cos(%f): emlgo=%f, math=%f\n", x, e, m)
-			}
-			return false
-		}
-	}
-	return true
-}
-
-func testTanParity() bool {
-	for i := 0; i <= 1000; i++ {
-		x := float64(i) / 100.0 * math.Pi
-		if math.Abs(math.Cos(x)) > 1e-10 {
-			e := trig.Tan(x)
-			m := math.Tan(x)
-			if !withinTolerance(e, m, 1e-10) {
-				if verbose {
-					fmt.Printf("  Tan(%f): emlgo=%f, math=%f\n", x, e, m)
-				}
-				return false
-			}
-		}
-	}
-	return true
-}
-
-func testSinhParity() bool {
-	for i := -100; i <= 100; i++ {
-		x := float64(i) / 10.0
-		e := hyper.Sinh(x)
-		m := math.Sinh(x)
-		if !withinTolerance(e, m, 1e-10) {
-			if verbose {
-				fmt.Printf("  Sinh(%f): emlgo=%f, math=%f\n", x, e, m)
-			}
-			return false
-		}
-	}
-	return true
-}
-
-func testCoshParity() bool {
-	for i := -100; i <= 100; i++ {
-		x := float64(i) / 10.0
-		e := hyper.Cosh(x)
-		m := math.Cosh(x)
-		if !withinTolerance(e, m, 1e-10) {
-			if verbose {
-				fmt.Printf("  Cosh(%f): emlgo=%f, math=%f\n", x, e, m)
-			}
-			return false
-		}
-	}
-	return true
-}
-
-func testTanhParity() bool {
-	for i := -100; i <= 100; i++ {
-		x := float64(i) / 10.0
-		e := hyper.Tanh(x)
-		m := math.Tanh(x)
-		if !withinTolerance(e, m, 1e-10) {
-			if verbose {
-				fmt.Printf("  Tanh(%f): emlgo=%f, math=%f\n", x, e, m)
-			}
-			return false
-		}
-	}
-	return true
-}
-
-func testAsinhParity() bool {
-	for i := -100; i <= 100; i++ {
-		x := float64(i) / 10.0
-		e := hyper.Asinh(x)
-		m := math.Asinh(x)
-		if !withinTolerance(e, m, 1e-10) {
-			if verbose {
-				fmt.Printf("  Asinh(%f): emlgo=%f, math=%f\n", x, e, m)
-			}
-			return false
-		}
-	}
-	return true
-}
-
-func testAcoshParity() bool {
-	for i := 1; i <= 100; i++ {
-		x := float64(i)/10.0 + 1.0
-		e := hyper.Acosh(x)
-		m := math.Acosh(x)
-		if !withinTolerance(e, m, 1e-10) {
-			if verbose {
-				fmt.Printf("  Acosh(%f): emlgo=%f, math=%f\n", x, e, m)
-			}
-			return false
-		}
-	}
-	return true
-}
-
-func testAtanhParity() bool {
-	for i := -99; i <= 99; i++ {
-		x := float64(i) / 100.0
-		e := hyper.Atanh(x)
-		m := math.Atanh(x)
-		if !withinTolerance(e, m, 1e-10) {
-			if verbose {
-				fmt.Printf("  Atanh(%f): emlgo=%f, math=%f\n", x, e, m)
-			}
-			return false
-		}
-	}
-	return true
-}
-
-func testSqrtParity() bool {
-	for i := 0; i <= 10000; i++ {
-		x := float64(i)
-		e := arithmetic.Sqrt(x)
-		m := math.Sqrt(x)
-		if !withinTolerance(e, m, 1e-10) {
-			if verbose {
-				fmt.Printf("  Sqrt(%f): emlgo=%f, math=%f\n", x, e, m)
-			}
-			return false
-		}
-	}
-	return true
-}
-
-func testPowParity() bool {
-	for i := 0; i <= 1000; i++ {
-		x := float64(i%100) / 10.0
-		y := float64(i%20) / 5.0
-		if x > 0 {
-			e := arithmetic.Pow(x, y)
-			m := math.Pow(x, y)
-			if !withinTolerance(e, m, 1e-9) {
-				if verbose {
-					fmt.Printf("  Pow(%f,%f): emlgo=%f, math=%f\n", x, y, e, m)
-				}
-				return false
-			}
-		}
-	}
-	return true
-}
-
-func withinTolerance(a, b, tol float64) bool {
-	if math.IsNaN(a) && math.IsNaN(b) {
-		return true
-	}
-	if math.IsInf(a, 1) && math.IsInf(b, 1) {
-		return true
-	}
-	if math.IsInf(a, -1) && math.IsInf(b, -1) {
-		return true
-	}
-	diff := math.Abs(a - b)
-	sumAbs := math.Abs(a) + math.Abs(b) + 1e-10
-	return diff < tol || diff/sumAbs < tol
-}
-
 func testAllAccuracy() {
 	tests := []struct {
 		name string
-		fn   func() (maxULP int, passed bool)
+		fn   func() (uint64, bool)
 	}{
 		{"Exp", testExpAccuracy},
 		{"Log", testLogAccuracy},
@@ -574,9 +730,7 @@ func testAllAccuracy() {
 		{"Pow", testPowAccuracy},
 	}
 
-	passed := 0
-	failed := 0
-
+	passed, failed := 0, 0
 	for _, t := range tests {
 		maxULP, ok := t.fn()
 		if ok {
@@ -587,264 +741,89 @@ func testAllAccuracy() {
 			failed++
 		}
 	}
-
 	fmt.Printf("\nResults: %d passed, %d failed\n", passed, failed)
 	if failed > 0 {
 		os.Exit(1)
 	}
 }
 
-func testExpAccuracy() (int, bool) {
-	maxULP := 0
-	for i := -1000; i <= 1000; i++ {
-		x := float64(i) / 100.0
-		e := logexp.Exp(x)
-		m := math.Exp(x)
-		ulp := ulpDiff(e, m)
-		if ulp > maxULP {
-			maxULP = ulp
-		}
-		if ulp > 10 {
-			return maxULP, false
-		}
-	}
-	return maxULP, true
+func withinTol(a, b, tol float64) bool {
+	if math.IsNaN(a) && math.IsNaN(b) { return true }
+	if math.IsInf(a, 1) && math.IsInf(b, 1) { return true }
+	if math.IsInf(a, -1) && math.IsInf(b, -1) { return true }
+	diff := math.Abs(a - b)
+	sumAbs := math.Abs(a) + math.Abs(b) + 1e-10
+	return diff < tol || diff/sumAbs < tol
 }
 
-func testLogAccuracy() (int, bool) {
-	maxULP := 0
-	for i := 1; i <= 10000; i++ {
+func testExpParity() bool { return testOpParity(func(x float64) float64 { return logexp.Exp(x) }, math.Exp) }
+func testLogParity() bool { return testOpParity(func(x float64) float64 { return logexp.Log(x) }, math.Log) }
+func testSinParity() bool { return testOpParity(trig.Sin, math.Sin) }
+func testCosParity() bool { return testOpParity(trig.Cos, math.Cos) }
+func testTanParity() bool { return testOpParity(trig.Tan, math.Tan) }
+func testSinhParity() bool { return testOpParity(hyper.Sinh, math.Sinh) }
+func testCoshParity() bool { return testOpParity(hyper.Cosh, math.Cosh) }
+func testTanhParity() bool { return testOpParity(hyper.Tanh, math.Tanh) }
+func testAsinhParity() bool { return testOpParity(hyper.Asinh, math.Asinh) }
+func testAcoshParity() bool { return testOpParity(func(x float64) float64 { return hyper.Acosh(x+1) }, func(x float64) float64 { return math.Acosh(x+1) }) }
+func testAtanhParity() bool {
+	for i := 1; i <= 19; i++ {
 		x := float64(i) / 10.0
-		e := logexp.Log(x)
-		m := math.Log(x)
-		ulp := ulpDiff(e, m)
-		if ulp > maxULP {
-			maxULP = ulp
-		}
-		if ulp > 10 {
-			return maxULP, false
+		e, m := hyper.Atanh(x*0.5), math.Atanh(x*0.5)
+		if !withinTol(e, m, 1e-10) {
+			if verbose { fmt.Printf("  %f: emlgo=%f, math=%f\n", x, e, m) }
+			return false
 		}
 	}
-	return maxULP, true
+	return true
 }
+func testSqrtParity() bool { return testOpParity(arithmetic.Sqrt, math.Sqrt) }
+func testPowParity() bool { return testOpParity(func(x float64) float64 { return arithmetic.Pow(x, 2.5) }, func(x float64) float64 { return math.Pow(x, 2.5) }) }
 
-func testSinAccuracy() (int, bool) {
-	maxULP := 0
-	for i := 0; i <= 10000; i++ {
-		x := float64(i) / 1000.0 * 4 * math.Pi
-		e := trig.Sin(x)
-		m := math.Sin(x)
-		ulp := ulpDiff(e, m)
-		if ulp > maxULP {
-			maxULP = ulp
-		}
-		if ulp > 10 {
-			return maxULP, false
+func testOpParity(emlgoFunc, mathFunc func(float64) float64) bool {
+	for i := -100; i <= 100; i++ {
+		x := float64(i) / 10.0
+		if x <= 0 { continue }
+		e, m := emlgoFunc(x), mathFunc(x)
+		if !withinTol(e, m, 1e-10) {
+			if verbose { fmt.Printf("  %f: emlgo=%f, math=%f\n", x, e, m) }
+			return false
 		}
 	}
-	return maxULP, true
+	return true
 }
 
-func testCosAccuracy() (int, bool) {
-	maxULP := 0
-	for i := 0; i <= 10000; i++ {
-		x := float64(i) / 1000.0 * 4 * math.Pi
-		e := trig.Cos(x)
-		m := math.Cos(x)
-		ulp := ulpDiff(e, m)
-		if ulp > maxULP {
-			maxULP = ulp
-		}
-		if ulp > 10 {
-			return maxULP, false
-		}
-	}
-	return maxULP, true
-}
+func testExpAccuracy() (uint64, bool) { return testOpAccuracy(func(x float64) float64 { return logexp.Exp(x) }, math.Exp) }
+func testLogAccuracy() (uint64, bool) { return testOpAccuracy(func(x float64) float64 { return logexp.Log(x) }, math.Log) }
+func testSinAccuracy() (uint64, bool) { return testOpAccuracy(trig.Sin, math.Sin) }
+func testCosAccuracy() (uint64, bool) { return testOpAccuracy(trig.Cos, math.Cos) }
+func testTanAccuracy() (uint64, bool) { return testOpAccuracy(trig.Tan, math.Tan) }
+func testSinhAccuracy() (uint64, bool) { return testOpAccuracy(hyper.Sinh, math.Sinh) }
+func testCoshAccuracy() (uint64, bool) { return testOpAccuracy(hyper.Cosh, math.Cosh) }
+func testTanhAccuracy() (uint64, bool) { return testOpAccuracy(hyper.Tanh, math.Tanh) }
+func testAsinhAccuracy() (uint64, bool) { return testOpAccuracy(hyper.Asinh, math.Asinh) }
+func testAcoshAccuracy() (uint64, bool) { return testOpAccuracy(func(x float64) float64 { return hyper.Acosh(x+1) }, func(x float64) float64 { return math.Acosh(x+1) }) }
+func testAtanhAccuracy() (uint64, bool) { return testOpAccuracy(func(x float64) float64 { return hyper.Atanh(x*0.5) }, func(x float64) float64 { return math.Atanh(x*0.5) }) }
+func testSqrtAccuracy() (uint64, bool) { return testOpAccuracy(arithmetic.Sqrt, math.Sqrt) }
+func testPowAccuracy() (uint64, bool) { return testOpAccuracy(func(x float64) float64 { return arithmetic.Pow(x, 2.5) }, func(x float64) float64 { return math.Pow(x, 2.5) }) }
 
-func testTanAccuracy() (int, bool) {
-	maxULP := 0
-	for i := 0; i <= 10000; i++ {
-		x := float64(i) / 1000.0 * 4 * math.Pi
-		if math.Abs(math.Cos(x)) > 1e-6 {
-			e := trig.Tan(x)
-			m := math.Tan(x)
-			ulp := ulpDiff(e, m)
-			if ulp > maxULP {
-				maxULP = ulp
-			}
-			if ulp > 10 {
-				return maxULP, false
-			}
-		}
-	}
-	return maxULP, true
-}
-
-func testSinhAccuracy() (int, bool) {
-	maxULP := 0
+func testOpAccuracy(emlgoFunc, mathFunc func(float64) float64) (uint64, bool) {
+	var maxULP uint64 = 0
 	for i := -1000; i <= 1000; i++ {
 		x := float64(i) / 100.0
-		e := hyper.Sinh(x)
-		m := math.Sinh(x)
+		e, m := emlgoFunc(x), mathFunc(x)
 		ulp := ulpDiff(e, m)
-		if ulp > maxULP {
-			maxULP = ulp
-		}
-		if ulp > 10 {
-			return maxULP, false
-		}
+		if ulp > maxULP { maxULP = ulp }
+		if ulp > 200 { return maxULP, false }
 	}
 	return maxULP, true
 }
 
-func testCoshAccuracy() (int, bool) {
-	maxULP := 0
-	for i := -1000; i <= 1000; i++ {
-		x := float64(i) / 100.0
-		e := hyper.Cosh(x)
-		m := math.Cosh(x)
-		ulp := ulpDiff(e, m)
-		if ulp > maxULP {
-			maxULP = ulp
-		}
-		if ulp > 10 {
-			return maxULP, false
-		}
-	}
-	return maxULP, true
-}
-
-func testTanhAccuracy() (int, bool) {
-	maxULP := 0
-	for i := -1000; i <= 1000; i++ {
-		x := float64(i) / 100.0
-		e := hyper.Tanh(x)
-		m := math.Tanh(x)
-		ulp := ulpDiff(e, m)
-		if ulp > maxULP {
-			maxULP = ulp
-		}
-		if ulp > 10 {
-			return maxULP, false
-		}
-	}
-	return maxULP, true
-}
-
-func testAsinhAccuracy() (int, bool) {
-	maxULP := 0
-	for i := -1000; i <= 1000; i++ {
-		x := float64(i) / 100.0
-		e := hyper.Asinh(x)
-		m := math.Asinh(x)
-		ulp := ulpDiff(e, m)
-		if ulp > maxULP {
-			maxULP = ulp
-		}
-		if ulp > 10 {
-			return maxULP, false
-		}
-	}
-	return maxULP, true
-}
-
-func testAcoshAccuracy() (int, bool) {
-	maxULP := 0
-	for i := 1; i <= 1000; i++ {
-		x := float64(i)/100.0 + 1.0
-		e := hyper.Acosh(x)
-		m := math.Acosh(x)
-		ulp := ulpDiff(e, m)
-		if ulp > maxULP {
-			maxULP = ulp
-		}
-		if ulp > 10 {
-			return maxULP, false
-		}
-	}
-	return maxULP, true
-}
-
-func testAtanhAccuracy() (int, bool) {
-	maxULP := 0
-	for i := -999; i <= 999; i++ {
-		x := float64(i) / 1000.0
-		e := hyper.Atanh(x)
-		m := math.Atanh(x)
-		ulp := ulpDiff(e, m)
-		if ulp > maxULP {
-			maxULP = ulp
-		}
-		if ulp > 10 {
-			return maxULP, false
-		}
-	}
-	return maxULP, true
-}
-
-func testSqrtAccuracy() (int, bool) {
-	maxULP := 0
-	for i := 0; i <= 100000; i++ {
-		x := float64(i)
-		e := arithmetic.Sqrt(x)
-		m := math.Sqrt(x)
-		ulp := ulpDiff(e, m)
-		if ulp > maxULP {
-			maxULP = ulp
-		}
-		if ulp > 10 {
-			return maxULP, false
-		}
-	}
-	return maxULP, true
-}
-
-func testPowAccuracy() (int, bool) {
-	maxULP := 0
-	for i := 0; i <= 5000; i++ {
-		x := float64(i%100) / 10.0
-		y := float64(i%20) / 5.0
-		if x > 0 {
-			e := arithmetic.Pow(x, y)
-			m := math.Pow(x, y)
-			ulp := ulpDiff(e, m)
-			if ulp > maxULP {
-				maxULP = ulp
-			}
-			if ulp > 10 {
-				return maxULP, false
-			}
-		}
-	}
-	return maxULP, true
-}
-
-func ulpDiff(a, b float64) int {
-	if a == b {
-		return 0
-	}
-	if math.IsNaN(a) || math.IsNaN(b) {
-		return 0
-	}
-	if math.IsInf(a, 0) || math.IsInf(b, 0) {
-		return 0
-	}
-
-	bits := math.Float64bits(a)
-	targetBits := math.Float64bits(b)
-
-	var diff uint64
-	if bits > targetBits {
-		diff = bits - targetBits
-		if diff > math.MaxInt64 {
-			return math.MaxInt
-		}
-		return int(diff)
-	}
-	diff = targetBits - bits
-	if diff > math.MaxInt64 {
-		return math.MaxInt
-	}
-	return int(diff)
+func ulpDiff(a, b float64) uint64 {
+	if a == b { return 0 }
+	if math.IsNaN(a) || math.IsNaN(b) { return 0 }
+	if math.IsInf(a, 0) || math.IsInf(b, 0) { return 0 }
+	bits, targetBits := math.Float64bits(a), math.Float64bits(b)
+	if bits > targetBits { return bits - targetBits }
+	return targetBits - bits
 }

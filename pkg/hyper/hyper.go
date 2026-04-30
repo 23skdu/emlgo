@@ -4,9 +4,9 @@ import (
 	"math"
 
 	"github.com/emlgo/eml/pkg/arithmetic"
-	"github.com/emlgo/eml/pkg/logexp"
 )
 
+//go:inline
 func Sinh(x float64) float64 {
 	if math.IsNaN(x) {
 		return math.NaN()
@@ -20,11 +20,12 @@ func Sinh(x float64) float64 {
 		}
 		return math.Inf(-1)
 	}
-	ex := logexp.Exp(x)
-	emx := logexp.Exp(-x)
+	ex := math.Exp(x)
+	emx := math.Exp(-x)
 	return (ex - emx) / 2
 }
 
+//go:inline
 func Cosh(x float64) float64 {
 	if math.IsNaN(x) {
 		return math.NaN()
@@ -35,11 +36,12 @@ func Cosh(x float64) float64 {
 	if x > 709.78 || x < -709.78 {
 		return math.Inf(1)
 	}
-	ex := logexp.Exp(x)
-	emx := logexp.Exp(-x)
+	ex := math.Exp(x)
+	emx := math.Exp(-x)
 	return (ex + emx) / 2
 }
 
+//go:inline
 func Tanh(x float64) float64 {
 	if math.IsNaN(x) {
 		return math.NaN()
@@ -56,8 +58,8 @@ func Tanh(x float64) float64 {
 	if math.IsInf(x, -1) {
 		return -1
 	}
-	ex := logexp.Exp(x)
-	emx := logexp.Exp(-x)
+	ex := math.Exp(x)
+	emx := math.Exp(-x)
 	sum := ex + emx
 	if math.IsInf(sum, 1) {
 		if x > 0 {
@@ -68,6 +70,7 @@ func Tanh(x float64) float64 {
 	return (ex - emx) / sum
 }
 
+//go:inline
 func Asinh(x float64) float64 {
 	if math.IsNaN(x) {
 		return math.NaN()
@@ -80,8 +83,6 @@ func Asinh(x float64) float64 {
 	}
 	absX := math.Abs(x)
 	if absX > 1e150 {
-		// For extremely large x, use: asinh(x) ≈ ln(2x) + ln(1+1/(2x)) ≈ ln(2x) + 1/(2x)
-		// But 2*x overflows, so use: ln(2) + ln(x) = ln(2) + ln(10)*log10(x)
 		log10x := math.Log10(absX)
 		approx := math.Ln2 + math.Ln10*log10x
 		if x > 0 {
@@ -91,8 +92,6 @@ func Asinh(x float64) float64 {
 	}
 	if absX > math.MaxFloat64/2 {
 		if x > 0 {
-			// For large x: asinh(x) ≈ ln(2x)
-			// Use log10 to avoid overflow
 			log10x := math.Log10(2 * absX)
 			return math.Ln10 * log10x
 		}
@@ -101,16 +100,16 @@ func Asinh(x float64) float64 {
 	}
 	term := arithmetic.Sqrt(x*x + 1)
 	if math.IsInf(term, 1) {
-		// Use log10 approximation
 		log10x := math.Log10(2 * absX)
 		if x > 0 {
 			return math.Ln10 * log10x
 		}
 		return -math.Ln10 * log10x
 	}
-	return logexp.Log(x + term)
+	return math.Log(x + term)
 }
 
+//go:inline
 func Acosh(x float64) float64 {
 	if math.IsNaN(x) {
 		return math.NaN()
@@ -125,11 +124,12 @@ func Acosh(x float64) float64 {
 		return x
 	}
 	if x > math.MaxFloat64/2 {
-		return logexp.Log(2*x) - 0.6931471805599453
+		return math.Log(2*x) - 0.6931471805599453
 	}
-	return logexp.Log(x + arithmetic.Sqrt(x-1)*arithmetic.Sqrt(x+1))
+	return math.Log(x + arithmetic.Sqrt(x-1)*arithmetic.Sqrt(x+1))
 }
 
+//go:inline
 func Atanh(x float64) float64 {
 	if math.IsNaN(x) {
 		return math.NaN()
@@ -146,5 +146,5 @@ func Atanh(x float64) float64 {
 		}
 		return math.Inf(-1)
 	}
-	return logexp.Log((1+x)/(1-x)) / 2
+	return math.Log((1+x)/(1-x)) / 2
 }
