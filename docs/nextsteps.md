@@ -36,7 +36,7 @@ Standard `math` performs extensive checks for signed zeros, subnormal numbers, a
 
 ---
 
-### Implementation Status:
+### Implementation Status
 
 1. `[x]` **Scalar Sqrt:** Map directly to `SQRTSD` / `FSQRT`.
 2. `[x]` **Scalar FMA:** Implement `FMA(a, b, c)` as a single instruction.

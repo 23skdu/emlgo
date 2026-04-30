@@ -6,11 +6,12 @@ A pure Go implementation of all elementary mathematical functions using only the
 
 The emlgo library provides a complete set of elementary mathematical functions (trigonometric, hyperbolic, exponential, logarithmic, and arithmetic operations) implemented using a single primitive operator:
 
-```
+```math
 eml(x, y) = exp(x) - ln(y)
 ```
 
 This approach enables:
+
 - **No external dependencies** - Pure Go with optional SIMD support
 - **Unified implementation** - All functions derived from a single primitive
 - **SIMD optimizations** - Batch processing with AVX2/AVX512/NEON support
@@ -52,7 +53,7 @@ func main() {
 ## Packages
 
 | Package | Description |
-|---------|-------------|
+| :--- | :--- |
 | `pkg/logexp` | Exponential and logarithmic functions |
 | `pkg/trig` | Trigonometric and inverse trigonometric functions |
 | `pkg/hyper` | Hyperbolic and inverse hyperbolic functions |

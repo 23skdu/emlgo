@@ -56,7 +56,7 @@ func main() {
 ## Packages
 
 | Package | Description |
-|---------|-------------|
+| :--- | :--- |
 | `pkg/logexp` | Exp, Log functions using EML |
 | `pkg/trig` | Trig, inverse trig, hyperbolic functions |
 | `pkg/hyper` | Dedicated hyperbolic functions |
@@ -72,6 +72,7 @@ The library automatically detects and uses SIMD instructions:
 - **ARM64**: NEON/ASIMD (4-wide)
 
 Batch operations automatically use SIMD:
+
 ```go
 values := make([]float64, 1000)
 // ... fill values ...
@@ -81,6 +82,7 @@ results := trig.SinBatch(values)  // Uses SIMD when available
 ## Benchmarking
 
 Run speed benchmarks comparing emlgo to math library:
+
 ```bash
 ./scripts/run_benchmark.sh           # Speed benchmark
 ./scripts/run_benchmark.sh -c        # Feature parity
@@ -90,6 +92,7 @@ Run speed benchmarks comparing emlgo to math library:
 ## Validation
 
 Run validation tests for all Go data types:
+
 ```bash
 ./scripts/run_validation.sh           # All validations
 ./scripts/run_validation.sh -v       # Verbose output
@@ -117,7 +120,7 @@ gosec ./...
 
 ## Architecture
 
-```
+```text
 emlgo/
 ├── cmd/
 │   ├── bench/         # Benchmark tool
