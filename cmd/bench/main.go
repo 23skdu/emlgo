@@ -834,8 +834,17 @@ func ulpDiff(a, b float64) int {
 	bits := math.Float64bits(a)
 	targetBits := math.Float64bits(b)
 
+	var diff uint64
 	if bits > targetBits {
-		return int(bits - targetBits)
+		diff = bits - targetBits
+		if diff > math.MaxInt64 {
+			return math.MaxInt
+		}
+		return int(diff)
 	}
-	return int(targetBits - bits)
+	diff = targetBits - bits
+	if diff > math.MaxInt64 {
+		return math.MaxInt
+	}
+	return int(diff)
 }
