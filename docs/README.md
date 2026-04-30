@@ -57,8 +57,13 @@ func main() {
 | `pkg/trig` | Trigonometric and inverse trigonometric functions |
 | `pkg/hyper` | Hyperbolic and inverse hyperbolic functions |
 | `pkg/arithmetic` | Basic arithmetic operations, roots, powers |
-| `internal/eml` | Core EML operator implementation |
+| `pkg/fastmath` | High-performance scalar alternatives |
+| `internal/eml` | Core EML operator + SIMD/Scalar kernels |
 | `internal/constants` | Mathematical constants |
+
+## Architecture
+
+For details on the internal design and SIMD dispatch logic, see [Architecture](architecture.md).
 
 ## Features
 
