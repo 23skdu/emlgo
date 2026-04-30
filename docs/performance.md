@@ -88,7 +88,26 @@ Both libraries prioritize zero-allocation paths for performance.
 
 ---
 
-## 4. Conclusion & Recommendations
+## 4. Comparative Advantage: Scalar vs Batch
+
+The following table highlights where `emlgo` provides the most significant advantages, specifically contrasting scalar latency against batch throughput (SIMD).
+
+| Operation | Scalar Winner | Scalar Note | Batch Winner | Batch Note |
+| :--- | :--- | :--- | :--- | :--- |
+| **Addition** | **math** | Compiler Intrinsic | **emlgo** | SIMD Vectorized |
+| **Subtraction** | **math** | Compiler Intrinsic | **emlgo** | SIMD Vectorized |
+| **Multiplication**| **math** | Compiler Intrinsic | **emlgo** | SIMD Vectorized |
+| **Division** | **math** | Compiler Intrinsic | **emlgo** | SIMD Vectorized |
+| **Sqrt** | **math** | Compiler Intrinsic | **emlgo** | SIMD (AVX512/NEON) |
+| **Exp** | **math** | Near-parity | **emlgo** | SIMD (AVX512/NEON) |
+| **Sin/Cos** | **emlgo*** | FastMath optimized | **emlgo** | SIMD (AVX512/NEON) |
+| **PowInt** | **emlgo** | Optimized loop | **emlgo** | SIMD Parallelized |
+
+*\*Requires `pkg/fastmath` for peak scalar performance.*
+
+---
+
+## 5. Conclusion & Recommendations
 
 ### When to use `math`
 
