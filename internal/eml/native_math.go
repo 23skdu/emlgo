@@ -212,36 +212,16 @@ func expImpl(x float64) float64 {
 }
 
 func nativeLog(x float64) float64 {
-	if isNaN(x) || x > 0 {
+	if isNaN(x) {
 		return x
 	}
-	if x == 0 {
-		return inf(-1)
-	}
-	if x < 0 {
+	if x <= 0 {
+		if x == 0 {
+			return inf(-1)
+		}
 		return nan()
 	}
-
-	exp := int(f64bits(x)>>52) - 1023
-	mant := f64bits(x) & ((1 << 52) - 1)
-	m := float64(mant) / float64(1<<52)
-	m = m + 1.0
-
-	if exp < -1022 {
-		exp = -1022
-		m = m / 2
-	} else {
-		m = m - 1
-	}
-
-	f := m - 1.0
-	s := f * f
-	h := 2*m - 1.0
-	w := f * s * (logC1 + s*(logC2+s*(logC3+s*(logC4+s*(logC5+s*(logC6+s*(logC7+s*(logC8+s*logC9))))))))
-	w = w - h*(m-1-(f*(logC1+s*(logC2+s*(logC3+s*(logC4+s*(logC5+s*(logC6+s*(logC7+s*(logC8+s*logC9))))))))))
-
-	r := float64(exp)*ln2Hi + w
-	return r + float64(exp)*ln2Lo
+	return math.Log(x)
 }
 
 func nativeSin(x float64) float64 {

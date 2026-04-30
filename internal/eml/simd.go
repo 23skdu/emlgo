@@ -429,9 +429,35 @@ func AddSIMD(a, b []float64) []float64 {
 		return a
 	}
 	result := make([]float64, n)
-	for i := 0; i < n; i++ {
-		result[i] = a[i] + b[i]
+
+	if n < 256 {
+		for i := 0; i < n; i++ {
+			result[i] = a[i] + b[i]
+		}
+		return result
 	}
+
+	numWorkers := runtime.GOMAXPROCS(0)
+	chunkSize := (n + numWorkers - 1) / numWorkers
+	if chunkSize > 4096 {
+		chunkSize = 4096
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < n; i += chunkSize {
+		end := i + chunkSize
+		if end > n {
+			end = n
+		}
+		wg.Add(1)
+		go func(start, end int) {
+			defer wg.Done()
+			for j := start; j < end; j++ {
+				result[j] = a[j] + b[j]
+			}
+		}(i, end)
+	}
+	wg.Wait()
 	return result
 }
 
@@ -444,9 +470,35 @@ func SubSIMD(a, b []float64) []float64 {
 		return a
 	}
 	result := make([]float64, n)
-	for i := 0; i < n; i++ {
-		result[i] = a[i] - b[i]
+
+	if n < 256 {
+		for i := 0; i < n; i++ {
+			result[i] = a[i] - b[i]
+		}
+		return result
 	}
+
+	numWorkers := runtime.GOMAXPROCS(0)
+	chunkSize := (n + numWorkers - 1) / numWorkers
+	if chunkSize > 4096 {
+		chunkSize = 4096
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < n; i += chunkSize {
+		end := i + chunkSize
+		if end > n {
+			end = n
+		}
+		wg.Add(1)
+		go func(start, end int) {
+			defer wg.Done()
+			for j := start; j < end; j++ {
+				result[j] = a[j] - b[j]
+			}
+		}(i, end)
+	}
+	wg.Wait()
 	return result
 }
 
@@ -459,9 +511,35 @@ func MulSIMD(a, b []float64) []float64 {
 		return a
 	}
 	result := make([]float64, n)
-	for i := 0; i < n; i++ {
-		result[i] = a[i] * b[i]
+
+	if n < 256 {
+		for i := 0; i < n; i++ {
+			result[i] = a[i] * b[i]
+		}
+		return result
 	}
+
+	numWorkers := runtime.GOMAXPROCS(0)
+	chunkSize := (n + numWorkers - 1) / numWorkers
+	if chunkSize > 4096 {
+		chunkSize = 4096
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < n; i += chunkSize {
+		end := i + chunkSize
+		if end > n {
+			end = n
+		}
+		wg.Add(1)
+		go func(start, end int) {
+			defer wg.Done()
+			for j := start; j < end; j++ {
+				result[j] = a[j] * b[j]
+			}
+		}(i, end)
+	}
+	wg.Wait()
 	return result
 }
 
@@ -474,9 +552,35 @@ func DivSIMD(a, b []float64) []float64 {
 		return a
 	}
 	result := make([]float64, n)
-	for i := 0; i < n; i++ {
-		result[i] = a[i] / b[i]
+
+	if n < 256 {
+		for i := 0; i < n; i++ {
+			result[i] = a[i] / b[i]
+		}
+		return result
 	}
+
+	numWorkers := runtime.GOMAXPROCS(0)
+	chunkSize := (n + numWorkers - 1) / numWorkers
+	if chunkSize > 4096 {
+		chunkSize = 4096
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < n; i += chunkSize {
+		end := i + chunkSize
+		if end > n {
+			end = n
+		}
+		wg.Add(1)
+		go func(start, end int) {
+			defer wg.Done()
+			for j := start; j < end; j++ {
+				result[j] = a[j] / b[j]
+			}
+		}(i, end)
+	}
+	wg.Wait()
 	return result
 }
 
@@ -486,9 +590,35 @@ func AddScalarSIMD(a []float64, b float64) []float64 {
 		return a
 	}
 	result := make([]float64, n)
-	for i := 0; i < n; i++ {
-		result[i] = a[i] + b
+
+	if n < 256 {
+		for i := 0; i < n; i++ {
+			result[i] = a[i] + b
+		}
+		return result
 	}
+
+	numWorkers := runtime.GOMAXPROCS(0)
+	chunkSize := (n + numWorkers - 1) / numWorkers
+	if chunkSize > 4096 {
+		chunkSize = 4096
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < n; i += chunkSize {
+		end := i + chunkSize
+		if end > n {
+			end = n
+		}
+		wg.Add(1)
+		go func(start, end int) {
+			defer wg.Done()
+			for j := start; j < end; j++ {
+				result[j] = a[j] + b
+			}
+		}(i, end)
+	}
+	wg.Wait()
 	return result
 }
 
@@ -498,8 +628,262 @@ func MulScalarSIMD(a []float64, b float64) []float64 {
 		return a
 	}
 	result := make([]float64, n)
-	for i := 0; i < n; i++ {
-		result[i] = a[i] * b
+
+	if n < 256 {
+		for i := 0; i < n; i++ {
+			result[i] = a[i] * b
+		}
+		return result
 	}
+
+	numWorkers := runtime.GOMAXPROCS(0)
+	chunkSize := (n + numWorkers - 1) / numWorkers
+	if chunkSize > 4096 {
+		chunkSize = 4096
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < n; i += chunkSize {
+		end := i + chunkSize
+		if end > n {
+			end = n
+		}
+		wg.Add(1)
+		go func(start, end int) {
+			defer wg.Done()
+			for j := start; j < end; j++ {
+				result[j] = a[j] * b
+			}
+		}(i, end)
+	}
+	wg.Wait()
+	return result
+}
+
+func SinhBatch(x []float64) []float64 {
+	n := len(x)
+	if n == 0 {
+		return x
+	}
+	result := make([]float64, n)
+
+	if n < 256 {
+		for i := 0; i < n; i++ {
+			result[i] = Sinh(x[i])
+		}
+		return result
+	}
+
+	numWorkers := runtime.GOMAXPROCS(0)
+	chunkSize := (n + numWorkers - 1) / numWorkers
+	if chunkSize > 4096 {
+		chunkSize = 4096
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < n; i += chunkSize {
+		end := i + chunkSize
+		if end > n {
+			end = n
+		}
+		wg.Add(1)
+		go func(start, end int) {
+			defer wg.Done()
+			for j := start; j < end; j++ {
+				result[j] = Sinh(x[j])
+			}
+		}(i, end)
+	}
+	wg.Wait()
+	return result
+}
+
+func CoshBatch(x []float64) []float64 {
+	n := len(x)
+	if n == 0 {
+		return x
+	}
+	result := make([]float64, n)
+
+	if n < 256 {
+		for i := 0; i < n; i++ {
+			result[i] = Cosh(x[i])
+		}
+		return result
+	}
+
+	numWorkers := runtime.GOMAXPROCS(0)
+	chunkSize := (n + numWorkers - 1) / numWorkers
+	if chunkSize > 4096 {
+		chunkSize = 4096
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < n; i += chunkSize {
+		end := i + chunkSize
+		if end > n {
+			end = n
+		}
+		wg.Add(1)
+		go func(start, end int) {
+			defer wg.Done()
+			for j := start; j < end; j++ {
+				result[j] = Cosh(x[j])
+			}
+		}(i, end)
+	}
+	wg.Wait()
+	return result
+}
+
+func TanhBatch(x []float64) []float64 {
+	n := len(x)
+	if n == 0 {
+		return x
+	}
+	result := make([]float64, n)
+
+	if n < 256 {
+		for i := 0; i < n; i++ {
+			result[i] = Tanh(x[i])
+		}
+		return result
+	}
+
+	numWorkers := runtime.GOMAXPROCS(0)
+	chunkSize := (n + numWorkers - 1) / numWorkers
+	if chunkSize > 4096 {
+		chunkSize = 4096
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < n; i += chunkSize {
+		end := i + chunkSize
+		if end > n {
+			end = n
+		}
+		wg.Add(1)
+		go func(start, end int) {
+			defer wg.Done()
+			for j := start; j < end; j++ {
+				result[j] = Tanh(x[j])
+			}
+		}(i, end)
+	}
+	wg.Wait()
+	return result
+}
+
+func AsinhBatch(x []float64) []float64 {
+	n := len(x)
+	if n == 0 {
+		return x
+	}
+	result := make([]float64, n)
+
+	if n < 256 {
+		for i := 0; i < n; i++ {
+			result[i] = Asinh(x[i])
+		}
+		return result
+	}
+
+	numWorkers := runtime.GOMAXPROCS(0)
+	chunkSize := (n + numWorkers - 1) / numWorkers
+	if chunkSize > 4096 {
+		chunkSize = 4096
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < n; i += chunkSize {
+		end := i + chunkSize
+		if end > n {
+			end = n
+		}
+		wg.Add(1)
+		go func(start, end int) {
+			defer wg.Done()
+			for j := start; j < end; j++ {
+				result[j] = Asinh(x[j])
+			}
+		}(i, end)
+	}
+	wg.Wait()
+	return result
+}
+
+func AcoshBatch(x []float64) []float64 {
+	n := len(x)
+	if n == 0 {
+		return x
+	}
+	result := make([]float64, n)
+
+	if n < 256 {
+		for i := 0; i < n; i++ {
+			result[i] = Acosh(x[i])
+		}
+		return result
+	}
+
+	numWorkers := runtime.GOMAXPROCS(0)
+	chunkSize := (n + numWorkers - 1) / numWorkers
+	if chunkSize > 4096 {
+		chunkSize = 4096
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < n; i += chunkSize {
+		end := i + chunkSize
+		if end > n {
+			end = n
+		}
+		wg.Add(1)
+		go func(start, end int) {
+			defer wg.Done()
+			for j := start; j < end; j++ {
+				result[j] = Acosh(x[j])
+			}
+		}(i, end)
+	}
+	wg.Wait()
+	return result
+}
+
+func AtanhBatch(x []float64) []float64 {
+	n := len(x)
+	if n == 0 {
+		return x
+	}
+	result := make([]float64, n)
+
+	if n < 256 {
+		for i := 0; i < n; i++ {
+			result[i] = Atanh(x[i])
+		}
+		return result
+	}
+
+	numWorkers := runtime.GOMAXPROCS(0)
+	chunkSize := (n + numWorkers - 1) / numWorkers
+	if chunkSize > 4096 {
+		chunkSize = 4096
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < n; i += chunkSize {
+		end := i + chunkSize
+		if end > n {
+			end = n
+		}
+		wg.Add(1)
+		go func(start, end int) {
+			defer wg.Done()
+			for j := start; j < end; j++ {
+				result[j] = Atanh(x[j])
+			}
+		}(i, end)
+	}
+	wg.Wait()
 	return result
 }
