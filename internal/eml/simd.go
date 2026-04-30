@@ -1,6 +1,7 @@
 package eml
 
 import (
+	"math"
 	"runtime"
 	"sync"
 
@@ -35,7 +36,7 @@ func HasAVX512() bool {
 	return hasAVX512
 }
 
-func EmlSIMD(x, y []float64, result []float64) {
+func EmlSIMD(x, y, result []float64) {
 	initSIMD()
 	if len(x) != len(y) || len(x) != len(result) {
 		panic("slice length mismatch")
@@ -51,7 +52,40 @@ func EmlSIMD(x, y []float64, result []float64) {
 }
 
 func emlSIMDImpl(x, y, result []float64) {
-	for i := range x {
-		result[i] = Eml(x[i], y[i])
+	n := len(x)
+
+	if n >= 128 && hasAVX512 {
+		emlSIMD128(x, y, result)
+		return
 	}
+
+	for i := 0; i < n; i++ {
+		result[i] = math.Exp(x[i]) - math.Log(y[i])
+	}
+}
+
+func emlSIMD128(x, y, result []float64) {
+	for i := 0; i < len(x); i++ {
+		result[i] = math.Exp(x[i]) - math.Log(y[i])
+	}
+}
+
+type VectorFunc func(x, y, result []float64) error
+
+func EmlBatch(x, y []float64, fn VectorFunc) error {
+	if len(x) != len(y) {
+		return ErrLengthMismatch
+	}
+	result := make([]float64, len(x))
+	return fn(x, y, result)
+}
+
+var ErrLengthMismatch = &EMLError{message: "slice length mismatch"}
+
+type EMLError struct {
+	message string
+}
+
+func (e *EMLError) Error() string {
+	return e.message
 }
