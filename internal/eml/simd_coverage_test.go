@@ -1,6 +1,7 @@
 package eml
 
 import (
+	"runtime"
 	"testing"
 )
 
