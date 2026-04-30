@@ -24,6 +24,9 @@ func mulScalarAVX512(a []float64, b float64, result []float64)
 func sqrtAVX2(a, result []float64)
 func sqrtAVX512(a, result []float64)
 
+func sqrtScalar(x float64) float64
+func fmaScalar(a, b, c float64) float64
+
 func detectAMD64SIMD() {
 	_, _, ecx, _ := cpuid(1, 0)
 	hasSSE4 = (ecx & (1 << 19)) != 0

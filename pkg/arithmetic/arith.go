@@ -299,7 +299,7 @@ func Expm1(x float64) float64 {
 }
 
 func FMA(x, y, z float64) float64 {
-	return x*y + z
+	return eml.FmaScalar(x, y, z)
 }
 
 func GCD(a, b int64) int64 {

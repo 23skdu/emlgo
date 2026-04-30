@@ -1,6 +1,7 @@
 package eml
 
 import (
+	"math"
 	"runtime"
 	"sync"
 )
@@ -14,10 +15,8 @@ var (
 	simdOnce   sync.Once
 )
 
-func initSIMD() {
-	simdOnce.Do(func() {
-		detectSIMD()
-	})
+func init() {
+	detectSIMD()
 }
 
 func detectSIMD() {
@@ -38,32 +37,42 @@ func detectSIMD() {
 // detectAMD64SIMD and detectARM64SIMD are implemented in architecture-specific files.
 
 func HasSSE4() bool {
-	initSIMD()
 	return hasSSE4
 }
 
 func HasAVX2() bool {
-	initSIMD()
 	return hasAVX2
 }
 
 func HasAVX512() bool {
-	initSIMD()
 	return hasAVX512
 }
 
 func HasNeon() bool {
-	initSIMD()
 	return hasNeon
 }
 
 func HasNeonDot() bool {
-	initSIMD()
 	return hasNeonDot
 }
 
+func FmaScalar(a, b, c float64) float64 {
+	// FMA is available on AVX2+ and all ARM64 (NEON)
+	if hasAVX2 || hasAVX512 || hasNeon {
+		return fmaScalar(a, b, c)
+	}
+	return a*b + c
+}
+
+func SqrtScalar(x float64) float64 {
+	// SQRTSD is universal on AMD64, FSQRTD is universal on ARM64
+	if runtime.GOARCH == "amd64" || runtime.GOARCH == "arm64" {
+		return sqrtScalar(x)
+	}
+	return math.Sqrt(x)
+}
+
 func EmlSIMD(x, y, result []float64) {
-	initSIMD()
 	if len(x) != len(y) || len(x) != len(result) {
 		panic("slice length mismatch")
 	}

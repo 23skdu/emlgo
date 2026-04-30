@@ -307,3 +307,19 @@ loop_sqrt512:
     JNZ loop_sqrt512
 done_sqrt512:
     RET
+
+// func sqrtScalar(x float64) float64
+TEXT ·sqrtScalar(SB), NOSPLIT, $0-16
+	MOVSD x+0(FP), X0
+	SQRTSD X0, X0
+	MOVSD X0, ret+8(FP)
+	RET
+
+// func fmaScalar(a, b, c float64) float64
+TEXT ·fmaScalar(SB), NOSPLIT, $0-32
+	MOVSD a+0(FP), X0
+	MOVSD b+8(FP), X1
+	MOVSD c+16(FP), X2
+	VFMADD213SD X1, X2, X0 // x0 = x0 * x1 + x2
+	MOVSD X0, ret+24(FP)
+	RET

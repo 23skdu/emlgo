@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/emlgo/eml/pkg/arithmetic"
+	"github.com/emlgo/eml/pkg/fastmath"
 	"github.com/emlgo/eml/pkg/hyper"
 	"github.com/emlgo/eml/pkg/logexp"
 	"github.com/emlgo/eml/pkg/trig"
@@ -61,6 +62,7 @@ func main() {
 	fmt.Printf("=== Comprehensive Performance Benchmark (n=%d) ===\n", iterations)
 	results := runAllBenchmarks()
 	results = append(results, runBatchBenchmarks()...)
+	results = append(results, runFastMathBenchmarks()...)
 	printResults(results)
 	checkRegression(results)
 }
@@ -625,6 +627,20 @@ func benchmarkComplex128(typ, name string, emlgoFunc, mathFunc func(complex128) 
 		Ratio:     emlgoTime / mathTime,
 		Passed:    true,
 	}
+}
+
+// ==================== FASTMATH BENCHMARKS ====================
+
+func runFastMathBenchmarks() []BenchmarkResult {
+	results := []BenchmarkResult{}
+
+	results = append(results, benchmarkFloat64("fastmath.Exp", fastmath.Exp, math.Exp))
+	results = append(results, benchmarkFloat64("fastmath.Log", fastmath.Log, math.Log))
+	results = append(results, benchmarkFloat64("fastmath.Sin", fastmath.Sin, math.Sin))
+	results = append(results, benchmarkFloat64("fastmath.Cos", fastmath.Cos, math.Cos))
+	results = append(results, benchmarkFloat64("fastmath.Sqrt", fastmath.Sqrt, math.Sqrt))
+
+	return results
 }
 
 // ==================== BATCH BENCHMARKS ====================
