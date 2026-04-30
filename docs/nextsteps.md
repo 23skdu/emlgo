@@ -272,15 +272,16 @@ After fixing all P0 blockers:
 - Provide seamless CPU/GPU interoperability
 
 **Subtasks:**
-- [ ] Implement EML core kernel in CUDA (eml(x,y) = exp(x) - ln(y))
-- [ ] Implement Exp kernel for GPU
-- [ ] Implement Log kernel for GPU
-- [ ] Implement Sin/Cos/Tan kernels using complex exponentials on GPU
-- [ ] Implement Sinh/Cosh/Tanh kernels on GPU
-- [ ] Implement Sqrt/Pow kernels on GPU
-- [ ] Add CUDA memory management (device allocation, copy)
-- [ ] Implement stream-based asynchronous execution
-- [ ] Add benchmark comparisons CPU vs GPU
+- [x] Implement EML core kernel in CUDA (eml(x,y) = exp(x) - ln(y))
+- [x] Implement Exp kernel for GPU
+- [x] Implement Log kernel for GPU
+- [x] Implement Sin/Cos/Tan kernels using complex exponentials on GPU
+- [x] Implement Sinh/Cosh/Tanh kernels on GPU
+- [x] Implement Sqrt/Pow kernels on GPU
+- [x] Add CUDA memory management (device allocation, copy)
+- [x] Implement stream-based asynchronous execution
+- [x] Add benchmark comparisons CPU vs GPU
+- [ ] Add cuBLAS integration for large matrix operations (Future work)
 
 **CUDA Kernel Implementation Details:**
 
