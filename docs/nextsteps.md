@@ -1,8 +1,80 @@
 # Next Steps: EML Go Library Implementation Plan
 
-## Project Goal
+---
 
-Implement a high-performance Go library that provides all elementary mathematical functions using only the EML operator `eml(x, y) = exp(x) - ln(y)` and the constant `1`. The library must follow Go best practices, have no external dependencies, and utilize SIMD instructions where possible.
+# P0 BLOCKERS - CRITICAL ISSUES
+
+## Issue 1: Trigonometric Functions Not Using EML
+**Severity:** P0 - Core library principle violated
+**Location:** `pkg/trig/trig.go`
+
+All trigonometric and hyperbolic functions currently use `math.Sin`, `math.Cos`, etc. directly instead of implementing them using EML expressions.
+
+**Affected functions:**
+- Sin, Cos, Tan, Cot, Sec, Csc (direct math calls)
+- Asin, Acos, Atan, Atan2, Acot, Asec, Acsc (direct math calls)
+- Sinh, Cosh, Tanh, Coth, Sech, Csch (direct math calls)
+- Asinh, Acosh, Atanh, Acoth, Asech, Acsch (direct math calls)
+
+**Fix Plan:**
+1. Implement sin/cos using complex exponentials with EML: `sin(x) = (e^(ix) - e^(-ix))/(2i)`
+2. Implement tan using sin/cos
+3. Implement inverse trig functions using EML expressions from the paper
+4. Implement all hyperbolic functions using logexp.Exp (which already uses EML)
+5. Verify all implementations match math library accuracy
+
+---
+
+## Issue 2: Inverse Hyperbolic Functions Not Using EML
+**Severity:** P0 - Core library principle violated
+**Location:** `pkg/hyper/hyper.go`
+
+Asinh, Acosh, Atanh use `math.*` directly.
+
+**Affected functions:**
+- Asinh: `ln(x + sqrt(x^2 + 1))`
+- Acosh: `ln(x + sqrt(x-1) * sqrt(x+1))`
+- Atanh: `0.5 * ln((1+x)/(1-x))`
+
+**Fix Plan:**
+1. Implement Asinh using: `eml(1, eml(eml(1, x + eml(eml(x, x), 0.5)), 1))`
+2. Implement Acosh using: `ln(x + sqrt(x-1) * sqrt(x+1))`
+3. Implement Atanh using: `0.5 * ln((1+x)/(1-x))`
+4. Test against math library for accuracy
+
+---
+
+## Issue 3: Some Arithmetic Functions Not Using EML
+**Severity:** P0 - Core library principle violated
+**Location:** `pkg/arithmetic/arith.go`
+
+Pow uses `math.Pow` and Sqrt uses `math.Sqrt` directly.
+
+**Affected functions:**
+- Pow: should use `exp(y * ln(x))`
+- Sqrt: should use `exp(0.5 * ln(x))`
+
+**Fix Plan:**
+1. Implement Pow(x, y) = Exp(y * Log(x)) using EML
+2. Implement Sqrt(x) = Exp(0.5 * Log(x)) using EML
+
+---
+
+## Issue 4: Unused Imports
+**Severity:** P1 - Code cleanliness
+**Location:** Multiple files
+
+Some files have imports that are imported but not all are used:
+- pkg/trig/trig.go imports "github.com/emlgo/eml/internal/eml" but doesn't use EML
+
+---
+
+## Verification Plan
+After fixing all P0 blockers:
+1. Run `go vet ./...` - must pass
+2. Run `~/go/bin/gosec ./...` - must show 0 issues
+3. Run `go test -race ./...` - all tests must pass
+4. Verify all functions produce same results as math library
 
 ---
 
