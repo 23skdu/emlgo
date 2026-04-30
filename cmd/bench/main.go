@@ -61,6 +61,7 @@ func main() {
 	fmt.Printf("=== Comprehensive Performance Benchmark (n=%d) ===\n", iterations)
 	results := runAllBenchmarks()
 	printResults(results)
+	checkRegression(results)
 }
 
 func runAllBenchmarks() []BenchmarkResult {
@@ -824,4 +825,55 @@ func ulpDiff(a, b float64) uint64 {
 	bits, targetBits := math.Float64bits(a), math.Float64bits(b)
 	if bits > targetBits { return bits - targetBits }
 	return targetBits - bits
+}
+
+var baseline = map[string]float64{
+	"float64/Exp":    1.10,
+	"float64/Log":    1.00,
+	"float64/Sin":    1.02,
+	"float64/Cos":    1.00,
+	"float64/Tan":    1.07,
+	"float64/Sqrt":   1.00,
+	"float64/Pow":    0.85,
+	"float64/PowInt": 0.16,
+	"float64/Cosh":   1.00,
+	"int/Add":        1.01,
+	"int/Mod":        1.00,
+	"int/Max":        1.00,
+	"int/Min":        1.00,
+	"uint/Add":       1.00,
+	"uint/Mul":       1.00,
+	"uint/Div":       1.00,
+}
+
+func checkRegression(results []BenchmarkResult) {
+	regressionFlag := flag.Bool("regression", false, "Check for performance regression against baseline")
+	flag.Parse()
+	
+	if !*regressionFlag {
+		return
+	}
+	
+	fmt.Println("\n=== Regression Check ===")
+	regressions := 0
+	for _, r := range results {
+		key := r.Type + "/" + r.Name
+		if baselineRatio, ok := baseline[key]; ok {
+			regression := r.Ratio - baselineRatio
+			if regression > 0.15 {
+				fmt.Printf("⚠️  REGRESSION: %s ratio changed from %.2fx to %.2fx (+%.1f%%)\n", 
+					key, baselineRatio, r.Ratio, regression*100)
+				regressions++
+			} else if regression < -0.15 {
+				fmt.Printf("✓  IMPROVEMENT: %s ratio changed from %.2fx to %.2fx (%.1f%% better)\n",
+					key, baselineRatio, r.Ratio, -regression*100)
+			}
+		}
+	}
+	if regressions > 0 {
+		fmt.Printf("\n⚠️  WARNING: %d regressions detected (>15%% slower than baseline)\n", regressions)
+		os.Exit(1)
+	} else {
+		fmt.Println("\n✓ All benchmarks within 15% of baseline")
+	}
 }
