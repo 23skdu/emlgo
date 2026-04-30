@@ -108,6 +108,19 @@ func TestSubSIMD(t *testing.T) {
 	}
 }
 
+func TestDivSIMD(t *testing.T) {
+	a := []float64{10, 20, 30, 40, 50}
+	b := []float64{2, 4, 5, 8, 10}
+	result := DivSIMD(a, b)
+
+	expected := []float64{5, 5, 6, 5, 5}
+	for i, v := range result {
+		if v != expected[i] {
+			t.Errorf("DivSIMD[%d] = %v, want %v", i, v, expected[i])
+		}
+	}
+}
+
 func TestSIMDEmptySlice(t *testing.T) {
 	x := make([]float64, 0)
 	y := make([]float64, 0)

@@ -79,6 +79,29 @@ The project has SIMD infrastructure in `internal/eml/simd.go` but implementation
   - [ ] Refactor SqrtSIMD: chunks should use vectorized sqrt
   - [ ] Refactor SinSIMD/CosSIMD: chunks should use vectorized trig
 
+#### Task 6: Vectorize Arithmetic in `simd.go`
+- **Location:** `internal/eml/simd.go`
+- **Current:** Scalar loops with goroutines
+- **Target:** True SIMD kernels for element-wise arithmetic
+- **Subtasks:**
+  - [ ] Implement AddSIMD with AVX2/NEON kernels
+  - [ ] Implement SubSIMD with AVX2/NEON kernels
+  - [ ] Implement MulSIMD with AVX2/NEON kernels
+  - [ ] Implement DivSIMD with AVX2/NEON kernels
+  - [ ] Implement AddScalarSIMD/MulScalarSIMD with AVX2/NEON kernels
+
+#### Task 7: Optimize Batch Functions in `arithmetic` and `trig`
+- **Location:** `pkg/arithmetic/arith.go`, `pkg/trig/trig.go`
+- **Current:** Scalar loops with goroutines
+- **Target:** Call SIMD kernels from batch functions
+- **Subtasks:**
+  - [ ] Implement AbsSIMD and use in AbsBatch
+  - [ ] Implement MaxSIMD/MinSIMD and use in MaxBatch/MinBatch
+  - [ ] Implement FloorSIMD/CeilSIMD/TruncSIMD and use in FloorBatch/CeilBatch/TruncBatch
+  - [ ] Implement Log1pSIMD and use in Log1pBatch
+  - [ ] Implement Expm1SIMD and use in Expm1Batch
+  - [ ] Implement TanSIMD and use in TanBatch
+
 ---
 
 ## Missing Batch Operations Matrix

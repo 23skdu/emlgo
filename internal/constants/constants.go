@@ -30,15 +30,24 @@ const (
 )
 
 func GenerateE() float64 {
-	return E
+	// e = eml(1, 1) = exp(1) - log(1) = e - 0
+	return eml.Eml(One, One)
 }
 
 func GeneratePi() float64 {
-	return Pi
+	// pi = 4 * atan(1)
+	// atan(x) = i/2 * (log(1-ix) - log(1+ix))
+	// Using eml.EmlComplex(0, z) = 1 - log(z)
+	// log(z) = 1 - eml.EmlComplex(0, z)
+	i := complex(0, 1)
+	log1minusI := 1 - eml.EmlComplex(0, 1-i)
+	log1plusI := 1 - eml.EmlComplex(0, 1+i)
+	atan1 := (i / 2) * (log1minusI - log1plusI)
+	return 4 * real(atan1)
 }
 
 func GenerateI() complex128 {
-	return I
+	return ComplexI
 }
 
 func ExpOne() float64 {

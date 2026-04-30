@@ -35,36 +35,7 @@ func detectSIMD() {
 	}
 }
 
-func detectAMD64SIMD() {
-	hasSSE4 = true
-	hasAVX2 = true
-	hasAVX512 = true
-	hasNeon = false
-	hasNeonDot = false
-}
-
-func detectARM64SIMD() {
-	switch runtime.GOOS {
-	case "darwin":
-		hasSSE4 = false
-		hasAVX2 = false
-		hasAVX512 = false
-		hasNeon = true
-		hasNeonDot = true
-	case "linux":
-		hasSSE4 = false
-		hasAVX2 = false
-		hasAVX512 = false
-		hasNeon = true
-		hasNeonDot = true
-	default:
-		hasSSE4 = false
-		hasAVX2 = false
-		hasAVX512 = false
-		hasNeon = true
-		hasNeonDot = true
-	}
-}
+// detectAMD64SIMD and detectARM64SIMD are implemented in architecture-specific files.
 
 func HasSSE4() bool {
 	initSIMD()
@@ -420,6 +391,44 @@ func SinCosSIMD(x []float64) (sin, cos []float64) {
 	return
 }
 
+func TanSIMD(x []float64) []float64 {
+	n := len(x)
+	if n == 0 {
+		return x
+	}
+	result := make([]float64, n)
+
+	if n < 256 {
+		for i := 0; i < n; i++ {
+			result[i] = nativeTan(x[i])
+		}
+		return result
+	}
+
+	numWorkers := runtime.GOMAXPROCS(0)
+	chunkSize := (n + numWorkers - 1) / numWorkers
+	if chunkSize > 4096 {
+		chunkSize = 4096
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < n; i += chunkSize {
+		end := i + chunkSize
+		if end > n {
+			end = n
+		}
+		wg.Add(1)
+		go func(start, end int) {
+			defer wg.Done()
+			for j := start; j < end; j++ {
+				result[j] = nativeTan(x[j])
+			}
+		}(i, end)
+	}
+	wg.Wait()
+	return result
+}
+
 func AddSIMD(a, b []float64) []float64 {
 	if len(a) != len(b) {
 		panic("length mismatch")
@@ -430,8 +439,26 @@ func AddSIMD(a, b []float64) []float64 {
 	}
 	result := make([]float64, n)
 
-	if n < 256 {
+	if n < 4 {
 		for i := 0; i < n; i++ {
+			result[i] = a[i] + b[i]
+		}
+		return result
+	}
+
+	if hasAVX2 && runtime.GOARCH == "amd64" {
+		simdLen := (n / 4) * 4
+		addAVX2(a[:simdLen], b[:simdLen], result[:simdLen])
+		for i := simdLen; i < n; i++ {
+			result[i] = a[i] + b[i]
+		}
+		return result
+	}
+
+	if hasNeon && runtime.GOARCH == "arm64" {
+		simdLen := (n / 2) * 2
+		addNEON(a[:simdLen], b[:simdLen], result[:simdLen])
+		for i := simdLen; i < n; i++ {
 			result[i] = a[i] + b[i]
 		}
 		return result
@@ -471,8 +498,26 @@ func SubSIMD(a, b []float64) []float64 {
 	}
 	result := make([]float64, n)
 
-	if n < 256 {
+	if n < 4 {
 		for i := 0; i < n; i++ {
+			result[i] = a[i] - b[i]
+		}
+		return result
+	}
+
+	if hasAVX2 && runtime.GOARCH == "amd64" {
+		simdLen := (n / 4) * 4
+		subAVX2(a[:simdLen], b[:simdLen], result[:simdLen])
+		for i := simdLen; i < n; i++ {
+			result[i] = a[i] - b[i]
+		}
+		return result
+	}
+
+	if hasNeon && runtime.GOARCH == "arm64" {
+		simdLen := (n / 2) * 2
+		subNEON(a[:simdLen], b[:simdLen], result[:simdLen])
+		for i := simdLen; i < n; i++ {
 			result[i] = a[i] - b[i]
 		}
 		return result
@@ -512,8 +557,26 @@ func MulSIMD(a, b []float64) []float64 {
 	}
 	result := make([]float64, n)
 
-	if n < 256 {
+	if n < 4 {
 		for i := 0; i < n; i++ {
+			result[i] = a[i] * b[i]
+		}
+		return result
+	}
+
+	if hasAVX2 && runtime.GOARCH == "amd64" {
+		simdLen := (n / 4) * 4
+		mulAVX2(a[:simdLen], b[:simdLen], result[:simdLen])
+		for i := simdLen; i < n; i++ {
+			result[i] = a[i] * b[i]
+		}
+		return result
+	}
+
+	if hasNeon && runtime.GOARCH == "arm64" {
+		simdLen := (n / 2) * 2
+		mulNEON(a[:simdLen], b[:simdLen], result[:simdLen])
+		for i := simdLen; i < n; i++ {
 			result[i] = a[i] * b[i]
 		}
 		return result
@@ -553,8 +616,26 @@ func DivSIMD(a, b []float64) []float64 {
 	}
 	result := make([]float64, n)
 
-	if n < 256 {
+	if n < 4 {
 		for i := 0; i < n; i++ {
+			result[i] = a[i] / b[i]
+		}
+		return result
+	}
+
+	if hasAVX2 && runtime.GOARCH == "amd64" {
+		simdLen := (n / 4) * 4
+		divAVX2(a[:simdLen], b[:simdLen], result[:simdLen])
+		for i := simdLen; i < n; i++ {
+			result[i] = a[i] / b[i]
+		}
+		return result
+	}
+
+	if hasNeon && runtime.GOARCH == "arm64" {
+		simdLen := (n / 2) * 2
+		divNEON(a[:simdLen], b[:simdLen], result[:simdLen])
+		for i := simdLen; i < n; i++ {
 			result[i] = a[i] / b[i]
 		}
 		return result
@@ -591,8 +672,26 @@ func AddScalarSIMD(a []float64, b float64) []float64 {
 	}
 	result := make([]float64, n)
 
-	if n < 256 {
+	if n < 4 {
 		for i := 0; i < n; i++ {
+			result[i] = a[i] + b
+		}
+		return result
+	}
+
+	if hasAVX2 && runtime.GOARCH == "amd64" {
+		simdLen := (n / 4) * 4
+		addScalarAVX2(a[:simdLen], b, result[:simdLen])
+		for i := simdLen; i < n; i++ {
+			result[i] = a[i] + b
+		}
+		return result
+	}
+
+	if hasNeon && runtime.GOARCH == "arm64" {
+		simdLen := (n / 2) * 2
+		addScalarNEON(a[:simdLen], b, result[:simdLen])
+		for i := simdLen; i < n; i++ {
 			result[i] = a[i] + b
 		}
 		return result
@@ -629,8 +728,26 @@ func MulScalarSIMD(a []float64, b float64) []float64 {
 	}
 	result := make([]float64, n)
 
-	if n < 256 {
+	if n < 4 {
 		for i := 0; i < n; i++ {
+			result[i] = a[i] * b
+		}
+		return result
+	}
+
+	if hasAVX2 && runtime.GOARCH == "amd64" {
+		simdLen := (n / 4) * 4
+		mulScalarAVX2(a[:simdLen], b, result[:simdLen])
+		for i := simdLen; i < n; i++ {
+			result[i] = a[i] * b
+		}
+		return result
+	}
+
+	if hasNeon && runtime.GOARCH == "arm64" {
+		simdLen := (n / 2) * 2
+		mulScalarNEON(a[:simdLen], b, result[:simdLen])
+		for i := simdLen; i < n; i++ {
 			result[i] = a[i] * b
 		}
 		return result

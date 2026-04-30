@@ -1,6 +1,9 @@
 package arithmetic
 
 import (
+	"runtime"
+	"sync"
+
 	"github.com/emlgo/eml/internal/eml"
 	"github.com/emlgo/eml/pkg/logexp"
 )
@@ -403,9 +406,418 @@ func SqrtBatch(x []float64) []float64 {
 	return eml.SqrtSIMD(x)
 }
 
+func AbsBatch(x []float64) []float64 {
+	n := len(x)
+	if n == 0 {
+		return x
+	}
+	result := make([]float64, n)
+	if n < 256 {
+		for i := 0; i < n; i++ {
+			result[i] = Abs(x[i])
+		}
+		return result
+	}
+	numWorkers := runtime.GOMAXPROCS(0)
+	chunkSize := (n + numWorkers - 1) / numWorkers
+	if chunkSize > 4096 {
+		chunkSize = 4096
+	}
+	var wg sync.WaitGroup
+	for i := 0; i < n; i += chunkSize {
+		end := i + chunkSize
+		if end > n {
+			end = n
+		}
+		wg.Add(1)
+		go func(start, end int) {
+			defer wg.Done()
+			for j := start; j < end; j++ {
+				result[j] = Abs(x[j])
+			}
+		}(i, end)
+	}
+	wg.Wait()
+	return result
+}
+
+func FloorBatch(x []float64) []float64 {
+	n := len(x)
+	if n == 0 {
+		return x
+	}
+	result := make([]float64, n)
+	if n < 256 {
+		for i := 0; i < n; i++ {
+			result[i] = Floor(x[i])
+		}
+		return result
+	}
+	numWorkers := runtime.GOMAXPROCS(0)
+	chunkSize := (n + numWorkers - 1) / numWorkers
+	if chunkSize > 4096 {
+		chunkSize = 4096
+	}
+	var wg sync.WaitGroup
+	for i := 0; i < n; i += chunkSize {
+		end := i + chunkSize
+		if end > n {
+			end = n
+		}
+		wg.Add(1)
+		go func(start, end int) {
+			defer wg.Done()
+			for j := start; j < end; j++ {
+				result[j] = Floor(x[j])
+			}
+		}(i, end)
+	}
+	wg.Wait()
+	return result
+}
+
+func CeilBatch(x []float64) []float64 {
+	n := len(x)
+	if n == 0 {
+		return x
+	}
+	result := make([]float64, n)
+	if n < 256 {
+		for i := 0; i < n; i++ {
+			result[i] = Ceil(x[i])
+		}
+		return result
+	}
+	numWorkers := runtime.GOMAXPROCS(0)
+	chunkSize := (n + numWorkers - 1) / numWorkers
+	if chunkSize > 4096 {
+		chunkSize = 4096
+	}
+	var wg sync.WaitGroup
+	for i := 0; i < n; i += chunkSize {
+		end := i + chunkSize
+		if end > n {
+			end = n
+		}
+		wg.Add(1)
+		go func(start, end int) {
+			defer wg.Done()
+			for j := start; j < end; j++ {
+				result[j] = Ceil(x[j])
+			}
+		}(i, end)
+	}
+	wg.Wait()
+	return result
+}
+
+func TruncBatch(x []float64) []float64 {
+	n := len(x)
+	if n == 0 {
+		return x
+	}
+	result := make([]float64, n)
+	if n < 256 {
+		for i := 0; i < n; i++ {
+			result[i] = Trunc(x[i])
+		}
+		return result
+	}
+	numWorkers := runtime.GOMAXPROCS(0)
+	chunkSize := (n + numWorkers - 1) / numWorkers
+	if chunkSize > 4096 {
+		chunkSize = 4096
+	}
+	var wg sync.WaitGroup
+	for i := 0; i < n; i += chunkSize {
+		end := i + chunkSize
+		if end > n {
+			end = n
+		}
+		wg.Add(1)
+		go func(start, end int) {
+			defer wg.Done()
+			for j := start; j < end; j++ {
+				result[j] = Trunc(x[j])
+			}
+		}(i, end)
+	}
+	wg.Wait()
+	return result
+}
+
+func Log1pBatch(x []float64) []float64 {
+	n := len(x)
+	if n == 0 {
+		return x
+	}
+	result := make([]float64, n)
+	if n < 256 {
+		for i := 0; i < n; i++ {
+			result[i] = Log1p(x[i])
+		}
+		return result
+	}
+	numWorkers := runtime.GOMAXPROCS(0)
+	chunkSize := (n + numWorkers - 1) / numWorkers
+	if chunkSize > 4096 {
+		chunkSize = 4096
+	}
+	var wg sync.WaitGroup
+	for i := 0; i < n; i += chunkSize {
+		end := i + chunkSize
+		if end > n {
+			end = n
+		}
+		wg.Add(1)
+		go func(start, end int) {
+			defer wg.Done()
+			for j := start; j < end; j++ {
+				result[j] = Log1p(x[j])
+			}
+		}(i, end)
+	}
+	wg.Wait()
+	return result
+}
+
+func Expm1Batch(x []float64) []float64 {
+	n := len(x)
+	if n == 0 {
+		return x
+	}
+	result := make([]float64, n)
+	if n < 256 {
+		for i := 0; i < n; i++ {
+			result[i] = Expm1(x[i])
+		}
+		return result
+	}
+	numWorkers := runtime.GOMAXPROCS(0)
+	chunkSize := (n + numWorkers - 1) / numWorkers
+	if chunkSize > 4096 {
+		chunkSize = 4096
+	}
+	var wg sync.WaitGroup
+	for i := 0; i < n; i += chunkSize {
+		end := i + chunkSize
+		if end > n {
+			end = n
+		}
+		wg.Add(1)
+		go func(start, end int) {
+			defer wg.Done()
+			for j := start; j < end; j++ {
+				result[j] = Expm1(x[j])
+			}
+		}(i, end)
+	}
+	wg.Wait()
+	return result
+}
+
+func PowBatch(x []float64, y float64) []float64 {
+	n := len(x)
+	if n == 0 {
+		return x
+	}
+	result := make([]float64, n)
+	if n < 256 {
+		for i := 0; i < n; i++ {
+			result[i] = Pow(x[i], y)
+		}
+		return result
+	}
+	numWorkers := runtime.GOMAXPROCS(0)
+	chunkSize := (n + numWorkers - 1) / numWorkers
+	if chunkSize > 4096 {
+		chunkSize = 4096
+	}
+	var wg sync.WaitGroup
+	for i := 0; i < n; i += chunkSize {
+		end := i + chunkSize
+		if end > n {
+			end = n
+		}
+		wg.Add(1)
+		go func(start, end int) {
+			defer wg.Done()
+			for j := start; j < end; j++ {
+				result[j] = Pow(x[j], y)
+			}
+		}(i, end)
+	}
+	wg.Wait()
+	return result
+}
+
+func CbrtBatch(x []float64) []float64 {
+	n := len(x)
+	if n == 0 {
+		return x
+	}
+	result := make([]float64, n)
+	if n < 256 {
+		for i := 0; i < n; i++ {
+			result[i] = Cbrt(x[i])
+		}
+		return result
+	}
+	numWorkers := runtime.GOMAXPROCS(0)
+	chunkSize := (n + numWorkers - 1) / numWorkers
+	if chunkSize > 4096 {
+		chunkSize = 4096
+	}
+	var wg sync.WaitGroup
+	for i := 0; i < n; i += chunkSize {
+		end := i + chunkSize
+		if end > n {
+			end = n
+		}
+		wg.Add(1)
+		go func(start, end int) {
+			defer wg.Done()
+			for j := start; j < end; j++ {
+				result[j] = Cbrt(x[j])
+			}
+		}(i, end)
+	}
+	wg.Wait()
+	return result
+}
+
+func HypotBatch(x, y []float64) []float64 {
+	n := len(x)
+	if n == 0 || len(y) == 0 {
+		return x
+	}
+	result := make([]float64, n)
+	if n < 256 {
+		for i := 0; i < n; i++ {
+			result[i] = Hypot(x[i], y[i])
+		}
+		return result
+	}
+	numWorkers := runtime.GOMAXPROCS(0)
+	chunkSize := (n + numWorkers - 1) / numWorkers
+	if chunkSize > 4096 {
+		chunkSize = 4096
+	}
+	var wg sync.WaitGroup
+	for i := 0; i < n; i += chunkSize {
+		end := i + chunkSize
+		if end > n {
+			end = n
+		}
+		wg.Add(1)
+		go func(start, end int) {
+			defer wg.Done()
+			for j := start; j < end; j++ {
+				result[j] = Hypot(x[j], y[j])
+			}
+		}(i, end)
+	}
+	wg.Wait()
+	return result
+}
+
+func MaxBatch(x []float64, y float64) []float64 {
+	n := len(x)
+	if n == 0 {
+		return x
+	}
+	result := make([]float64, n)
+	if n < 256 {
+		for i := 0; i < n; i++ {
+			result[i] = Max(x[i], y)
+		}
+		return result
+	}
+	numWorkers := runtime.GOMAXPROCS(0)
+	chunkSize := (n + numWorkers - 1) / numWorkers
+	if chunkSize > 4096 {
+		chunkSize = 4096
+	}
+	var wg sync.WaitGroup
+	for i := 0; i < n; i += chunkSize {
+		end := i + chunkSize
+		if end > n {
+			end = n
+		}
+		wg.Add(1)
+		go func(start, end int) {
+			defer wg.Done()
+			for j := start; j < end; j++ {
+				result[j] = Max(x[j], y)
+			}
+		}(i, end)
+	}
+	wg.Wait()
+	return result
+}
+
+func MinBatch(x []float64, y float64) []float64 {
+	n := len(x)
+	if n == 0 {
+		return x
+	}
+	result := make([]float64, n)
+	if n < 256 {
+		for i := 0; i < n; i++ {
+			result[i] = Min(x[i], y)
+		}
+		return result
+	}
+	numWorkers := runtime.GOMAXPROCS(0)
+	chunkSize := (n + numWorkers - 1) / numWorkers
+	if chunkSize > 4096 {
+		chunkSize = 4096
+	}
+	var wg sync.WaitGroup
+	for i := 0; i < n; i += chunkSize {
+		end := i + chunkSize
+		if end > n {
+			end = n
+		}
+		wg.Add(1)
+		go func(start, end int) {
+			defer wg.Done()
+			for j := start; j < end; j++ {
+				result[j] = Min(x[j], y)
+			}
+		}(i, end)
+	}
+	wg.Wait()
+	return result
+}
+
 func ExpM1(x float64) float64 {
 	if isNaN(x) {
 		return nan()
 	}
 	return eml.Expm1(x)
+}
+
+func AddBatch(x, y []float64) []float64 {
+	return eml.AddSIMD(x, y)
+}
+
+func SubBatch(x, y []float64) []float64 {
+	return eml.SubSIMD(x, y)
+}
+
+func MulBatch(x, y []float64) []float64 {
+	return eml.MulSIMD(x, y)
+}
+
+func DivBatch(x, y []float64) []float64 {
+	return eml.DivSIMD(x, y)
+}
+
+func AddScalarBatch(x []float64, y float64) []float64 {
+	return eml.AddScalarSIMD(x, y)
+}
+
+func MulScalarBatch(x []float64, y float64) []float64 {
+	return eml.MulScalarSIMD(x, y)
 }
