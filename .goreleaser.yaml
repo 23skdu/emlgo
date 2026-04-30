@@ -1,0 +1,38 @@
+archives:
+  - format: tarball
+    format_overrides:
+      - goos: windows
+        format: zip
+    builds:
+      - emlcli
+    files:
+      - README.md
+      - LICENSE
+      - CONTRIBUTING.md
+      - CODE_OF_CONDUCT.md
+
+builds:
+  - id: emlcli
+    dir: ./cmd/emlcli
+    main: .
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+
+checksum:
+  name_template: 'checksums.txt'
+
+snapshot:
+  name_template: "{{ .Tag }}-next"
+
+changelog:
+  filters:
+    exclude:
+      - '^docs:'
+      - '^chore:'
+      - '^refactor:'
+      - '^style:'
