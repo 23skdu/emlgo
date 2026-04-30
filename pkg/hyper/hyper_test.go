@@ -95,8 +95,8 @@ func TestTanhAll(t *testing.T) {
 		{"large_pos", 100, 1},
 		{"large_neg", -100, -1},
 		{"nan", math.NaN(), math.NaN()},
-		{"inf_pos", math.Inf(1), math.NaN()},
-		{"inf_neg", math.Inf(-1), math.NaN()},
+		{"inf_pos", math.Inf(1), 1},
+		{"inf_neg", math.Inf(-1), -1},
 		{"half", 0.5, math.Tanh(0.5)},
 	}
 
