@@ -383,6 +383,40 @@ func IntMin(a, b int) int {
 	return b
 }
 
+// Unsigned integer-specific operations (optimized for uint type)
+
+func UintAdd(a, b uint) uint { return a + b }
+func UintSub(a, b uint) uint { return a - b }
+func UintMul(a, b uint) uint { return a * b }
+
+func UintDiv(a, b uint) uint {
+	if b == 0 {
+		return 0
+	}
+	return a / b
+}
+
+func UintMod(a, b uint) uint {
+	if b == 0 {
+		return 0
+	}
+	return a % b
+}
+
+func UintMax(a, b uint) uint {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+func UintMin(a, b uint) uint {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 func SqrtBatch(x []float64) []float64 {
 	return eml.SqrtSIMD(x)
 }
