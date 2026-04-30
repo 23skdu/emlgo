@@ -244,7 +244,34 @@ func SqrtSIMD(x []float64) []float64 {
 	}
 	result := make([]float64, n)
 
-	if n < 256 {
+	if hasAVX512 && runtime.GOARCH == "amd64" {
+		simdLen := (n / 8) * 8
+		sqrtAVX512(x[:simdLen], result[:simdLen])
+		for i := simdLen; i < n; i++ {
+			result[i] = nativeSqrt(x[i])
+		}
+		return result
+	}
+
+	if hasAVX2 && runtime.GOARCH == "amd64" {
+		simdLen := (n / 4) * 4
+		sqrtAVX2(x[:simdLen], result[:simdLen])
+		for i := simdLen; i < n; i++ {
+			result[i] = nativeSqrt(x[i])
+		}
+		return result
+	}
+
+	if hasNeon && runtime.GOARCH == "arm64" {
+		simdLen := (n / 2) * 2
+		sqrtNEON(x[:simdLen], result[:simdLen])
+		for i := simdLen; i < n; i++ {
+			result[i] = nativeSqrt(x[i])
+		}
+		return result
+	}
+
+	if n < 4 {
 		for i := 0; i < n; i++ {
 			result[i] = nativeSqrt(x[i])
 		}

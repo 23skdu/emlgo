@@ -19,4 +19,7 @@ func divAVX512(a, b, result []float64)           {}
 func addScalarAVX512(a []float64, b float64, result []float64) {}
 func mulScalarAVX512(a []float64, b float64, result []float64) {}
 
+func sqrtAVX2(a, result []float64)   {}
+func sqrtAVX512(a, result []float64) {}
+
 func detectAMD64SIMD() {}

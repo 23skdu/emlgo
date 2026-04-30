@@ -276,3 +276,41 @@ loop_mul_scalar512:
 done_mul_scalar512:
     VZEROUPPER
     RET
+
+// func sqrtAVX2(a, result []float64)
+TEXT ·sqrtAVX2(SB), NOSPLIT, $0-48
+    MOVQ a_ptr+0(FP), SI
+    MOVQ res_ptr+24(FP), DX
+    MOVQ a_len+8(FP), CX
+    SHRQ $2, CX
+    JZ done_sqrt2
+loop_sqrt2:
+    VMOVUPD (SI), Y0
+    VSQRTPD Y0, Y1
+    VMOVUPD Y1, (DX)
+    ADDQ $32, SI
+    ADDQ $32, DX
+    DECQ CX
+    JNZ loop_sqrt2
+done_sqrt2:
+    VZEROUPPER
+    RET
+
+// func sqrtAVX512(a, result []float64)
+TEXT ·sqrtAVX512(SB), NOSPLIT, $0-48
+    MOVQ a_ptr+0(FP), SI
+    MOVQ res_ptr+24(FP), DX
+    MOVQ a_len+8(FP), CX
+    SHRQ $3, CX
+    JZ done_sqrt512
+loop_sqrt512:
+    VMOVUPD (SI), Z0
+    VSQRTPD Z0, Z1
+    VMOVUPD Z1, (DX)
+    ADDQ $64, SI
+    ADDQ $64, DX
+    DECQ CX
+    JNZ loop_sqrt512
+done_sqrt512:
+    VZEROUPPER
+    RET

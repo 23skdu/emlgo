@@ -9,5 +9,6 @@ func mulNEON(a, b, result []float64)           {}
 func divNEON(a, b, result []float64)           {}
 func addScalarNEON(a []float64, b float64, result []float64) {}
 func mulScalarNEON(a []float64, b float64, result []float64) {}
+func sqrtNEON(a, result []float64)                          {}
 
 func detectARM64SIMD() {}
