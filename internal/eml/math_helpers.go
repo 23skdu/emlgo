@@ -17,6 +17,9 @@ func IsNaN(f float64) bool {
 }
 
 func IsInf(f float64, sign int) bool {
+	if sign == 0 {
+		return f == inf(1) || f == inf(-1)
+	}
 	if sign > 0 {
 		return f == inf(1)
 	}

@@ -8,7 +8,6 @@ import (
 var (
 	pi          = eml.Pi
 	piOver2     = eml.PiOver2
-	piOver4     = eml.PiOver4
 	inf  = eml.Inf
 	nan  = eml.NaN
 	isNaN = eml.IsNaN
@@ -16,7 +15,6 @@ var (
 	nativeSin  = eml.Sin
 	nativeCos  = eml.Cos
 	nativeTan  = eml.Tan
-	nativeSincos = eml.Sincos
 	nativeAsin = eml.Asin
 	nativeAcos = eml.Acos
 	nativeAtan = eml.Atan
@@ -26,7 +24,6 @@ var (
 	nativeSinh = eml.Sinh
 	nativeCosh = eml.Cosh
 	nativeTanh = eml.Tanh
-	nativeLog  = eml.Log
 )
 
 func Sin(x float64) float64 {
@@ -295,18 +292,6 @@ func SinCosBatch(x []float64) (sin, cos []float64) {
 }
 
 func TanBatch(x []float64) []float64 {
-	n := len(x)
-	if n == 0 {
-		return x
-	}
-	result := make([]float64, n)
 	sin, cos := SinCosBatch(x)
-	for i := 0; i < n; i++ {
-		if cos[i] != 0 {
-			result[i] = sin[i] / cos[i]
-		} else {
-			result[i] = inf(1)
-		}
-	}
-	return result
+	return eml.DivSIMD(sin, cos)
 }

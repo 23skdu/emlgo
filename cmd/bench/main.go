@@ -179,6 +179,7 @@ func benchmarkFuncInt(typ, name string, emlgoFunc, mathFunc func(int, int)) Benc
 	rand.Seed(42)
 	randData := make([]int, iterations)
 	// nosec G404 - benchmark tool uses math/rand for deterministic test data
+	// #nosec G404 - benchmark tool uses math/rand for deterministic test data
 	for i := range randData {
 		randData[i] = rand.Intn(10000) - 5000
 	}
@@ -245,6 +246,7 @@ func benchmarkFuncUint(typ, name string, emlgoFunc, mathFunc func(uint, uint)) B
 	rand.Seed(42)
 	randData := make([]uint, iterations)
 	// nosec G404 - benchmark tool uses math/rand for deterministic test data
+	// #nosec G404 - benchmark tool uses math/rand for deterministic test data
 	for i := range randData {
 		randData[i] = uint(rand.Intn(10000))
 	}
@@ -342,6 +344,7 @@ func runFloat32Benchmarks() []BenchmarkResult {
 func benchmarkFuncFloat32(typ, name string, emlgoFunc, mathFunc func(float32)) BenchmarkResult {
 	rand.Seed(42)
 	randData := make([]float32, iterations)
+	// #nosec G404 - benchmark tool uses math/rand for deterministic test data
 	for i := range randData {
 		randData[i] = float32(rand.Float64()*10 - 5)
 	}
@@ -429,6 +432,7 @@ func runFloat64Benchmarks() []BenchmarkResult {
 func benchmarkFloat64(name string, emlgoFunc, mathFunc func(float64) float64) BenchmarkResult {
 	rand.Seed(42)
 	randData := make([]float64, iterations)
+	// #nosec G404 - benchmark tool uses math/rand for deterministic test data
 	for i := range randData {
 		randData[i] = rand.Float64()*10 - 5
 	}
@@ -509,6 +513,7 @@ func runComplex64Benchmarks() []BenchmarkResult {
 func benchmarkComplex64(typ, name string, emlgoFunc, mathFunc func(complex64) complex64) BenchmarkResult {
 	rand.Seed(42)
 	randData := make([]complex64, iterations)
+	// #nosec G404 - benchmark tool uses math/rand for deterministic test data
 	for i := range randData {
 		randData[i] = complex(float32(rand.Float64()*10-5), float32(rand.Float64()*10-5))
 	}
@@ -594,6 +599,7 @@ func runComplex128Benchmarks() []BenchmarkResult {
 func benchmarkComplex128(typ, name string, emlgoFunc, mathFunc func(complex128) complex128) BenchmarkResult {
 	rand.Seed(42)
 	randData := make([]complex128, iterations)
+	// #nosec G404 - benchmark tool uses math/rand for deterministic test data
 	for i := range randData {
 		randData[i] = complex(rand.Float64()*10-5, rand.Float64()*10-5)
 	}
