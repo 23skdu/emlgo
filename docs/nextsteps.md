@@ -2,6 +2,152 @@
 
 ---
 
+# SIMD Optimization Deep Analysis (April 2026)
+
+## Current SIMD Status
+
+The project has SIMD infrastructure in `internal/eml/simd.go` but implementations are **NOT using actual CPU intrinsics** - they use scalar loops with goroutine parallelization.
+
+**Files with SIMD detection but scalar implementations:**
+- `avx2Eml` (lines 116-128) - uses scalar loop, not AVX2
+- `avx512Eml` (lines 130-142) - uses scalar loop, not AVX512
+- `neonEml` (lines 144-156) - uses scalar loop, not NEON
+
+---
+
+## SIMD Optimization Opportunities
+
+### HIGH PRIORITY (Production Impact)
+
+#### Task 1: Vectorize AddSIMD/SubSIMD/MulSIMD/DivSIMD
+- **Location:** `internal/eml/simd.go:423-505`
+- **Current:** Simple scalar loops
+- **Target:** AVX2/NEON vectorized operations
+- **Impact:** 2-4x speedup for element-wise operations
+- **Subtasks:**
+  - [ ] Implement AddSIMD with AVX2 (4x float64) / NEON (2x float64)
+  - [ ] Implement SubSIMD with AVX2/NEON
+  - [ ] Implement MulSIMD with AVX2/NEON
+  - [ ] Implement DivSIMD with AVX2/NEON
+  - [ ] Add AddScalarSIMD and MulScalarSIMD vectorized
+
+#### Task 2: Fix TanBatch SIMD
+- **Location:** `pkg/trig/trig.go:297-311`
+- **Current:** Calls SinCosBatch then divides
+- **Target:** Direct vectorized tan implementation
+- **Subtasks:**
+  - [ ] Add TanSIMD function in simd.go
+  - [ ] Update TanBatch to use TanSIMD
+
+### MEDIUM PRIORITY (Batch Operations)
+
+#### Task 3: Add Missing Batch Functions
+- **Location:** Multiple packages
+- **Subtasks:**
+  - [ ] Add SinhBatch in `internal/eml/simd.go` or `pkg/hyper/hyper.go`
+  - [ ] Add CoshBatch in `internal/eml/simd.go` or `pkg/hyper/hyper.go`
+  - [ ] Add TanhBatch in `internal/eml/simd.go` or `pkg/hyper/hyper.go`
+  - [ ] Add AsinhBatch in `internal/eml/simd.go` or `pkg/hyper/hyper.go`
+  - [ ] Add AcoshBatch in `internal/eml/simd.go` or `pkg/hyper/hyper.go`
+  - [ ] Add AtanhBatch in `internal/eml/simd.go` or `pkg/hyper/hyper.go`
+  - [ ] Add PowBatch in `pkg/arithmetic/arith.go`
+  - [ ] Add CbrtBatch in `pkg/arithmetic/arith.go`
+  - [ ] Add HypotBatch in `pkg/arithmetic/arith.go`
+  - [ ] Add AbsBatch in `pkg/arithmetic/arith.go`
+  - [ ] Add FloorBatch/CeilBatch/TruncBatch in `pkg/arithmetic/arith.go`
+  - [ ] Add Log1pBatch/Expm1Batch in `pkg/arithmetic/arith.go`
+
+### LOW PRIORITY (True SIMD Intrinsics)
+
+#### Task 4: Replace Scalar Loops with True SIMD Intrinsics
+- **Location:** `internal/eml/simd.go`
+- **Current:** Uses runtime.GOMAXPROCS(0) with scalar operations
+- **Target:** Actual AVX2/AVX512/NEON intrinsics via Go assembly
+- **Subtasks:**
+  - [ ] Create `internal/eml/simd_amd64.s` with AVX2 operations
+  - [ ] Create `internal/eml/simd_arm64.s` with NEON operations
+  - [ ] Use cpu feature detection via runtime built-in (not external)
+  - [ ] Benchmark actual SIMD vs current parallel implementation
+
+#### Task 5: Optimize Parallel Goroutine SIMD
+- **Location:** `internal/eml/simd.go` (ExpSIMD, LogSIMD, etc.)
+- **Current:** Uses goroutines with scalar operations per goroutine
+- **Target:** Each goroutine uses SIMD vectorized operations
+- **Subtasks:**
+  - [ ] Refactor ExpSIMD: chunks should use vectorized exp
+  - [ ] Refactor LogSIMD: chunks should use vectorized log
+  - [ ] Refactor SqrtSIMD: chunks should use vectorized sqrt
+  - [ ] Refactor SinSIMD/CosSIMD: chunks should use vectorized trig
+
+---
+
+## Missing Batch Operations Matrix
+
+| Package | Function | Missing Batch | SIMD Feasible |
+|---------|-----------|---------------|---------------|
+| arithmetic | Pow | PowBatch | Yes - exp/log |
+| arithmetic | Cbrt | CbrtBatch | Yes - pow(x, 1/3) |
+| arithmetic | Hypot | HypotBatch | Yes - sqrt(x²+y²) |
+| arithmetic | Max | MaxBatch | Yes - vector max |
+| arithmetic | Min | MinBatch | Yes - vector min |
+| arithmetic | Floor | FloorBatch | Yes - vector floor |
+| arithmetic | Ceil | CeilBatch | Yes - vector ceil |
+| arithmetic | Trunc | TruncBatch | Yes - vector trunc |
+| arithmetic | Abs | AbsBatch | Yes - vector abs |
+| arithmetic | Log1p | Log1pBatch | Yes - vector log1p |
+| arithmetic | Expm1 | Expm1Batch | Yes - vector expm1 |
+| trig | Tan | TanBatch | Yes - sin/cos |
+| trig | Asin | AsinBatch | Yes - vector asin |
+| trig | Acos | AcosBatch | Yes - vector acos |
+| trig | Atan | AtanBatch | Yes - vector atan |
+| hyper | Sinh | SinhBatch | Yes - (exp-ex)/(2) |
+| hyper | Cosh | CoshBatch | Yes - (exp+ex)/(2) |
+| hyper | Tanh | TanhBatch | Yes - sinh/cosh |
+
+---
+
+## Architecture-Specific SIMD Notes
+
+### AMD64 (Intel/AMD)
+- AVX2: 8 float64 (256-bit)
+- AVX512: 8 float64 (512-bit, requires Skylake-X)
+- Current: Scalar loops with parallelization
+
+### ARM64 (Apple Silicon, AWS Graviton)
+- NEON: 2 float64 (128-bit)
+- Current: Scalar loops with parallelization
+- **Note:** ARM64 darwin/metal has 2x float64 SIMD
+
+### Implementation Strategy
+1. Use Go's built-in `math` package (not external) for correctness
+2. Vectorize batch operations at chunk level
+3. Use runtime.GOMAXPROCS for parallelism
+4. True intrinsics via assembly (.s files) when needed
+
+---
+
+## Verification Commands
+
+After implementing SIMD optimizations:
+```bash
+# Build
+go build ./...
+
+# Run tests
+go test ./...
+
+# Race detection
+go test -race ./...
+
+# Vet
+go vet ./...
+
+# Benchmarks
+go test -bench=. -benchmem ./...
+```
+
+---
+
 # Performance Optimization Plan (Priority Items)
 
 ## Current Status (v1.4 - April 2026)
