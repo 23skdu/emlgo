@@ -24,32 +24,24 @@ package main
 
 import (
     "fmt"
-    "math"
-
-    "github.com/emlgo/eml/pkg/arithmetic"
-    "github.com/emlgo/eml/pkg/hyper"
-    "github.com/emlgo/eml/pkg/logexp"
     "github.com/emlgo/eml/pkg/trig"
+    "github.com/emlgo/eml/pkg/logexp"
+    "github.com/emlgo/eml/pkg/arithmetic"
 )
 
 func main() {
-    // Trigonometric
-    fmt.Printf("sin(π/4) = %.6f (math: %.6f)\n", trig.Sin(math.Pi/4), math.Sin(math.Pi/4))
-    fmt.Printf("cos(π/4) = %.6f (math: %.6f)\n", trig.Cos(math.Pi/4), math.Cos(math.Pi/4))
-    fmt.Printf("tan(π/4) = %.6f (math: %.6f)\n", trig.Tan(math.Pi/4), math.Tan(math.Pi/4))
+    // Trigonometric functions
+    fmt.Printf("sin(π/4) = %v\n", trig.Sin(math.Pi/4))  // ≈ 0.707
+    fmt.Printf("cos(π/4) = %v\n", trig.Cos(math.Pi/4))  // ≈ 0.707
+    fmt.Printf("tan(π/4) = %v\n", trig.Tan(math.Pi/4))  // ≈ 1.0
 
-    // Exponential & Logarithmic
-    fmt.Printf("exp(1) = %.6f (math: %.6f)\n", logexp.Exp(1), math.Exp(1))
-    fmt.Printf("ln(e) = %.6f (math: %.6f)\n", logexp.Log(math.E), math.Log(math.E))
-
-    // Hyperbolic
-    fmt.Printf("sinh(1) = %.6f (math: %.6f)\n", hyper.Sinh(1), math.Sinh(1))
-    fmt.Printf("cosh(1) = %.6f (math: %.6f)\n", hyper.Cosh(1), math.Cosh(1))
-    fmt.Printf("tanh(1) = %.6f (math: %.6f)\n", hyper.Tanh(1), math.Tanh(1))
+    // Exponential and Logarithmic
+    fmt.Printf("exp(1) = %v\n", logexp.Exp(1))          // ≈ 2.718
+    fmt.Printf("ln(e) = %v\n", logexp.Log(math.E))      // ≈ 1.0
 
     // Arithmetic
-    fmt.Printf("sqrt(2) = %.6f (math: %.6f)\n", arithmetic.Sqrt(2), math.Sqrt(2))
-    fmt.Printf("pow(2, 10) = %.0f (math: %.0f)\n", arithmetic.Pow(2, 10), math.Pow(2, 10))
+    fmt.Printf("sqrt(2) = %v\n", arithmetic.Sqrt(2))     // ≈ 1.414
+    fmt.Printf("pow(2, 3) = %v\n", arithmetic.Pow(2, 3)) // ≈ 8.0
 }
 ```
 
