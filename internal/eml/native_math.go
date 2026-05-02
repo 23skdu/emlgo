@@ -7,10 +7,12 @@ import (
 
 // math constants removed to satisfy lint
 
+//go:inline
 func nan() float64 {
 	return f64frombits(0x7FFFFFFFFFFFFFFF)
 }
 
+//go:inline
 func inf(sign int) float64 {
 	if sign > 0 {
 		return f64frombits(0x7FF0000000000000)
@@ -18,10 +20,12 @@ func inf(sign int) float64 {
 	return f64frombits(0xFFF0000000000000)
 }
 
+//go:inline
 func isNaN(f float64) bool {
 	return f != f
 }
 
+//go:inline
 func isInf(f float64, sign int) bool {
 	if sign > 0 {
 		return f == inf(1)
@@ -30,10 +34,12 @@ func isInf(f float64, sign int) bool {
 }
 
 
+//go:inline
 func signbit(f float64) bool {
 	return f64bits(f)>>63 == 1
 }
 
+//go:inline
 func copysign(x, y float64) float64 {
 	if (x > 0) == (y > 0) {
 		return x
@@ -41,11 +47,13 @@ func copysign(x, y float64) float64 {
 	return -x
 }
 
+//go:inline
 func f64bits(f float64) uint64 {
 	// #nosec G103 - high performance float/bits conversion
 	return *(*uint64)(unsafe.Pointer(&f))
 }
 
+//go:inline
 func f64frombits(b uint64) float64 {
 	// #nosec G103 - high performance float/bits conversion
 	return *(*float64)(unsafe.Pointer(&b))
@@ -55,7 +63,7 @@ func nativeSqrt(x float64) float64 {
 	return sqrtScalar(x)
 }
 
-
+//go:inline
 func nativeExp(x float64) float64 {
 	return expImpl(x)
 }
@@ -77,31 +85,38 @@ func nativeLog(x float64) float64 {
 	return math.Log(x)
 }
 
+//go:inline
 func nativeSin(x float64) float64 {
 	return math.Sin(x)
 }
 
+//go:inline
 func nativeCos(x float64) float64 {
 	return math.Cos(x)
 }
 
+//go:inline
 func nativeSincos(x float64) (sin, cos float64) {
 	return math.Sincos(x)
 }
 
 
+//go:inline
 func floor(x float64) float64 {
 	return math.Floor(x)
 }
 
+//go:inline
 func ceil(x float64) float64 {
 	return math.Ceil(x)
 }
 
+//go:inline
 func trunc(x float64) float64 {
 	return math.Trunc(x)
 }
 
+//go:inline
 func round(x float64) float64 {
 	return math.Round(x)
 }
@@ -110,6 +125,7 @@ func nativeExpm1(x float64) float64 {
 	return math.Expm1(x)
 }
 
+//go:inline
 func nativeTan(x float64) float64 {
 	s, c := nativeSincos(x)
 	if c == 0 {
@@ -118,34 +134,42 @@ func nativeTan(x float64) float64 {
 	return s / c
 }
 
+//go:inline
 func nativeAtan(x float64) float64 {
 	return math.Atan(x)
 }
 
+//go:inline
 func nativeAtan2(y, x float64) float64 {
 	return math.Atan2(y, x)
 }
 
+//go:inline
 func nativeAsin(x float64) float64 {
 	return math.Asin(x)
 }
 
+//go:inline
 func nativeAcos(x float64) float64 {
 	return math.Acos(x)
 }
 
+//go:inline
 func nativeAsinh(x float64) float64 {
 	return math.Asinh(x)
 }
 
+//go:inline
 func nativeAcosh(x float64) float64 {
 	return math.Acosh(x)
 }
 
+//go:inline
 func nativeAtanh(x float64) float64 {
 	return math.Atanh(x)
 }
 
+//go:inline
 func nativeLog1p(x float64) float64 {
 	return math.Log1p(x)
 }
@@ -177,6 +201,7 @@ func isInteger(x float64) bool {
 	return x == floor(x)
 }
 
+//go:inline
 func nativeInv(x float64) float64 {
 	if isNaN(x) {
 		return x
@@ -187,6 +212,7 @@ func nativeInv(x float64) float64 {
 	return 1 / x
 }
 
+//go:inline
 func nativeNeg(x float64) float64 {
 	if isNaN(x) {
 		return x
@@ -197,6 +223,7 @@ func nativeNeg(x float64) float64 {
 	return -x
 }
 
+//go:inline
 func nativeAbs(x float64) float64 {
 	if isNaN(x) {
 		return x
@@ -207,6 +234,7 @@ func nativeAbs(x float64) float64 {
 	return x
 }
 
+//go:inline
 func nativeMod(x, y float64) float64 {
 	if isNaN(x) || isNaN(y) || y == 0 {
 		return nan()
@@ -223,6 +251,7 @@ func nativeMod(x, y float64) float64 {
 	return x
 }
 
+//go:inline
 func nativeRemainder(x, y float64) float64 {
 	if isNaN(x) || isNaN(y) || y == 0 {
 		return nan()
@@ -236,6 +265,7 @@ func nativeRemainder(x, y float64) float64 {
 	return nativeMod(x, y)
 }
 
+//go:inline
 func nativeHypot(x, y float64) float64 {
 	if isNaN(x) || isNaN(y) {
 		return nan()
@@ -281,6 +311,7 @@ func nativeCbrt(x float64) float64 {
 	return result
 }
 
+//go:inline
 func nativeMax(x, y float64) float64 {
 	if isNaN(x) {
 		return y
@@ -306,6 +337,7 @@ func nativeMax(x, y float64) float64 {
 	return y
 }
 
+//go:inline
 func nativeMin(x, y float64) float64 {
 	if isNaN(x) {
 		return y
@@ -344,6 +376,7 @@ func nativeLog10(x float64) float64 {
 	return nativeLog(x) / ln10()
 }
 
+//go:inline
 func ln10() float64 {
 	return 2.3025850929940456840179914546843642
 }

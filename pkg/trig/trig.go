@@ -1,6 +1,8 @@
 package trig
 
 import (
+	"math"
+
 	"github.com/emlgo/eml/internal/eml"
 	"github.com/emlgo/eml/pkg/logexp"
 )
@@ -294,4 +296,29 @@ func SinCosBatch(x []float64) (sin, cos []float64) {
 func TanBatch(x []float64) []float64 {
 	sin, cos := SinCosBatch(x)
 	return eml.DivSIMD(sin, cos)
+}
+
+func SinFast(x float64) float64 {
+	if isNaN(x) || isInf(x, 0) {
+		return nan()
+	}
+	if x == 0 {
+		return 0
+	}
+	return math.Sin(x)
+}
+
+func CosFast(x float64) float64 {
+	if isNaN(x) || isInf(x, 0) {
+		return nan()
+	}
+	return math.Cos(x)
+}
+
+func TanFast(x float64) float64 {
+	s, c := math.Sincos(x)
+	if c == 0 {
+		return nan()
+	}
+	return s / c
 }
