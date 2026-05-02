@@ -223,27 +223,21 @@ func Abs(x float64) float64 {
 	if isNaN(x) {
 		return nan()
 	}
-	return nativeAbs(x)
+	return eml.Abs(x)
 }
 
 func Neg(x float64) float64 {
 	if isNaN(x) {
 		return nan()
 	}
-	if x == 0 {
-		return eml.Copysign(0, -1)
-	}
-	return -x
+	return eml.Neg(x)
 }
 
 func Inv(x float64) float64 {
 	if isNaN(x) {
 		return nan()
 	}
-	if x == 0 {
-		return inf(1)
-	}
-	return 1 / x
+	return eml.Inv(x)
 }
 
 func Square(x float64) float64 {
