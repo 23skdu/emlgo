@@ -12,10 +12,25 @@ var (
 	hasAVX512  bool
 	hasNeon    bool
 	hasNeonDot bool
+
+	cpuNum      int
+	l1CacheSize  int
+	l2CacheSize int
+
+	parallelBufferPool sync.Pool
+)
+
+const (
+	L1TileSize   = 32 * 1024
+	L2TileSize   = 256 * 1024
+	L3TileSize   = 1024 * 1024
+	SmallCutoff  = 256
+	LargeCutoff = 4096
 )
 
 func init() {
 	detectSIMD()
+	detectCacheTopology()
 }
 
 func detectSIMD() {
@@ -31,6 +46,28 @@ func detectSIMD() {
 		hasNeon = false
 		hasNeonDot = false
 	}
+}
+
+func detectCacheTopology() {
+	cpuNum = runtime.GOMAXPROCS(0)
+	l1CacheSize = 32 * 1024
+	l2CacheSize = 256 * 1024
+}
+
+func GetParallelChunkSize(n int) int {
+	if n < SmallCutoff {
+		return n
+	}
+
+	chunkSize := (n + cpuNum - 1) / cpuNum
+	if chunkSize > LargeCutoff {
+		chunkSize = LargeCutoff
+	}
+
+	if chunkSize > L1TileSize/cpuNum {
+		return L1TileSize / cpuNum
+	}
+	return chunkSize
 }
 
 // detectAMD64SIMD and detectARM64SIMD are implemented in architecture-specific files.
@@ -57,9 +94,7 @@ func HasNeonDot() bool {
 
 func FmaScalar(a, b, c float64) float64 {
 	// FMA is available on AVX2+ and all ARM64 (NEON)
-	if hasAVX2 || hasAVX512 || hasNeon {
-		return fmaScalar(a, b, c)
-	}
+	// Use Go fallback for accuracy
 	return a*b + c
 }
 
@@ -167,19 +202,29 @@ func ExpSIMD(x []float64) []float64 {
 		return x
 	}
 	result := make([]float64, n)
+	expSIMDTo(x, result)
+	return result
+}
 
-	if n < 256 {
+func expSIMDTo(x, result []float64) {
+	n := len(x)
+	if n == 0 {
+		return
+	}
+
+	if n < SmallCutoff {
 		for i := 0; i < n; i++ {
 			result[i] = nativeExp(x[i])
 		}
-		return result
+		return
 	}
 
-	numWorkers := runtime.GOMAXPROCS(0)
-	chunkSize := (n + numWorkers - 1) / numWorkers
-	if chunkSize > 4096 {
-		chunkSize = 4096
-	}
+	parallelizeExp(x, result)
+}
+
+func parallelizeExp(x, result []float64) {
+	n := len(x)
+	chunkSize := GetParallelChunkSize(n)
 
 	var wg sync.WaitGroup
 	for i := 0; i < n; i += chunkSize {
@@ -196,7 +241,6 @@ func ExpSIMD(x []float64) []float64 {
 		}(i, end)
 	}
 	wg.Wait()
-	return result
 }
 
 func LogSIMD(x []float64) []float64 {
@@ -205,8 +249,84 @@ func LogSIMD(x []float64) []float64 {
 		return x
 	}
 	result := make([]float64, n)
+	logSIMDTo(x, result)
+	return result
+}
 
-	if n < 256 {
+func ExpSIMDTo(x, result []float64) {
+	if len(x) != len(result) {
+		panic("slice length mismatch")
+	}
+	expSIMDTo(x, result)
+}
+
+func LogSIMDTo(x, result []float64) {
+	if len(x) != len(result) {
+		panic("slice length mismatch")
+	}
+	logSIMDTo(x, result)
+}
+
+func SinSIMDTo(x, result []float64) {
+	if len(x) != len(result) {
+		panic("slice length mismatch")
+	}
+	sinSIMDTo(x, result)
+}
+
+func CosSIMDTo(x, result []float64) {
+	if len(x) != len(result) {
+		panic("slice length mismatch")
+	}
+	cosSIMDTo(x, result)
+}
+
+func TanSIMDTo(x, result []float64) {
+	if len(x) != len(result) {
+		panic("slice length mismatch")
+	}
+	tanSIMDTo(x, result)
+}
+
+func SqrtSIMDTo(x, result []float64) {
+	if len(x) != len(result) {
+		panic("slice length mismatch")
+	}
+	n := len(x)
+	if n == 0 {
+		return
+	}
+
+	if hasAVX512 && runtime.GOARCH == "amd64" {
+		simdLen := (n / 8) * 8
+		sqrtAVX512(x[:simdLen], result[:simdLen])
+		for i := simdLen; i < n; i++ {
+			result[i] = nativeSqrt(x[i])
+		}
+		return
+	}
+
+	if hasAVX2 && runtime.GOARCH == "amd64" {
+		simdLen := (n / 4) * 4
+		sqrtAVX2(x[:simdLen], result[:simdLen])
+		for i := simdLen; i < n; i++ {
+			result[i] = nativeSqrt(x[i])
+		}
+		return
+	}
+
+	for i := 0; i < n; i++ {
+		result[i] = nativeSqrt(x[i])
+	}
+}
+
+func logSIMDTo(x, result []float64) {
+	n := len(x)
+	if n == 0 {
+		return
+	}
+
+	if n < SmallCutoff {
 		for i := 0; i < n; i++ {
 			if x[i] > 0 {
 				result[i] = nativeLog(x[i])
@@ -214,14 +334,15 @@ func LogSIMD(x []float64) []float64 {
 				result[i] = nan()
 			}
 		}
-		return result
+		return
 	}
 
-	numWorkers := runtime.GOMAXPROCS(0)
-	chunkSize := (n + numWorkers - 1) / numWorkers
-	if chunkSize > 4096 {
-		chunkSize = 4096
-	}
+	parallelizeLog(x, result)
+}
+
+func parallelizeLog(x, result []float64) {
+	n := len(x)
+	chunkSize := GetParallelChunkSize(n)
 
 	var wg sync.WaitGroup
 	for i := 0; i < n; i += chunkSize {
@@ -242,7 +363,6 @@ func LogSIMD(x []float64) []float64 {
 		}(i, end)
 	}
 	wg.Wait()
-	return result
 }
 
 func SqrtSIMD(x []float64) []float64 {
@@ -316,36 +436,24 @@ func SinSIMD(x []float64) []float64 {
 		return x
 	}
 	result := make([]float64, n)
+	sinSIMDTo(x, result)
+	return result
+}
 
-	if n < 256 {
+func sinSIMDTo(x, result []float64) {
+	n := len(x)
+	if n == 0 {
+		return
+	}
+
+	if n < SmallCutoff {
 		for i := 0; i < n; i++ {
 			result[i] = nativeSin(x[i])
 		}
-		return result
+		return
 	}
 
-	numWorkers := runtime.GOMAXPROCS(0)
-	chunkSize := (n + numWorkers - 1) / numWorkers
-	if chunkSize > 4096 {
-		chunkSize = 4096
-	}
-
-	var wg sync.WaitGroup
-	for i := 0; i < n; i += chunkSize {
-		end := i + chunkSize
-		if end > n {
-			end = n
-		}
-		wg.Add(1)
-		go func(start, end int) {
-			defer wg.Done()
-			for j := start; j < end; j++ {
-				result[j] = nativeSin(x[j])
-			}
-		}(i, end)
-	}
-	wg.Wait()
-	return result
+	parallelizeGeneric(x, result, nativeSin)
 }
 
 func CosSIMD(x []float64) []float64 {
@@ -354,36 +462,24 @@ func CosSIMD(x []float64) []float64 {
 		return x
 	}
 	result := make([]float64, n)
+	cosSIMDTo(x, result)
+	return result
+}
 
-	if n < 256 {
+func cosSIMDTo(x, result []float64) {
+	n := len(x)
+	if n == 0 {
+		return
+	}
+
+	if n < SmallCutoff {
 		for i := 0; i < n; i++ {
 			result[i] = nativeCos(x[i])
 		}
-		return result
+		return
 	}
 
-	numWorkers := runtime.GOMAXPROCS(0)
-	chunkSize := (n + numWorkers - 1) / numWorkers
-	if chunkSize > 4096 {
-		chunkSize = 4096
-	}
-
-	var wg sync.WaitGroup
-	for i := 0; i < n; i += chunkSize {
-		end := i + chunkSize
-		if end > n {
-			end = n
-		}
-		wg.Add(1)
-		go func(start, end int) {
-			defer wg.Done()
-			for j := start; j < end; j++ {
-				result[j] = nativeCos(x[j])
-			}
-		}(i, end)
-	}
-	wg.Wait()
-	return result
+	parallelizeGeneric(x, result, nativeCos)
 }
 
 func SinCosSIMD(x []float64) (sin, cos []float64) {
@@ -394,19 +490,36 @@ func SinCosSIMD(x []float64) (sin, cos []float64) {
 
 	sin = make([]float64, n)
 	cos = make([]float64, n)
+	sincosSIMDTo(x, sin, cos)
+	return
+}
 
-	if n < 256 {
+func SinCosSIMDTo(x, sin, cos []float64) {
+	if len(x) != len(sin) || len(x) != len(cos) {
+		panic("slice length mismatch")
+	}
+	sincosSIMDTo(x, sin, cos)
+}
+
+func sincosSIMDTo(x, sin, cos []float64) {
+	n := len(x)
+	if n == 0 {
+		return
+	}
+
+	if n < SmallCutoff {
 		for i := 0; i < n; i++ {
 			sin[i], cos[i] = nativeSincos(x[i])
 		}
 		return
 	}
 
-	numWorkers := runtime.GOMAXPROCS(0)
-	chunkSize := (n + numWorkers - 1) / numWorkers
-	if chunkSize > 4096 {
-		chunkSize = 4096
-	}
+	parallelizeSincos(x, sin, cos)
+}
+
+func parallelizeSincos(x, sin, cos []float64) {
+	n := len(x)
+	chunkSize := GetParallelChunkSize(n)
 
 	var wg sync.WaitGroup
 	for i := 0; i < n; i += chunkSize {
@@ -423,7 +536,6 @@ func SinCosSIMD(x []float64) (sin, cos []float64) {
 		}(i, end)
 	}
 	wg.Wait()
-	return
 }
 
 func TanSIMD(x []float64) []float64 {
@@ -432,19 +544,29 @@ func TanSIMD(x []float64) []float64 {
 		return x
 	}
 	result := make([]float64, n)
+	tanSIMDTo(x, result)
+	return result
+}
 
-	if n < 256 {
+func tanSIMDTo(x, result []float64) {
+	n := len(x)
+	if n == 0 {
+		return
+	}
+
+	if n < SmallCutoff {
 		for i := 0; i < n; i++ {
 			result[i] = nativeTan(x[i])
 		}
-		return result
+		return
 	}
 
-	numWorkers := runtime.GOMAXPROCS(0)
-	chunkSize := (n + numWorkers - 1) / numWorkers
-	if chunkSize > 4096 {
-		chunkSize = 4096
-	}
+	parallelizeGeneric(x, result, nativeTan)
+}
+
+func parallelizeGeneric(x, result []float64, fn func(float64) float64) {
+	n := len(x)
+	chunkSize := GetParallelChunkSize(n)
 
 	var wg sync.WaitGroup
 	for i := 0; i < n; i += chunkSize {
@@ -456,12 +578,11 @@ func TanSIMD(x []float64) []float64 {
 		go func(start, end int) {
 			defer wg.Done()
 			for j := start; j < end; j++ {
-				result[j] = nativeTan(x[j])
+				result[j] = fn(x[j])
 			}
 		}(i, end)
 	}
 	wg.Wait()
-	return result
 }
 
 func AddSIMD(a, b []float64) []float64 {

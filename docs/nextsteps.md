@@ -1,44 +1,107 @@
-# Next Steps: Surpassing Go Standard Library Scalar Performance
+# Next Steps: Performance Optimization Roadmap
 
-While `emlgo` currently provides significant speedups for **batch** operations via SIMD, standard scalar operations often trail behind Go's `math` library due to compiler intrinsics. This document outlines the roadmap to achieve scalar parity and eventual superiority.
+This document outlines a 10-part plan to enhance performance across scalar, batch, and system-level operations.
 
-## 1. Direct Assembly Scalar Kernels
-
-The primary reason for `math` library superiority is the use of compiler intrinsics that emit direct assembly instructions (e.g., `FSQRT`).
-
-- **Action:** Implement scalar versions of core arithmetic and transcendental functions in `simd_amd64.s` and `simd_arm64.s`.
-- **Target:** Bypass Go function call overhead and leverage the same underlying hardware instructions used by the compiler.
-
-## 2. Algorithmic Optimizations
-
-Go's standard library prioritize portability and strict IEEE 754 compliance. We can optimize for speed on modern architectures:
-
-- **FMA (Fused Multiply-Add):** Use `VFMADD` instructions for polynomial evaluations (Sin, Cos, Exp). This reduces latency and improves precision.
-- **Polynomial Refinement:** Use lower-degree minimax polynomials for specialized ranges, reducing the number of multiplications needed.
-- **Fast Paths:** Implement branchless checks for common values (0, 1, integers) to avoid complex math logic for simple cases.
-
-## 3. Lighter Robustness (FastMath Mode)
-
-Standard `math` performs extensive checks for signed zeros, subnormal numbers, and specific NaN patterns.
-
-- **Action:** Introduce a `fastscalar` sub-package that relaxes non-critical IEEE 754 edge-case handling in exchange for a 2x-3x speedup.
-- **Benefit:** High-performance workloads often don't require bit-perfect handling of signed zero or subnormal behavior.
-
-## 4. Inlining and Link-Time Optimization
-
-- **Action:** Ensure all scalar wrappers in `pkg/arithmetic` are simple enough for the Go compiler to inline automatically.
-- **Action:** Use `//go:noescape` and `//go:nosplit` annotations on assembly stubs to minimize runtime overhead.
-
-## 5. Benchmarking and Iteration
-
-- **Matrix:** Expand `cmd/bench` to track scalar latency (cycles/op) in addition to throughput.
-- **Profiling:** Use `pprof` to identify remaining overhead in the dispatch logic.
-
----
-
-### Implementation Status
+## Completed Items (from prior roadmap)
 
 1. `[x]` **Scalar Sqrt:** Map directly to `SQRTSD` / `FSQRT`.
 2. `[x]` **Scalar FMA:** Implement `FMA(a, b, c)` as a single instruction.
 3. `[x]` **Scalar Exp/Log:** Optimized polynomial implementation using FMA.
-4. `[x]` **FastScalar Package:** Initial release with relaxed error handling for maximum throughput.
+4. `[x]` **FastScalar Package:** Initial release with relaxed error handling.
+
+---
+
+## 10-Part Performance Improvement Plan
+
+### 1. Expanded Batch SIMD Coverage
+
+**Target:** Exp, Log, Sin, Cos, Tan, Pow for batch sizes > 64 elements  
+**Implementation:** Add AVX2/AVX512/NEON vectorized kernels in assembly  
+**Benchmark:** Achieve 2x-4x speedup vs parallel Go implementation  
+**Files:** `simd_amd64.s`, `simd_arm64.s`, `simd.go`
+
+### 2. Cache-Oblivious Algorithms
+
+**Target:** Implement cache-tiling for batch operations > 1MB  
+**Implementation:** Process data in L1/L2/L3 cache-friendly chunks (32KB/256KB/1MB)  
+**Benefits:** Reduces cache misses by 40-60% for large batch operations  
+**Files:** `simd.go`, `batch.go` (new file)
+
+### 3. Adaptive Parallelization Strategy
+
+**Target:** Use adaptive chunking based on CPU cache topology  
+**Implementation:** Query `runtime.NumCPU()`, L1d cache size, and adjust workers  
+**Features:** Gang scheduling, work-stealing queue for load balancing  
+**Files:** `parallel.go` (new or enhanced in `internal/eml/`)
+
+### 4. Reduced Memory Allocations
+
+**Target:** Eliminate allocations in functions called < 1000x/second  
+**Implementation:** Pre-allocate buffers, use stack-allocated temporaries  
+**Benefits:** GC pressure reduction, 10-20% performance gain  
+**Files:** All `pkg/*` files - audit and optimize allocation hot paths
+
+### 5. Branchless Implementation
+
+**Target:** Convert branch-heavy code to branchless equivalents  
+**Implementation:** Use bitwise operations for conditional logic (AND/OR instead of if/else)  
+**Examples:** Sign handling in `Sin`, `Cos`, domain checks in `Log`, `Pow`  
+**Files:** `pkg/trig/trig.go`, `pkg/logexp/exp.go`, `pkg/arithmetic/arith.go`
+
+### 6. Hardware-Accelerated Transcendentals
+
+**Target:** Use `VGETEXP`, `VGETMANT`, `VSCALEF` where accuracy permits  
+**Implementation:** Combine with polynomial correction for full accuracy  
+**Files:** `simd_amd64.s`
+
+### 7. Benchmark Infrastructure Enhancement
+
+**Target:** Add latency profiling and cache simulation tools  
+**Implementation:** Extend `cmd/bench` with cycle-accurate measurements  
+**Features:** ULP tracking, cache miss profiling, branch mispredict tracking  
+**Files:** `cmd/bench/main.go`
+
+### 8. Improved Polynomial Evaluation
+
+**Target:** Optimize minimax polynomial coefficients  
+**Implementation:** Use Remez algorithm for tighter approximations  
+**Benefits:** 5-10% reduction in polynomial degree needed  
+**Files:** `internal/eml/math_helpers.go`, `pkg/fastmath/`
+
+### 9. Batch Operation Fusion
+
+**Target:** Fuse multiple operations to reduce memory traffic  
+**Implementation:** Combine Exp+Mul, Log+Div into single pass  
+**Benefits:** 20-30% memory bandwidth reduction  
+**Files:** `simd.go`, batch operation functions
+
+### 10. Microkernel Optimization
+
+**Target:** Optimize inner loop kernels for modern CPU pipelines  
+**Implementation:** Software prefetching, loop unrolling, instruction scheduling  
+**Benefits:** 10-15% improvement on memory-bound operations  
+**Files:** `simd_amd64.s`, `simd_arm64.s`
+
+---
+
+## Implementation Checklist
+
+- [ ] **Item 1:** Expanded Batch SIMD - Add vectorized Exp, Log, Sin, Cos, Tan, Pow
+- [ ] **Item 2:** Cache-Oblivious Algorithms - Implement cache tiling
+- [ ] **Item 3:** Adaptive Parallelization - Dynamic chunking based on CPU topology
+- [ ] **Item 4:** Reduced Memory Allocations - Eliminate allocations in hot paths
+- [ ] **Item 5:** Branchless Implementation - Convert conditional logic to bitwise
+- [ ] **Item 6:** Hardware-Accelerated Transcendentals - Use CPU intrinsics
+- [ ] **Item 7:** Benchmark Infrastructure - Add latency/cachesim profiling
+- [ ] **Item 8:** Polynomial Evaluation - Optimize minimax coefficients
+- [ ] **Item 9:** Batch Operation Fusion - Fuse multiple ops in single pass
+- [ ] **Item 10:** Microkernel Optimization - Software prefetch, loop unroll
+
+---
+
+## Future Considerations (Beyond 10-Part Plan)
+
+- GPU/CUDA Production Readiness
+- ARM SVE/SVE2 Support  
+- WebAssembly SIMD Intrinsics
+- JIT Polynomial Compilation
