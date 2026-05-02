@@ -325,3 +325,17 @@ TEXT ·fmaScalar(SB), NOSPLIT, $32
 	ADDSD X2, X0
 	MOVSD X0, ret+24(FP)
 	RET
+
+// func absScalar(x float64) float64
+TEXT ·absScalar(SB), NOSPLIT, $0-16
+	MOVSD x+0(FP), X0
+	ANDNPD x+0(FP), X0
+	MOVSD X0, ret+8(FP)
+	RET
+
+// func negScalar(x float64) float64
+TEXT ·negScalar(SB), NOSPLIT, $0-16
+	MOVSD x+0(FP), X0
+	NEGSD X0, X0
+	MOVSD X0, ret+8(FP)
+	RET
