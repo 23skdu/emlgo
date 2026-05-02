@@ -101,7 +101,7 @@ func FmaScalar(a, b, c float64) float64 {
 func SqrtScalar(x float64) float64 {
 	// SQRTSD is universal on AMD64, FSQRTD is universal on ARM64
 	if runtime.GOARCH == "amd64" || runtime.GOARCH == "arm64" {
-		return sqrtScalar(x)
+		return math.Sqrt(x)
 	}
 	return math.Sqrt(x)
 }
