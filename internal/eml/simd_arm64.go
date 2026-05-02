@@ -41,12 +41,9 @@ func mulScalarNEON(a []float64, b float64, result []float64) {
 
 func sqrtNEON(a, result []float64) {
 	for i := range a {
-		result[i] = sqrtScalar(a[i])
+		result[i] = nativeSqrt(a[i])
 	}
 }
-
-func sqrtScalar(x float64) float64
-func fmaScalar(a, b, c float64) float64
 
 func detectARM64SIMD() {
 	// NEON is always available on our target ARM64 platforms, 

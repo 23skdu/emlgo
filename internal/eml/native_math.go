@@ -60,7 +60,7 @@ func f64frombits(b uint64) float64 {
 }
 
 func nativeSqrt(x float64) float64 {
-	return sqrtScalar(x)
+	return math.Sqrt(x)
 }
 
 //go:inline
