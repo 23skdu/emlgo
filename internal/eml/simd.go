@@ -1214,3 +1214,143 @@ func AtanhBatch(x []float64) []float64 {
 	wg.Wait()
 	return result
 }
+
+func NegSIMD(a []float64) []float64 {
+	n := len(a)
+	if n == 0 {
+		return a
+	}
+	result := make([]float64, n)
+
+	if n < 4 {
+		for i := 0; i < n; i++ {
+			result[i] = -a[i]
+		}
+		return result
+	}
+
+	numWorkers := runtime.GOMAXPROCS(0)
+	chunkSize := (n + numWorkers - 1) / numWorkers
+	if chunkSize > 4096 {
+		chunkSize = 4096
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < n; i += chunkSize {
+		end := i + chunkSize
+		if end > n {
+			end = n
+		}
+		wg.Add(1)
+		go func(start, end int) {
+			defer wg.Done()
+			for j := start; j < end; j++ {
+				result[j] = -a[j]
+			}
+		}(i, end)
+	}
+	wg.Wait()
+	return result
+}
+
+func InvSIMD(a []float64) []float64 {
+	n := len(a)
+	if n == 0 {
+		return a
+	}
+	result := make([]float64, n)
+
+	if n < 4 {
+		for i := 0; i < n; i++ {
+			result[i] = 1 / a[i]
+		}
+		return result
+	}
+
+	numWorkers := runtime.GOMAXPROCS(0)
+	chunkSize := (n + numWorkers - 1) / numWorkers
+	if chunkSize > 4096 {
+		chunkSize = 4096
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < n; i += chunkSize {
+		end := i + chunkSize
+		if end > n {
+			end = n
+		}
+		wg.Add(1)
+		go func(start, end int) {
+			defer wg.Done()
+			for j := start; j < end; j++ {
+				result[j] = 1 / a[j]
+			}
+		}(i, end)
+	}
+	wg.Wait()
+	return result
+}
+
+func NegSIMDTo(a, result []float64) {
+	n := len(a)
+	if n != len(result) {
+		panic("length mismatch")
+	}
+	if n == 0 {
+		return
+	}
+
+	numWorkers := runtime.GOMAXPROCS(0)
+	chunkSize := (n + numWorkers - 1) / numWorkers
+	if chunkSize > 4096 {
+		chunkSize = 4096
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < n; i += chunkSize {
+		end := i + chunkSize
+		if end > n {
+			end = n
+		}
+		wg.Add(1)
+		go func(start, end int) {
+			defer wg.Done()
+			for j := start; j < end; j++ {
+				result[j] = -a[j]
+			}
+		}(i, end)
+	}
+	wg.Wait()
+}
+
+func InvSIMDTo(a, result []float64) {
+	n := len(a)
+	if n != len(result) {
+		panic("length mismatch")
+	}
+	if n == 0 {
+		return
+	}
+
+	numWorkers := runtime.GOMAXPROCS(0)
+	chunkSize := (n + numWorkers - 1) / numWorkers
+	if chunkSize > 4096 {
+		chunkSize = 4096
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < n; i += chunkSize {
+		end := i + chunkSize
+		if end > n {
+			end = n
+		}
+		wg.Add(1)
+		go func(start, end int) {
+			defer wg.Done()
+			for j := start; j < end; j++ {
+				result[j] = 1 / a[j]
+			}
+		}(i, end)
+	}
+	wg.Wait()
+}

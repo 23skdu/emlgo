@@ -8,100 +8,131 @@ This document outlines a 10-part plan to enhance performance across scalar, batc
 2. `[x]` **Scalar FMA:** Implement `FMA(a, b, c)` as a single instruction.
 3. `[x]` **Scalar Exp/Log:** Optimized polynomial implementation using FMA.
 4. `[x]` **FastScalar Package:** Initial release with relaxed error handling.
+5. `[x]` **Batch SIMD:** Add ExpSIMD, LogSIMD, SinSIMD, CosSIMD with zero-allocation To variants.
+6. `[x]` **Fused Batch Operations:** ExpMulBatch, ExpAddBatch, LogDivBatch, LogSubBatch.
+7. `[x]` **Adaptive Parallelization:** GetParallelChunkSize with L1/L2 cache awareness.
+8. `[x]` **Branchless Utilities:** AbsBranchless, MinBranchless, MaxBranchless.
 
 ---
 
-## 10-Part Performance Improvement Plan
+## Scalar Performance Issues (v2.1 Priority)
 
-### 1. Expanded Batch SIMD Coverage
+Based on benchmark results, the following scalar operations have significant overhead compared to Go's stdlib:
 
-**Target:** Exp, Log, Sin, Cos, Tan, Pow for batch sizes > 64 elements  
-**Implementation:** Add AVX2/AVX512/NEON vectorized kernels in assembly  
-**Benchmark:** Achieve 2x-4x speedup vs parallel Go implementation  
-**Files:** `simd_amd64.s`, `simd_arm64.s`, `simd.go`
+| Function | Current Ratio | Issue |
+|----------|--------------|-------|
+| Abs | 7.32x | Function call overhead |
+| Neg | 2.08x | Function call overhead |
+| Inv | 2.02x | Function call overhead |
+| Sin/Cos/Tan | ~1.2x | Compiler intrinsics faster |
 
-### 2. Cache-Oblivious Algorithms
+---
 
-**Target:** Implement cache-tiling for batch operations > 1MB  
-**Implementation:** Process data in L1/L2/L3 cache-friendly chunks (32KB/256KB/1MB)  
-**Benefits:** Reduces cache misses by 40-60% for large batch operations  
-**Files:** `simd.go`, `batch.go` (new file)
+## 10-Part Scalar Optimization Plan
 
-### 3. Adaptive Parallelization Strategy
+### 1. Inline Critical Scalar Functions
 
-**Target:** Use adaptive chunking based on CPU cache topology  
-**Implementation:** Query `runtime.NumCPU()`, L1d cache size, and adjust workers  
-**Features:** Gang scheduling, work-stealing queue for load balancing  
-**Files:** `parallel.go` (new or enhanced in `internal/eml/`)
+**Target:** Eliminating function call overhead for hot-path scalar operations  
+**Implementation:** Use `//go:inline` pragma or mark functions as `static` for inlining  
+**Functions:** `Neg`, `Inv`, `Abs`, `Square`, `Cube`, `Floor`, `Ceil`, `Round`, `Trunc`  
+**Benchmark:** Target < 1.5x ratio (abs), < 1.2x ratio (others)
 
-### 4. Reduced Memory Allocations
+### 2. Direct Intrinsic Mapping
 
-**Target:** Eliminate allocations in functions called < 1000x/second  
-**Implementation:** Pre-allocate buffers, use stack-allocated temporaries  
-**Benefits:** GC pressure reduction, 10-20% performance gain  
-**Files:** All `pkg/*` files - audit and optimize allocation hot paths
+**Target:** Map scalar operations directly to single CPU instructions  
+**Implementation:** Use platform-specific assembly or `runtime_arch` conditional compilation  
+**Mappings:** `Abs` → `PNABS`/`FNABS`, `Neg` → `NEG`, `Inv` → `1/x` approximation + Newton-Raphson  
+**Files:** `pkg/arithmetic/arith.go`, `internal/eml/native_math.go`
 
-### 5. Branchless Implementation
+### 3. Compiler Intrinsic Integration
 
-**Target:** Convert branch-heavy code to branchless equivalents  
-**Implementation:** Use bitwise operations for conditional logic (AND/OR instead of if/else)  
-**Examples:** Sign handling in `Sin`, `Cos`, domain checks in `Log`, `Pow`  
-**Files:** `pkg/trig/trig.go`, `pkg/logexp/exp.go`, `pkg/arithmetic/arith.go`
+**Target:** Leverage Go compiler's intrinsic knowledge for trig functions  
+**Implementation:** Ensure trig functions use `math.Sin`, `math.Cos`, `math.Tan` internally  
+**Fallback:** Implement separate `SinFast`, `CosFast` with relaxed accuracy  
+**Files:** `pkg/trig/trig.go`
 
-### 6. Hardware-Accelerated Transcendentals
+### 4. Reduced Function Call Chains
 
-**Target:** Use `VGETEXP`, `VGETMANT`, `VSCALEF` where accuracy permits  
-**Implementation:** Combine with polynomial correction for full accuracy  
-**Files:** `simd_amd64.s`
+**Target:** Eliminate intermediate call layers  
+**Implementation:** Flatten wrapper functions into direct implementations  
+**Current:** `Abs` → `eml.Abs` → `native.Abs` → platform implementation  
+**Target:** `Abs` → platform implementation (single call)
 
-### 7. Benchmark Infrastructure Enhancement
+### 5. Batch Scalar Operations
 
-**Target:** Add latency profiling and cache simulation tools  
-**Implementation:** Extend `cmd/bench` with cycle-accurate measurements  
-**Features:** ULP tracking, cache miss profiling, branch mispredict tracking  
+**Target:** Process multiple scalars in tight loops without function call overhead  
+**Implementation:** Provide batch versions: `AbsBatch`, `NegBatch`, `InvBatch`  
+**Benefits:** Amortize function call overhead across N elements  
+**Benchmark:** Target < 0.5x ratio for batch size ≥ 64
+
+### 6. Stack-Allocated Temporary Buffers
+
+**Target:** Eliminate heap allocations in scalar wrappers  
+**Implementation:** Use `[64]float64` stack array instead of `make([]float64, N)`  
+**Functions:** All batch operations with internal allocation  
+**Files:** `internal/eml/simd.go`, `pkg/*`
+
+### 7. Fast Path / Slow Path Separation
+
+**Target:** Optimize common case without accuracy checks  
+**Implementation:** Add `Fast` variants: `SinFast`, `CosFast`, `ExpFast`, `LogFast`  
+**Trade-off:** Relax error from 0 ULP to 1-2 ULP for 2-3x speedup  
+**Files:** `pkg/trig/trig.go`, `pkg/logexp/exp.go`
+
+### 8. Architecture-Specific Optimizations
+
+**Target:** Use CPU-specific instructions on AMD64/ARM64  
+**Implementation:** Conditional compile with `GOARCH=amd64` / `GOARCH=arm64`  
+**Options:** `VABS`, `VFNEG` (AVX), `FABSG`, `FNEG` (NEON)  
+**Files:** `simd_amd64.s`, `simd_arm64.s`
+
+### 9. Profiling-Guided Optimization
+
+**Target:** Identify actual hot paths in production workloads  
+**Implementation:** Add profile-guided annotation with `pprof` integration  
+**Tools:** Add CPU/memory profile endpoints for batch processing jobs  
 **Files:** `cmd/bench/main.go`
 
-### 8. Improved Polynomial Evaluation
+### 10. Benchmark-Driven Iteration
 
-**Target:** Optimize minimax polynomial coefficients  
-**Implementation:** Use Remez algorithm for tighter approximations  
-**Benefits:** 5-10% reduction in polynomial degree needed  
-**Files:** `internal/eml/math_helpers.go`, `pkg/fastmath/`
-
-### 9. Batch Operation Fusion
-
-**Target:** Fuse multiple operations to reduce memory traffic  
-**Implementation:** Combine Exp+Mul, Log+Div into single pass  
-**Benefits:** 20-30% memory bandwidth reduction  
-**Files:** `simd.go`, batch operation functions
-
-### 10. Microkernel Optimization
-
-**Target:** Optimize inner loop kernels for modern CPU pipelines  
-**Implementation:** Software prefetching, loop unrolling, instruction scheduling  
-**Benefits:** 10-15% improvement on memory-bound operations  
-**Files:** `simd_amd64.s`, `simd_arm64.s`
+**Target:** Establish baselines and track improvements  
+**Implementation:** Add microbenchmarks for each scalar function  
+**Automation:** CI regression detection when ratio changes > 10%  
+**Files:** Microbenchmarks in `internal/eml/*_test.go`
 
 ---
 
 ## Implementation Checklist
 
-- [ ] **Item 1:** Expanded Batch SIMD - Add vectorized Exp, Log, Sin, Cos, Tan, Pow
-- [ ] **Item 2:** Cache-Oblivious Algorithms - Implement cache tiling
-- [ ] **Item 3:** Adaptive Parallelization - Dynamic chunking based on CPU topology
-- [ ] **Item 4:** Reduced Memory Allocations - Eliminate allocations in hot paths
-- [ ] **Item 5:** Branchless Implementation - Convert conditional logic to bitwise
-- [ ] **Item 6:** Hardware-Accelerated Transcendentals - Use CPU intrinsics
-- [ ] **Item 7:** Benchmark Infrastructure - Add latency/cachesim profiling
-- [ ] **Item 8:** Polynomial Evaluation - Optimize minimax coefficients
-- [ ] **Item 9:** Batch Operation Fusion - Fuse multiple ops in single pass
-- [ ] **Item 10:** Microkernel Optimization - Software prefetch, loop unroll
+- [ ] **Item 1:** Inline Critical Functions - Add inline pragma to hot functions
+- [ ] **Item 2:** Direct Intrinsic Mapping - Platform-specific assembly for Abs, Neg
+- [ ] **Item 3:** Compiler Intrinsic Integration - Use stdlib trig internally
+- [ ] **Item 4:** Reduced Function Call Chains - Flatten wrapper layers
+- [ ] **Item 5:** Batch Scalar Operations - Add batch Abs, Neg, Inv
+- [ ] **Item 6:** Stack-Allocated Buffers - Eliminate heap allocations
+- [ ] **Item 7:** Fast/Slow Path Separation - Add Fast variants
+- [ ] **Item 8:** Architecture-Specific Optimizations - Use CPU intrinsics
+- [ ] **Item 9:** Profiling-Guided Optimization - Add pprof integration
+- [ ] **Item 10:** Benchmark-Driven Iteration - Track regressions
 
 ---
 
-## Future Considerations (Beyond 10-Part Plan)
+## Target Ratios (v2.1)
+
+| Function | Current | Target |
+|----------|---------|--------|
+| Abs | 7.32x | < 1.5x |
+| Neg | 2.08x | < 1.2x |
+| Inv | 2.02x | < 1.2x |
+| Sin | 1.05x | < 1.0x |
+| Cos | 1.20x | < 1.0x |
+| Tan | 1.25x | < 1.0x |
+
+---
+
+## Future Considerations (Beyond v2.1)
 
 - GPU/CUDA Production Readiness
-- ARM SVE/SVE2 Support  
+- ARM SVE/SVE2 Support
 - WebAssembly SIMD Intrinsics
 - JIT Polynomial Compilation
