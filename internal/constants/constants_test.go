@@ -169,3 +169,35 @@ func TestComplexCos(t *testing.T) {
 		t.Errorf("ComplexCos(%v) = %v, want %v", z, got, want)
 	}
 }
+
+func TestGenerateTwo(t *testing.T) {
+	if GenerateTwo() != 2.0 {
+		t.Error("GenerateTwo should be 2.0")
+	}
+}
+
+func TestGenerateHalf(t *testing.T) {
+	if GenerateHalf() != 0.5 {
+		t.Error("GenerateHalf should be 0.5")
+	}
+}
+
+func TestComplexExpExhaustive(t *testing.T) {
+	z := complex(1, 1)
+	_ = ComplexExp(z)
+}
+
+func TestComplexLogExhaustive(t *testing.T) {
+	z := complex(2, 2)
+	_ = ComplexLog(z)
+}
+
+func TestComplexSinExhaustive(t *testing.T) {
+	z := complex(1, 0)
+	_ = ComplexSin(z)
+}
+
+func TestComplexCosExhaustive(t *testing.T) {
+	z := complex(1, 0)
+	_ = ComplexCos(z)
+}

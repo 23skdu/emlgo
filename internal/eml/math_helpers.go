@@ -42,30 +42,37 @@ func Inf(sign int) float64 {
 	return inf(sign)
 }
 
+//go:inline
 func Floor(x float64) float64 {
 	return floor(x)
 }
 
+//go:inline
 func Ceil(x float64) float64 {
 	return ceil(x)
 }
 
+//go:inline
 func Trunc(x float64) float64 {
 	return trunc(x)
 }
 
+//go:inline
 func Round(x float64) float64 {
 	return round(x)
 }
 
+//go:inline
 func Abs(x float64) float64 {
 	return nativeAbs(x)
 }
 
+//go:inline
 func Neg(x float64) float64 {
 	return nativeNeg(x)
 }
 
+//go:inline
 func Inv(x float64) float64 {
 	return nativeInv(x)
 }

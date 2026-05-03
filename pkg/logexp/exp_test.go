@@ -87,6 +87,90 @@ func close(a, b, tol float64) bool {
 	return math.Abs(a-b) <= tol
 }
 
+func TestLogExpBatch(t *testing.T) {
+	testData := []float64{1, 2, 3, 4, 5}
+	testDataSmall := []float64{1, 2}
+
+	t.Run("ExpBatch", func(t *testing.T) {
+		result := ExpBatch(testData)
+		if len(result) != len(testData) {
+			t.Errorf("ExpBatch length = %v, want %v", len(result), len(testData))
+		}
+	})
+	t.Run("ExpBatch_empty", func(t *testing.T) {
+		result := ExpBatch([]float64{})
+		if result != nil && len(result) != 0 {
+			t.Errorf("ExpBatch empty = %v", result)
+		}
+	})
+	t.Run("ExpBatch_small", func(t *testing.T) {
+		result := ExpBatch(testDataSmall)
+		if len(result) != len(testDataSmall) {
+			t.Errorf("ExpBatch small length = %v, want %v", len(result), len(testDataSmall))
+		}
+	})
+	t.Run("LogBatch", func(t *testing.T) {
+		result := LogBatch(testData)
+		if len(result) != len(testData) {
+			t.Errorf("LogBatch length = %v, want %v", len(result), len(testData))
+		}
+	})
+	t.Run("LogBatch_empty", func(t *testing.T) {
+		result := LogBatch([]float64{})
+		if result != nil && len(result) != 0 {
+			t.Errorf("LogBatch empty = %v", result)
+		}
+	})
+}
+
+func TestFastFunctions(t *testing.T) {
+	testsExp := []struct {
+		name     string
+		x        float64
+		expected float64
+	}{
+		{"zero", 0, 1},
+		{"pos", 1, math.Exp(1)},
+		{"neg", -1, math.Exp(-1)},
+		{"large_pos", 800, math.Inf(1)},
+		{"large_neg", -800, 0},
+	}
+	for _, tt := range testsExp {
+		t.Run("ExpFast/"+tt.name, func(t *testing.T) {
+			got := ExpFast(tt.x)
+			if !close(got, tt.expected, 1e-10) {
+				t.Errorf("ExpFast(%v) = %v, want %v", tt.x, got, tt.expected)
+			}
+		})
+	}
+
+	testsLog := []struct {
+		name     string
+		x        float64
+		expected float64
+	}{
+		{"one", 1, 0},
+		{"e", math.E, 1},
+		{"half", 0.5, math.Log(0.5)},
+		{"zero", 0, math.NaN()},
+		{"neg", -1, math.NaN()},
+	}
+	for _, tt := range testsLog {
+		t.Run("LogFast/"+tt.name, func(t *testing.T) {
+			got := LogFast(tt.x)
+			if math.IsNaN(tt.expected) && !math.IsNaN(got) {
+				t.Errorf("LogFast(%v) = %v, want NaN", tt.x, got)
+			}
+			if math.IsNaN(tt.expected) && math.IsNaN(got) {
+				return
+			}
+			if !close(got, tt.expected, 1e-10) {
+				t.Errorf("LogFast(%v) = %v, want %v", tt.x, got, tt.expected)
+			}
+		})
+	}
+}
+
 func BenchmarkExp(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		Exp(1.5)
