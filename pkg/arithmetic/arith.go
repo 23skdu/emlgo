@@ -22,6 +22,7 @@ var (
 	nativeTrunc = eml.Trunc
 	nativeRound = eml.Round
 	nativeExp   = eml.Exp
+	copysign    = eml.Copysign
 )
 
 func Add(x, y float64) float64 {
@@ -223,21 +224,30 @@ func Abs(x float64) float64 {
 	if isNaN(x) {
 		return nan()
 	}
-	return eml.Abs(x)
+	if x < 0 {
+		return -x
+	}
+	return x
 }
 
 func Neg(x float64) float64 {
 	if isNaN(x) {
 		return nan()
 	}
-	return eml.Neg(x)
+	if x == 0 {
+		return copysign(0, -1)
+	}
+	return -x
 }
 
 func Inv(x float64) float64 {
 	if isNaN(x) {
 		return nan()
 	}
-	return eml.Inv(x)
+	if x == 0 {
+		return inf(1)
+	}
+	return 1 / x
 }
 
 func Square(x float64) float64 {

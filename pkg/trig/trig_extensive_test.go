@@ -687,6 +687,138 @@ func close(a, b, tol float64) bool {
 	return math.Abs(a-b) <= tol
 }
 
+func TestBatchFunctionsComprehensive(t *testing.T) {
+	testData := []float64{0, math.Pi / 4, math.Pi / 2, math.Pi, math.Pi * 1.5}
+	testDataSmall := []float64{0, math.Pi / 4}
+
+	t.Run("SinBatch", func(t *testing.T) {
+		result := SinBatch(testData)
+		if len(result) != len(testData) {
+			t.Errorf("SinBatch length = %v, want %v", len(result), len(testData))
+		}
+	})
+	t.Run("SinBatch_empty", func(t *testing.T) {
+		result := SinBatch([]float64{})
+		if result != nil && len(result) != 0 {
+			t.Errorf("SinBatch empty = %v", result)
+		}
+	})
+	t.Run("SinBatch_small", func(t *testing.T) {
+		result := SinBatch(testDataSmall)
+		if len(result) != len(testDataSmall) {
+			t.Errorf("SinBatch small length = %v, want %v", len(result), len(testDataSmall))
+		}
+	})
+	t.Run("CosBatch", func(t *testing.T) {
+		result := CosBatch(testData)
+		if len(result) != len(testData) {
+			t.Errorf("CosBatch length = %v, want %v", len(result), len(testData))
+		}
+	})
+	t.Run("CosBatch_empty", func(t *testing.T) {
+		result := CosBatch([]float64{})
+		if result != nil && len(result) != 0 {
+			t.Errorf("CosBatch empty = %v", result)
+		}
+	})
+	t.Run("SinCosBatch", func(t *testing.T) {
+		sin, cos := SinCosBatch(testData)
+		if len(sin) != len(testData) || len(cos) != len(testData) {
+			t.Errorf("SinCosBatch length mismatch")
+		}
+	})
+	t.Run("SinCosBatch_empty", func(t *testing.T) {
+		sin, cos := SinCosBatch([]float64{})
+		if (sin != nil && len(sin) != 0) || (cos != nil && len(cos) != 0) {
+			t.Errorf("SinCosBatch empty = %v, %v", sin, cos)
+		}
+	})
+	t.Run("TanBatch", func(t *testing.T) {
+		result := TanBatch(testData)
+		if len(result) != len(testData) {
+			t.Errorf("TanBatch length = %v, want %v", len(result), len(testData))
+		}
+	})
+}
+
+func TestFastFunctionsComprehensive(t *testing.T) {
+	testsSin := []struct {
+		name     string
+		x        float64
+		expected float64
+	}{
+		{"zero", 0, 0},
+		{"pi", math.Pi, 0},
+		{"pi/2", math.Pi / 2, 1},
+		{"nan", math.NaN(), math.NaN()},
+		{"inf", math.Inf(1), math.NaN()},
+	}
+	for _, tt := range testsSin {
+		t.Run("SinFast/"+tt.name, func(t *testing.T) {
+			got := SinFast(tt.x)
+			if math.IsNaN(tt.expected) && !math.IsNaN(got) {
+				t.Errorf("SinFast(%v) = %v, want NaN", tt.x, got)
+			}
+			if math.IsNaN(tt.expected) && math.IsNaN(got) {
+				return
+			}
+			if !close(got, tt.expected, 1e-10) {
+				t.Errorf("SinFast(%v) = %v, want %v", tt.x, got, tt.expected)
+			}
+		})
+	}
+
+	testsCos := []struct {
+		name     string
+		x        float64
+		expected float64
+	}{
+		{"zero", 0, 1},
+		{"pi", math.Pi, -1},
+		{"pi/2", math.Pi / 2, 0},
+		{"nan", math.NaN(), math.NaN()},
+		{"inf", math.Inf(1), math.NaN()},
+	}
+	for _, tt := range testsCos {
+		t.Run("CosFast/"+tt.name, func(t *testing.T) {
+			got := CosFast(tt.x)
+			if math.IsNaN(tt.expected) && !math.IsNaN(got) {
+				t.Errorf("CosFast(%v) = %v, want NaN", tt.x, got)
+			}
+			if math.IsNaN(tt.expected) && math.IsNaN(got) {
+				return
+			}
+			if !close(got, tt.expected, 1e-10) {
+				t.Errorf("CosFast(%v) = %v, want %v", tt.x, got, tt.expected)
+			}
+		})
+	}
+
+	testsTan := []struct {
+		name     string
+		x        float64
+		expected float64
+	}{
+		{"zero", 0, 0},
+		{"pi/4", math.Pi / 4, 1},
+		{"nan", math.NaN(), math.NaN()},
+	}
+	for _, tt := range testsTan {
+		t.Run("TanFast/"+tt.name, func(t *testing.T) {
+			got := TanFast(tt.x)
+			if math.IsNaN(tt.expected) && !math.IsNaN(got) {
+				t.Errorf("TanFast(%v) = %v, want NaN", tt.x, got)
+			}
+			if math.IsNaN(tt.expected) && math.IsNaN(got) {
+				return
+			}
+			if !close(got, tt.expected, 1e-10) {
+				t.Errorf("TanFast(%v) = %v, want %v", tt.x, got, tt.expected)
+			}
+		})
+	}
+}
+
 func BenchmarkSin(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		Sin(1.5)

@@ -650,6 +650,388 @@ func close(a, b, tol float64) bool {
 	return math.Abs(a-b) <= tol
 }
 
+func TestExpComprehensive(t *testing.T) {
+	tests := []struct {
+		name     string
+		x        float64
+		expected float64
+	}{
+		{"zero", 0, 1},
+		{"one", 1, math.E},
+		{"neg", -1, 1 / math.E},
+		{"pos", 2, math.E * math.E},
+		{"inf_pos", math.Inf(1), math.Inf(1)},
+		{"inf_neg", math.Inf(-1), 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := Exp(tt.x)
+			if !close(got, tt.expected, 1e-10) {
+				t.Errorf("Exp(%v) = %v, want %v", tt.x, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestExpm1Comprehensive(t *testing.T) {
+	tests := []struct {
+		name     string
+		x        float64
+		expected float64
+	}{
+		{"zero", 0, 0},
+		{"one", 1, math.E - 1},
+		{"neg", -1, 1/math.E - 1},
+		{"inf_pos", math.Inf(1), math.Inf(1)},
+		{"inf_neg", math.Inf(-1), -1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := Expm1(tt.x)
+			if math.IsNaN(tt.expected) && !math.IsNaN(got) {
+				t.Errorf("Expm1(%v) = %v, want NaN", tt.x, got)
+			}
+			if math.IsNaN(tt.expected) && math.IsNaN(got) {
+				return
+			}
+			if !close(got, tt.expected, 1e-10) {
+				t.Errorf("Expm1(%v) = %v, want %v", tt.x, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestRemainderComprehensive(t *testing.T) {
+	tests := []struct {
+		name     string
+		x, y     float64
+		expected float64
+	}{
+		{"pos", 7, 3, 1},
+		{"neg", -7, 3, -1},
+		{"zero", 0, 3, 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := Remainder(tt.x, tt.y)
+			if !close(got, tt.expected, 1e-10) {
+				t.Errorf("Remainder(%v, %v) = %v, want %v", tt.x, tt.y, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestLogBase2Comprehensive(t *testing.T) {
+	tests := []struct {
+		name     string
+		x        float64
+		expected float64
+	}{
+		{"one", 1, 0},
+		{"two", 2, 1},
+		{"half", 0.5, -1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := LogBase2(tt.x)
+			if math.IsNaN(tt.expected) && !math.IsNaN(got) {
+				t.Errorf("LogBase2(%v) = %v, want NaN", tt.x, got)
+			}
+			if math.IsNaN(tt.expected) && math.IsNaN(got) {
+				return
+			}
+			if !close(got, tt.expected, 1e-10) {
+				t.Errorf("LogBase2(%v) = %v, want %v", tt.x, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestLogBase10Comprehensive(t *testing.T) {
+	tests := []struct {
+		name     string
+		x        float64
+		expected float64
+	}{
+		{"one", 1, 0},
+		{"ten", 10, 1},
+		{"hundred", 100, 2},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := LogBase10(tt.x)
+			if math.IsNaN(tt.expected) && !math.IsNaN(got) {
+				t.Errorf("LogBase10(%v) = %v, want NaN", tt.x, got)
+			}
+			if math.IsNaN(tt.expected) && math.IsNaN(got) {
+				return
+			}
+			if !close(got, tt.expected, 1e-10) {
+				t.Errorf("LogBase10(%v) = %v, want %v", tt.x, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestIntFunctionsComprehensive(t *testing.T) {
+	t.Run("IntAdd", func(t *testing.T) {
+		if got := IntAdd(2, 3); got != 5 {
+			t.Errorf("IntAdd(2, 3) = %v, want 5", got)
+		}
+	})
+	t.Run("IntSub", func(t *testing.T) {
+		if got := IntSub(5, 3); got != 2 {
+			t.Errorf("IntSub(5, 3) = %v, want 2", got)
+		}
+	})
+	t.Run("IntMul", func(t *testing.T) {
+		if got := IntMul(3, 4); got != 12 {
+			t.Errorf("IntMul(3, 4) = %v, want 12", got)
+		}
+	})
+	t.Run("IntDiv", func(t *testing.T) {
+		if got := IntDiv(10, 3); got != 3 {
+			t.Errorf("IntDiv(10, 3) = %v, want 3", got)
+		}
+	})
+	t.Run("IntDiv_by_zero", func(t *testing.T) {
+		if got := IntDiv(10, 0); got != 0 {
+			t.Errorf("IntDiv(10, 0) = %v, want 0", got)
+		}
+	})
+	t.Run("IntMod", func(t *testing.T) {
+		if got := IntMod(10, 3); got != 1 {
+			t.Errorf("IntMod(10, 3) = %v, want 1", got)
+		}
+	})
+	t.Run("IntMod_by_zero", func(t *testing.T) {
+		if got := IntMod(10, 0); got != 0 {
+			t.Errorf("IntMod(10, 0) = %v, want 0", got)
+		}
+	})
+	t.Run("IntAbs_pos", func(t *testing.T) {
+		if got := IntAbs(5); got != 5 {
+			t.Errorf("IntAbs(5) = %v, want 5", got)
+		}
+	})
+	t.Run("IntAbs_neg", func(t *testing.T) {
+		if got := IntAbs(-5); got != 5 {
+			t.Errorf("IntAbs(-5) = %v, want 5", got)
+		}
+	})
+	t.Run("IntMax", func(t *testing.T) {
+		if got := IntMax(3, 7); got != 7 {
+			t.Errorf("IntMax(3, 7) = %v, want 7", got)
+		}
+	})
+	t.Run("IntMin", func(t *testing.T) {
+		if got := IntMin(3, 7); got != 3 {
+			t.Errorf("IntMin(3, 7) = %v, want 3", got)
+		}
+	})
+}
+
+func TestUintFunctionsComprehensive(t *testing.T) {
+	t.Run("UintAdd", func(t *testing.T) {
+		if got := UintAdd(2, 3); got != 5 {
+			t.Errorf("UintAdd(2, 3) = %v, want 5", got)
+		}
+	})
+	t.Run("UintSub", func(t *testing.T) {
+		if got := UintSub(5, 3); got != 2 {
+			t.Errorf("UintSub(5, 3) = %v, want 2", got)
+		}
+	})
+	t.Run("UintMul", func(t *testing.T) {
+		if got := UintMul(3, 4); got != 12 {
+			t.Errorf("UintMul(3, 4) = %v, want 12", got)
+		}
+	})
+	t.Run("UintDiv", func(t *testing.T) {
+		if got := UintDiv(10, 3); got != 3 {
+			t.Errorf("UintDiv(10, 3) = %v, want 3", got)
+		}
+	})
+	t.Run("UintDiv_by_zero", func(t *testing.T) {
+		if got := UintDiv(10, 0); got != 0 {
+			t.Errorf("UintDiv(10, 0) = %v, want 0", got)
+		}
+	})
+	t.Run("UintMod", func(t *testing.T) {
+		if got := UintMod(10, 3); got != 1 {
+			t.Errorf("UintMod(10, 3) = %v, want 1", got)
+		}
+	})
+	t.Run("UintMod_by_zero", func(t *testing.T) {
+		if got := UintMod(10, 0); got != 0 {
+			t.Errorf("UintMod(10, 0) = %v, want 0", got)
+		}
+	})
+	t.Run("UintMax", func(t *testing.T) {
+		if got := UintMax(3, 7); got != 7 {
+			t.Errorf("UintMax(3, 7) = %v, want 7", got)
+		}
+	})
+	t.Run("UintMin", func(t *testing.T) {
+		if got := UintMin(3, 7); got != 3 {
+			t.Errorf("UintMin(3, 7) = %v, want 3", got)
+		}
+	})
+}
+
+func TestBatchFunctionsComprehensive(t *testing.T) {
+	testData := []float64{1, 2, 3, 4, 5}
+	testDataNeg := []float64{-1, -2, -3, -4, -5}
+	testDataSmall := []float64{1, 2}
+
+	t.Run("SqrtBatch", func(t *testing.T) {
+		result := SqrtBatch(testData)
+		if len(result) != len(testData) {
+			t.Errorf("SqrtBatch length = %v, want %v", len(result), len(testData))
+		}
+	})
+	t.Run("SqrtBatch_empty", func(t *testing.T) {
+		result := SqrtBatch([]float64{})
+		if result != nil && len(result) != 0 {
+			t.Errorf("SqrtBatch empty = %v", result)
+		}
+	})
+	t.Run("AbsBatch", func(t *testing.T) {
+		result := AbsBatch(testDataNeg)
+		for i, v := range result {
+			if v < 0 {
+				t.Errorf("AbsBatch[%d] = %v, want >= 0", i, v)
+			}
+		}
+	})
+	t.Run("AbsBatch_small", func(t *testing.T) {
+		result := AbsBatch(testDataSmall)
+		if len(result) != len(testDataSmall) {
+			t.Errorf("AbsBatch length = %v, want %v", len(result), len(testDataSmall))
+		}
+	})
+	t.Run("FloorBatch", func(t *testing.T) {
+		result := FloorBatch(testData)
+		if len(result) != len(testData) {
+			t.Errorf("FloorBatch length = %v, want %v", len(result), len(testData))
+		}
+	})
+	t.Run("CeilBatch", func(t *testing.T) {
+		result := CeilBatch(testData)
+		if len(result) != len(testData) {
+			t.Errorf("CeilBatch length = %v, want %v", len(result), len(testData))
+		}
+	})
+	t.Run("TruncBatch", func(t *testing.T) {
+		result := TruncBatch(testData)
+		if len(result) != len(testData) {
+			t.Errorf("TruncBatch length = %v, want %v", len(result), len(testData))
+		}
+	})
+	t.Run("Log1pBatch", func(t *testing.T) {
+		result := Log1pBatch(testData)
+		if len(result) != len(testData) {
+			t.Errorf("Log1pBatch length = %v, want %v", len(result), len(testData))
+		}
+	})
+	t.Run("Expm1Batch", func(t *testing.T) {
+		result := Expm1Batch(testData)
+		if len(result) != len(testData) {
+			t.Errorf("Expm1Batch length = %v, want %v", len(result), len(testData))
+		}
+	})
+	t.Run("PowBatch", func(t *testing.T) {
+		result := PowBatch(testData, 2)
+		if len(result) != len(testData) {
+			t.Errorf("PowBatch length = %v, want %v", len(result), len(testData))
+		}
+	})
+	t.Run("CbrtBatch", func(t *testing.T) {
+		result := CbrtBatch(testData)
+		if len(result) != len(testData) {
+			t.Errorf("CbrtBatch length = %v, want %v", len(result), len(testData))
+		}
+	})
+	t.Run("HypotBatch", func(t *testing.T) {
+		result := HypotBatch(testData, testDataNeg)
+		if len(result) != len(testData) {
+			t.Errorf("HypotBatch length = %v, want %v", len(result), len(testData))
+		}
+	})
+	t.Run("HypotBatch_empty", func(t *testing.T) {
+		result := HypotBatch([]float64{}, []float64{})
+		if result != nil && len(result) != 0 {
+			t.Errorf("HypotBatch empty = %v", result)
+		}
+	})
+	t.Run("MaxBatch", func(t *testing.T) {
+		result := MaxBatch(testData, 3)
+		if len(result) != len(testData) {
+			t.Errorf("MaxBatch length = %v, want %v", len(result), len(testData))
+		}
+	})
+	t.Run("MinBatch", func(t *testing.T) {
+		result := MinBatch(testData, 3)
+		if len(result) != len(testData) {
+			t.Errorf("MinBatch length = %v, want %v", len(result), len(testData))
+		}
+	})
+}
+
+func TestFusedBatchFunctionsComprehensive(t *testing.T) {
+	testData := []float64{1, 2, 3, 4, 5}
+	testData2 := []float64{2, 3, 4, 5, 6}
+
+	t.Run("AddBatch", func(t *testing.T) {
+		result := AddBatch(testData, testData2)
+		if len(result) != len(testData) {
+			t.Errorf("AddBatch length = %v, want %v", len(result), len(testData))
+		}
+	})
+	t.Run("SubBatch", func(t *testing.T) {
+		result := SubBatch(testData, testData2)
+		if len(result) != len(testData) {
+			t.Errorf("SubBatch length = %v, want %v", len(result), len(testData))
+		}
+	})
+	t.Run("MulBatch", func(t *testing.T) {
+		result := MulBatch(testData, testData2)
+		if len(result) != len(testData) {
+			t.Errorf("MulBatch length = %v, want %v", len(result), len(testData))
+		}
+	})
+	t.Run("DivBatch", func(t *testing.T) {
+		result := DivBatch(testData, testData2)
+		if len(result) != len(testData) {
+			t.Errorf("DivBatch length = %v, want %v", len(result), len(testData))
+		}
+	})
+	t.Run("AddScalarBatch", func(t *testing.T) {
+		result := AddScalarBatch(testData, 10)
+		if len(result) != len(testData) {
+			t.Errorf("AddScalarBatch length = %v, want %v", len(result), len(testData))
+		}
+	})
+	t.Run("MulScalarBatch", func(t *testing.T) {
+		result := MulScalarBatch(testData, 2)
+		if len(result) != len(testData) {
+			t.Errorf("MulScalarBatch length = %v, want %v", len(result), len(testData))
+		}
+	})
+	t.Run("NegBatch", func(t *testing.T) {
+		result := NegBatch(testData)
+		if len(result) != len(testData) {
+			t.Errorf("NegBatch length = %v, want %v", len(result), len(testData))
+		}
+	})
+	t.Run("InvBatch", func(t *testing.T) {
+		result := InvBatch(testData)
+		if len(result) != len(testData) {
+			t.Errorf("InvBatch length = %v, want %v", len(result), len(testData))
+		}
+	})
+}
+
 func BenchmarkAdd(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		Add(1.5, 2.5)
