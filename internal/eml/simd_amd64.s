@@ -336,6 +336,7 @@ TEXT ·absScalar(SB), NOSPLIT, $0-16
 // func negScalar(x float64) float64
 TEXT ·negScalar(SB), NOSPLIT, $0-16
 	MOVSD x+0(FP), X0
-	NEGSD X0, X0
+	MOVSD \\$(0x8000000000000000), X1
+	XORPD X1, X0
 	MOVSD X0, ret+8(FP)
 	RET
