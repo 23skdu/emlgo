@@ -1215,6 +1215,99 @@ func AtanhBatch(x []float64) []float64 {
 	return result
 }
 
+func AbsSIMD(a []float64) []float64 {
+	n := len(a)
+	if n == 0 {
+		return a
+	}
+	result := make([]float64, n)
+
+	if n < 4 {
+		for i := 0; i < n; i++ {
+			if a[i] < 0 {
+				result[i] = -a[i]
+			} else {
+				result[i] = a[i]
+			}
+		}
+		return result
+	}
+
+	numWorkers := runtime.GOMAXPROCS(0)
+	chunkSize := (n + numWorkers - 1) / numWorkers
+	if chunkSize > 4096 {
+		chunkSize = 4096
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < n; i += chunkSize {
+		end := i + chunkSize
+		if end > n {
+			end = n
+		}
+		wg.Add(1)
+		go func(start, end int) {
+			defer wg.Done()
+			for j := start; j < end; j++ {
+				if a[j] < 0 {
+					result[j] = -a[j]
+				} else {
+					result[j] = a[j]
+				}
+			}
+		}(i, end)
+	}
+	wg.Wait()
+	return result
+}
+
+func AbsSIMDTo(a, result []float64) {
+	n := len(a)
+	if n != len(result) {
+		panic("length mismatch")
+	}
+	if n == 0 {
+		return
+	}
+
+	if n < 4 {
+		for i := 0; i < n; i++ {
+			if a[i] < 0 {
+				result[i] = -a[i]
+			} else {
+				result[i] = a[i]
+			}
+		}
+		return
+	}
+
+	numWorkers := runtime.GOMAXPROCS(0)
+	chunkSize := (n + numWorkers - 1) / numWorkers
+	if chunkSize > 4096 {
+		chunkSize = 4096
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < n; i += chunkSize {
+		end := i + chunkSize
+		if end > n {
+			end = n
+		}
+		wg.Add(1)
+		go func(start, end int) {
+			defer wg.Done()
+			for j := start; j < end; j++ {
+				if a[j] < 0 {
+					result[j] = -a[j]
+				} else {
+					result[j] = a[j]
+				}
+			}
+		}(i, end)
+	}
+	wg.Wait()
+}
+
 func NegSIMD(a []float64) []float64 {
 	n := len(a)
 	if n == 0 {

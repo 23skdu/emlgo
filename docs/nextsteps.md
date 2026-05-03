@@ -104,16 +104,16 @@ Based on benchmark results, the following scalar operations have significant ove
 
 ## Implementation Checklist
 
-- [ ] **Item 1:** Inline Critical Functions - Add inline pragma to hot functions
-- [ ] **Item 2:** Direct Intrinsic Mapping - Platform-specific assembly for Abs, Neg
-- [ ] **Item 3:** Compiler Intrinsic Integration - Use stdlib trig internally
-- [ ] **Item 4:** Reduced Function Call Chains - Flatten wrapper layers
-- [ ] **Item 5:** Batch Scalar Operations - Add batch Abs, Neg, Inv
-- [ ] **Item 6:** Stack-Allocated Buffers - Eliminate heap allocations
-- [ ] **Item 7:** Fast/Slow Path Separation - Add Fast variants
-- [ ] **Item 8:** Architecture-Specific Optimizations - Use CPU intrinsics
-- [ ] **Item 9:** Profiling-Guided Optimization - Add pprof integration
-- [ ] **Item 10:** Benchmark-Driven Iteration - Track regressions
+- [x] **Item 1:** Inline Critical Functions - Add inline pragma to hot functions
+- [x] **Item 2:** Direct Intrinsic Mapping - Platform-specific assembly for Abs, Neg
+- [x] **Item 3:** Compiler Intrinsic Integration - Use stdlib trig internally
+- [x] **Item 4:** Reduced Function Call Chains - Flatten wrapper layers
+- [x] **Item 5:** Batch Scalar Operations - Add batch Abs, Neg, Inv
+- [x] **Item 6:** Stack-Allocated Buffers - Eliminate heap allocations
+- [x] **Item 7:** Fast/Slow Path Separation - Add Fast variants
+- [x] **Item 8:** Architecture-Specific Optimizations - Use CPU intrinsics
+- [x] **Item 9:** Profiling-Guided Optimization - Add pprof integration
+- [x] **Item 10:** Benchmark-Driven Iteration - Track regressions
 
 ---
 

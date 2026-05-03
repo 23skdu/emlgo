@@ -1,6 +1,7 @@
 package main
 
-// gosec: G404: This is benchmark code - math/rand is acceptable for test data generation
+// This is benchmark code - math/rand is acceptable for test data generation
+//gosec: G404
 import (
 	"flag"
 	"fmt"
@@ -8,6 +9,8 @@ import (
 	"math/cmplx"
 	"math/rand"
 	"os"
+	"runtime"
+	"runtime/pprof"
 	"strings"
 	"time"
 
@@ -24,6 +27,7 @@ var (
 	verbose      bool
 	testAccuracy bool
 	typeFilter   string
+	profile     string
 )
 
 func init() {
@@ -32,6 +36,7 @@ func init() {
 	flag.BoolVar(&verbose, "v", false, "Verbose output")
 	flag.BoolVar(&testAccuracy, "accuracy", false, "Test accuracy (ULP) against math library")
 	flag.StringVar(&typeFilter, "type", "all", "Type to test: all, int, uint, float32, float64, complex64, complex128")
+	flag.StringVar(&profile, "profile", "", "Profile type: cpu, mem, or block (requires pprof binary)")
 }
 
 type BenchmarkResult struct {
@@ -46,6 +51,11 @@ type BenchmarkResult struct {
 func main() {
 	flag.Parse()
 	rand.Seed(42)
+
+	if profile != "" {
+		runProfiling()
+		return
+	}
 
 	if testAccuracy {
 		fmt.Println("=== Accuracy Test (ULP) ===")
@@ -65,6 +75,77 @@ func main() {
 	results = append(results, runFastMathBenchmarks()...)
 	printResults(results)
 	checkRegression(results)
+}
+
+func runProfiling() {
+	var profFile *os.File
+	var err error
+
+	switch profile {
+	case "cpu":
+		profFile, err = os.Create("cpu.prof")
+	case "mem":
+		profFile, err = os.Create("mem.prof")
+	case "block":
+		profFile, err = os.Create("block.prof")
+	default:
+		fmt.Printf("Unknown profile type: %s (use cpu, mem, or block)\n", profile)
+		os.Exit(1)
+	}
+	if err != nil {
+		fmt.Printf("Error creating profile file: %v\n", err)
+		os.Exit(1)
+	}
+	defer profFile.Close()
+
+	switch profile {
+	case "cpu":
+		if err := pprof.StartCPUProfile(profFile); err != nil {
+			fmt.Printf("Error starting CPU profile: %v\n", err)
+			os.Exit(1)
+		}
+		defer pprof.StopCPUProfile()
+	case "mem":
+		runtime.GC()
+		err := pprof.WriteHeapProfile(profFile)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error writing heap profile: %v\n", err)
+		}
+		fmt.Println("Memory profile written to mem.prof")
+		return
+	case "block":
+		runtime.SetBlockProfileRate(1)
+		defer func() {
+			if prof := pprof.Lookup("block"); prof != nil {
+				if err := prof.WriteTo(profFile, 0); err != nil {
+					fmt.Fprintf(os.Stderr, "Error writing block profile: %v\n", err)
+				}
+			}
+		}()
+	}
+
+	_ = iterations
+	n := 4096
+	data := make([]float64, n)
+	// #nosec G404
+	for i := range data {
+		data[i] = rand.Float64()*10 - 5
+	}
+
+	benchData := make([]float64, iterations)
+	// #nosec G404
+	for i := range benchData {
+		benchData[i] = rand.Float64() * 10
+	}
+
+	for i := 0; i < 100; i++ {
+		_ = arithmetic.AbsBatch(data)
+		_ = logexp.ExpBatch(data)
+		_ = trig.SinBatch(data)
+	}
+
+	fmt.Printf("Profile written to %s.prof\n", profile)
+	fmt.Printf("To analyze: go tool pprof %s.prof\n", profile)
 }
 
 func runAllBenchmarks() []BenchmarkResult {
