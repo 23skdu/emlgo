@@ -13,11 +13,7 @@ var (
 	hasNeon    bool
 	hasNeonDot bool
 
-	cpuNum      int
-	l1CacheSize  int
-	l2CacheSize int
-
-	parallelBufferPool sync.Pool
+	cpuNum int
 )
 
 const (
@@ -50,8 +46,6 @@ func detectSIMD() {
 
 func detectCacheTopology() {
 	cpuNum = runtime.GOMAXPROCS(0)
-	l1CacheSize = 32 * 1024
-	l2CacheSize = 256 * 1024
 }
 
 func GetParallelChunkSize(n int) int {
