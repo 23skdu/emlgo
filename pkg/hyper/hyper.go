@@ -12,7 +12,6 @@ var (
 	nan     = eml.NaN
 	nativeExp = eml.Exp
 	nativeLog = eml.Log
-	nativeSqrt = eml.Sqrt
 	nativeAbs  = eml.Abs
 )
 
