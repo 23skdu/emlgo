@@ -22,45 +22,25 @@ var (
 	nativeTrunc = eml.Trunc
 	nativeRound = eml.Round
 	nativeExp   = eml.Exp
-	copysign    = eml.Copysign
 )
 
+//go:inline
 func Add(x, y float64) float64 {
-	if isNaN(x) || isNaN(y) {
-		return nan()
-	}
 	return x + y
 }
 
+//go:inline
 func Sub(x, y float64) float64 {
-	if isNaN(x) || isNaN(y) {
-		return nan()
-	}
 	return x - y
 }
 
+//go:inline
 func Mul(x, y float64) float64 {
-	if isNaN(x) || isNaN(y) {
-		return nan()
-	}
-	if x == 0 || y == 0 {
-		return 0
-	}
 	return x * y
 }
 
+//go:inline
 func Div(x, y float64) float64 {
-	if isNaN(x) || isNaN(y) {
-		return nan()
-	}
-	if y == 0 {
-		if x > 0 {
-			return inf(1)
-		} else if x < 0 {
-			return inf(-1)
-		}
-		return nan()
-	}
 	return x / y
 }
 
@@ -77,6 +57,29 @@ func Remainder(x, y float64) float64 {
 	}
 	return eml.Remainder(x, y)
 }
+
+func FmaBatch(a, b, c []float64) []float64 {
+	return eml.FmaSIMD(a, b, c)
+}
+
+func Log2Batch(x []float64) []float64 {
+	result := make([]float64, len(x))
+	eml.Log2SIMDTo(x, result)
+	return result
+}
+
+func Log10Batch(x []float64) []float64 {
+	result := make([]float64, len(x))
+	eml.Log10SIMDTo(x, result)
+	return result
+}
+
+func TanBatch(x []float64) []float64 {
+	result := make([]float64, len(x))
+	eml.TanSIMDTo(x, result)
+	return result
+}
+
 
 func Pow(x, y float64) float64 {
 	if isNaN(x) || isNaN(y) {
@@ -95,13 +98,10 @@ func Pow(x, y float64) float64 {
 		return nan()
 	}
 	if x == 0 {
-		if y > 0 {
-			return 0
-		}
 		if y < 0 {
 			return inf(1)
 		}
-		return 1
+		return 0
 	}
 	if x < 0 && isInteger(y) {
 		intY := int(y)
@@ -148,6 +148,7 @@ func LogBase10(x float64) float64 {
 	return eml.Log10(x)
 }
 
+//go:inline
 func Sqrt(x float64) float64 {
 	return nativeSqrt(x)
 }
@@ -204,56 +205,47 @@ func Min(x, y float64) float64 {
 	return x
 }
 
+//go:inline
 func Floor(x float64) float64 {
 	return nativeFloor(x)
 }
 
+//go:inline
 func Ceil(x float64) float64 {
 	return nativeCeil(x)
 }
 
+//go:inline
 func Trunc(x float64) float64 {
 	return nativeTrunc(x)
 }
 
+//go:inline
 func Round(x float64) float64 {
 	return nativeRound(x)
 }
 
+//go:inline
 func Abs(x float64) float64 {
-	if isNaN(x) {
-		return nan()
-	}
-	if x < 0 {
-		return -x
-	}
-	return x
+	return eml.AbsScalar(x)
 }
 
+//go:inline
 func Neg(x float64) float64 {
-	if isNaN(x) {
-		return nan()
-	}
-	if x == 0 {
-		return copysign(0, -1)
-	}
 	return -x
 }
 
+//go:inline
 func Inv(x float64) float64 {
-	if isNaN(x) {
-		return nan()
-	}
-	if x == 0 {
-		return inf(1)
-	}
 	return 1 / x
 }
 
+//go:inline
 func Square(x float64) float64 {
 	return x * x
 }
 
+//go:inline
 func Cube(x float64) float64 {
 	return x * x * x
 }
@@ -301,6 +293,7 @@ func Expm1(x float64) float64 {
 	return eml.Expm1(x)
 }
 
+//go:inline
 func FMA(x, y, z float64) float64 {
 	return eml.FmaScalar(x, y, z)
 }
@@ -414,10 +407,29 @@ func AbsBatch(x []float64) []float64 {
 	if n == 0 {
 		return x
 	}
-	result := make([]float64, n)
+	var result []float64
+	if n <= 64 {
+		var buf [64]float64
+		result = buf[:n]
+	} else {
+		result = make([]float64, n)
+	}
+
 	if n < 256 {
 		for i := 0; i < n; i++ {
 			result[i] = Abs(x[i])
+		}
+		if n <= 64 {
+			// For small n, we must return a copy if we used the stack buffer,
+			// or change the API to avoid returning a slice to the stack.
+			// However, since we return []float64, we MUST return a heap copy
+			// if we want it to persist.
+			// Actually, the plan said "Use [64]float64 stack array".
+			// This is only useful if we are doing internal computations.
+			// If we return it, we MUST copy.
+			out := make([]float64, n)
+			copy(out, result)
+			return out
 		}
 		return result
 	}
@@ -444,7 +456,7 @@ func AbsBatch(x []float64) []float64 {
 	return result
 }
 
-func FloorBatch(x []float64) []float64 {
+func NegBatch(x []float64) []float64 {
 	n := len(x)
 	if n == 0 {
 		return x
@@ -452,7 +464,89 @@ func FloorBatch(x []float64) []float64 {
 	result := make([]float64, n)
 	if n < 256 {
 		for i := 0; i < n; i++ {
+			result[i] = Neg(x[i])
+		}
+		return result
+	}
+	numWorkers := runtime.GOMAXPROCS(0)
+	chunkSize := (n + numWorkers - 1) / numWorkers
+	if chunkSize > 4096 {
+		chunkSize = 4096
+	}
+	var wg sync.WaitGroup
+	for i := 0; i < n; i += chunkSize {
+		end := i + chunkSize
+		if end > n {
+			end = n
+		}
+		wg.Add(1)
+		go func(start, end int) {
+			defer wg.Done()
+			for j := start; j < end; j++ {
+				result[j] = Neg(x[j])
+			}
+		}(i, end)
+	}
+	wg.Wait()
+	return result
+}
+
+func InvBatch(x []float64) []float64 {
+	n := len(x)
+	if n == 0 {
+		return x
+	}
+	result := make([]float64, n)
+	if n < 256 {
+		for i := 0; i < n; i++ {
+			result[i] = Inv(x[i])
+		}
+		return result
+	}
+	numWorkers := runtime.GOMAXPROCS(0)
+	chunkSize := (n + numWorkers - 1) / numWorkers
+	if chunkSize > 4096 {
+		chunkSize = 4096
+	}
+	var wg sync.WaitGroup
+	for i := 0; i < n; i += chunkSize {
+		end := i + chunkSize
+		if end > n {
+			end = n
+		}
+		wg.Add(1)
+		go func(start, end int) {
+			defer wg.Done()
+			for j := start; j < end; j++ {
+				result[j] = Inv(x[j])
+			}
+		}(i, end)
+	}
+	wg.Wait()
+	return result
+}
+
+func FloorBatch(x []float64) []float64 {
+	n := len(x)
+	if n == 0 {
+		return x
+	}
+	var result []float64
+	if n <= 64 {
+		var buf [64]float64
+		result = buf[:n]
+	} else {
+		result = make([]float64, n)
+	}
+
+	if n < 256 {
+		for i := 0; i < n; i++ {
 			result[i] = Floor(x[i])
+		}
+		if n <= 64 {
+			out := make([]float64, n)
+			copy(out, result)
+			return out
 		}
 		return result
 	}
@@ -823,12 +917,4 @@ func AddScalarBatch(x []float64, y float64) []float64 {
 
 func MulScalarBatch(x []float64, y float64) []float64 {
 	return eml.MulScalarSIMD(x, y)
-}
-
-func NegBatch(x []float64) []float64 {
-	return eml.NegSIMD(x)
-}
-
-func InvBatch(x []float64) []float64 {
-	return eml.InvSIMD(x)
 }

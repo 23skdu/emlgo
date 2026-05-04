@@ -699,7 +699,7 @@ func TestBatchFunctionsComprehensive(t *testing.T) {
 	})
 	t.Run("SinBatch_empty", func(t *testing.T) {
 		result := SinBatch([]float64{})
-		if result != nil && len(result) != 0 {
+		if len(result) != 0 {
 			t.Errorf("SinBatch empty = %v", result)
 		}
 	})
@@ -717,7 +717,7 @@ func TestBatchFunctionsComprehensive(t *testing.T) {
 	})
 	t.Run("CosBatch_empty", func(t *testing.T) {
 		result := CosBatch([]float64{})
-		if result != nil && len(result) != 0 {
+		if len(result) != 0 {
 			t.Errorf("CosBatch empty = %v", result)
 		}
 	})
@@ -729,7 +729,7 @@ func TestBatchFunctionsComprehensive(t *testing.T) {
 	})
 	t.Run("SinCosBatch_empty", func(t *testing.T) {
 		sin, cos := SinCosBatch([]float64{})
-		if (sin != nil && len(sin) != 0) || (cos != nil && len(cos) != 0) {
+		if len(sin) != 0 || len(cos) != 0 {
 			t.Errorf("SinCosBatch empty = %v, %v", sin, cos)
 		}
 	})

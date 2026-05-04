@@ -187,3 +187,45 @@ func TestNativeEdge(t *testing.T) {
 	if nativeCbrt(0) != 0 { t.Error("nativeCbrt(0) failed") }
 	if nativeCbrt(-8) != -2 { t.Error("nativeCbrt(-8) failed") }
 }
+
+func BenchmarkAbsScalar(b *testing.B) {
+	x := -1.23
+	for i := 0; i < b.N; i++ {
+		_ = nativeAbs(x)
+	}
+}
+
+func BenchmarkNegScalar(b *testing.B) {
+	x := 1.23
+	for i := 0; i < b.N; i++ {
+		_ = nativeNeg(x)
+	}
+}
+
+func BenchmarkSqrtScalar(b *testing.B) {
+	x := 2.0
+	for i := 0; i < b.N; i++ {
+		_ = nativeSqrt(x)
+	}
+}
+
+func BenchmarkFMAScalar(b *testing.B) {
+	x, y, z := 1.2, 3.4, 5.6
+	for i := 0; i < b.N; i++ {
+		_ = fmaScalar(x, y, z)
+	}
+}
+
+func BenchmarkExpScalar(b *testing.B) {
+	x := 1.0
+	for i := 0; i < b.N; i++ {
+		_ = nativeExp(x)
+	}
+}
+
+func BenchmarkLogScalar(b *testing.B) {
+	x := 2.0
+	for i := 0; i < b.N; i++ {
+		_ = nativeLog(x)
+	}
+}

@@ -8,9 +8,6 @@ type fusedOps struct{}
 
 func (f fusedOps) ExpMulBatch(a, b []float64, result []float64) {
 	n := len(a)
-	if n == 0 || len(a) != len(b) || len(a) != len(result) {
-		return
-	}
 
 	if n < SmallCutoff {
 		for i := 0; i < n; i++ {
@@ -39,7 +36,7 @@ func (f fusedOps) ExpMulBatch(a, b []float64, result []float64) {
 
 func (f fusedOps) ExpAddBatch(a, b []float64, result []float64) {
 	n := len(a)
-	if n == 0 || len(a) != len(b) || len(a) != len(result) {
+	if n == 0 {
 		return
 	}
 
@@ -70,7 +67,7 @@ func (f fusedOps) ExpAddBatch(a, b []float64, result []float64) {
 
 func (f fusedOps) LogDivBatch(a, b []float64, result []float64) {
 	n := len(a)
-	if n == 0 || len(a) != len(b) || len(a) != len(result) {
+	if n == 0 {
 		return
 	}
 
@@ -109,7 +106,7 @@ func (f fusedOps) LogDivBatch(a, b []float64, result []float64) {
 
 func (f fusedOps) LogSubBatch(a, b []float64, result []float64) {
 	n := len(a)
-	if n == 0 || len(a) != len(b) || len(a) != len(result) {
+	if n == 0 {
 		return
 	}
 

@@ -1064,7 +1064,7 @@ func checkRegression(results []BenchmarkResult) {
 		key := r.Type + "/" + r.Name
 		if baselineRatio, ok := baseline[key]; ok {
 			regression := r.Ratio - baselineRatio
-			if regression > 0.15 {
+			if regression > 0.10 {
 				fmt.Printf("⚠️  REGRESSION: %s ratio changed from %.2fx to %.2fx (+%.1f%%)\n", 
 					key, baselineRatio, r.Ratio, regression*100)
 				regressions++

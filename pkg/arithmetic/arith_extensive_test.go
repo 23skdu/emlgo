@@ -892,7 +892,7 @@ func TestBatchFunctionsComprehensive(t *testing.T) {
 	})
 	t.Run("SqrtBatch_empty", func(t *testing.T) {
 		result := SqrtBatch([]float64{})
-		if result != nil && len(result) != 0 {
+		if len(result) != 0 {
 			t.Errorf("SqrtBatch empty = %v", result)
 		}
 	})
@@ -960,7 +960,7 @@ func TestBatchFunctionsComprehensive(t *testing.T) {
 	})
 	t.Run("HypotBatch_empty", func(t *testing.T) {
 		result := HypotBatch([]float64{}, []float64{})
-		if result != nil && len(result) != 0 {
+		if len(result) != 0 {
 			t.Errorf("HypotBatch empty = %v", result)
 		}
 	})

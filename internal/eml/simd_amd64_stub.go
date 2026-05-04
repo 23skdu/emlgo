@@ -3,23 +3,29 @@
 
 package eml
 
-func cpuid(_, _ uint32) (eax, ebx, ecx, edx uint32) { return 0, 0, 0, 0 }
+import "runtime"
 
-func addAVX2(a, b, result []float64)           {}
-func subAVX2(a, b, result []float64)           {}
-func mulAVX2(a, b, result []float64)           {}
-func divAVX2(a, b, result []float64)           {}
-func addScalarAVX2(a []float64, b float64, result []float64) {}
-func mulScalarAVX2(a []float64, b float64, result []float64) {}
+func addAVX2(a, b, result []float64)           { _, _, _ = a, b, result }
+func subAVX2(a, b, result []float64)           { _, _, _ = a, b, result }
+func mulAVX2(a, b, result []float64)           { _, _, _ = a, b, result }
+func divAVX2(a, b, result []float64)           { _, _, _ = a, b, result }
+func addScalarAVX2(a []float64, b float64, result []float64) { _, _, _ = a, b, result }
+func mulScalarAVX2(a []float64, b float64, result []float64) { _, _, _ = a, b, result }
 
-func addAVX512(a, b, result []float64)           {}
-func subAVX512(a, b, result []float64)           {}
-func mulAVX512(a, b, result []float64)           {}
-func divAVX512(a, b, result []float64)           {}
-func addScalarAVX512(a []float64, b float64, result []float64) {}
-func mulScalarAVX512(a []float64, b float64, result []float64) {}
+func addAVX512(a, b, result []float64)           { _, _, _ = a, b, result }
+func subAVX512(a, b, result []float64)           { _, _, _ = a, b, result }
+func mulAVX512(a, b, result []float64)           { _, _, _ = a, b, result }
+func divAVX512(a, b, result []float64)           { _, _, _ = a, b, result }
+func addScalarAVX512(a []float64, b float64, result []float64) { _, _, _ = a, b, result }
+func mulScalarAVX512(a []float64, b float64, result []float64) { _, _, _ = a, b, result }
 
-func sqrtAVX2(a, result []float64)   {}
-func sqrtAVX512(a, result []float64) {}
+func sqrtAVX2(a, result []float64)   { _, _ = a, result }
+func sqrtAVX512(a, result []float64) { _, _ = a, result }
 
-func detectAMD64SIMD() {}
+func fmaAVX2(a, b, c, result []float64)   { _, _, _, _ = a, b, c, result }
+func fmaAVX512(a, b, c, result []float64) { _, _, _, _ = a, b, c, result }
+
+func detectAMD64SIMD() { _ = runtime.GOARCH }
+
+func avx2Eml(x, y, result []float64) { _, _, _ = x, y, result }
+func avx512Eml(x, y, result []float64) { _, _, _ = x, y, result }

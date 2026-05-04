@@ -22,7 +22,7 @@ var (
 	nativeAtan = eml.Atan
 	nativeAtan2 = eml.Atan2
 	nativeSqrt = eml.Sqrt
-	nativeAbs  = eml.Abs
+
 	nativeSinh = eml.Sinh
 	nativeCosh = eml.Cosh
 	nativeTanh = eml.Tanh
@@ -62,25 +62,11 @@ func Cot(x float64) float64 {
 }
 
 func Sec(x float64) float64 {
-	if isNaN(x) || isInf(x, 0) {
-		return nan()
-	}
-	cosx := Cos(x)
-	if cosx == 0 {
-		return inf(1)
-	}
-	return 1 / cosx
+	return 1 / math.Cos(x)
 }
 
 func Csc(x float64) float64 {
-	if isNaN(x) || isInf(x, 0) {
-		return nan()
-	}
-	sinx := Sin(x)
-	if sinx == 0 {
-		return inf(1)
-	}
-	return 1 / sinx
+	return 1 / math.Sin(x)
 }
 
 func Asin(x float64) float64 {
@@ -261,24 +247,11 @@ func RadToDeg(rad float64) float64 {
 }
 
 func SinCos(x float64) (sin, cos float64) {
-	if isNaN(x) || isInf(x, 0) {
-		return nan(), nan()
-	}
-	sin = Sin(x)
-	cos = Cos(x)
-	return
+	return math.Sincos(x)
 }
 
 func SinhCosh(x float64) (sinh, cosh float64) {
-	if isNaN(x) {
-		return nan(), nan()
-	}
-	if isInf(x, 0) {
-		return x, nativeAbs(x)
-	}
-	sinh = Sinh(x)
-	cosh = Cosh(x)
-	return
+	return math.Sinh(x), math.Cosh(x)
 }
 
 func SinBatch(x []float64) []float64 {
@@ -317,8 +290,5 @@ func CosFast(x float64) float64 {
 
 func TanFast(x float64) float64 {
 	s, c := math.Sincos(x)
-	if c == 0 {
-		return nan()
-	}
 	return s / c
 }

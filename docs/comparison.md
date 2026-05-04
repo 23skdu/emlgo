@@ -5,6 +5,7 @@
 This document provides detailed benchmark results comparing `emlgo` (EML-based mathematical library) against Go's standard `math` library across multiple architectures.
 
 **Overall Results:**
+
 - **Average Ratio (AMD64)**: 1.15x (emlgo vs math)
 - **Average Ratio (ARM64)**: 1.20x (emlgo vs math)
 - **Batch Performance (SIMD)**: **1.2x to 15.0x faster** than standard library loops.
@@ -12,6 +13,7 @@ This document provides detailed benchmark results comparing `emlgo` (EML-based m
 - **Parity & Accuracy**: 100% feature parity verified; standard library accuracy matched to within 1 ULP for core functions.
 
 **Recent Improvements (v2.0):**
+
 - **Adaptive Parallelization**: Dynamic chunk sizing based on cache topology
 - **Batch Operation Fusion**: Combined Exp+Mul, Log+Div in single pass
 - **Zero-Allocation APIs**: In-place batch operations (SimDTo functions)
@@ -30,17 +32,17 @@ This document provides detailed benchmark results comparing `emlgo` (EML-based m
 
 | Function | Local (Ratio) | Remote (Ratio) | Status |
 | :--- | :--- | :--- | :--- |
-| **High Speed** |
+| **High Speed** | | | |
 | PowInt | **0.19x** | **0.15x** | ✓ 5-6x Faster |
 | Pow | **0.89x** | **0.76x** | ✓ Faster |
 | fastmath.Sin | **0.90x** | **0.89x** | ✓ Faster (New) |
 | Square | **0.90x** | **0.96x** | ✓ Faster |
 | Add/Sub/Mul | **0.92x** | **1.01x** | ✓ Parity |
-| **Near Parity** |
+| **Near Parity** | | | |
 | Log | 1.06x | 1.04x | ≈ Equal |
 | Exp | 1.13x | 1.05x | ≈ Equal |
 | Sin/Cos | 1.15x | 1.12x | ≈ Equal |
-| **Hardware Accelerated** |
+| **Hardware Accelerated** | | | |
 | Sqrt | 1.86x | 1.22x | Hardware Assembly |
 | FMA | 2.17x | 1.21x | Hardware Assembly |
 
@@ -59,6 +61,7 @@ This document provides detailed benchmark results comparing `emlgo` (EML-based m
 | LogDivBatch | 1K+ | **1.2x** | **1.4x** |
 
 **Fused Operations (v2.0):**
+
 - `ExpMulBatch`: Fuses Exp and multiply in single pass (20-30% less memory bandwidth)
 - `ExpAddBatch`: Fuses Exp and add in single pass
 - `LogDivBatch`: Fuses Log and divide in single pass
@@ -92,7 +95,7 @@ SqrtSIMDTo(src, dst)    // In-place: no allocation
 
 Dynamic chunk sizing based on CPU cache topology:
 
-```
+```text
 L1 Tile Size:   32 KB
 L2 Tile Size:  256 KB
 L3 Tile Size:    1 MB
@@ -120,6 +123,7 @@ Chunk size automatically adjusts based on array size and CPU count for optimal c
 ## Performance Analysis
 
 ### Why emlgo Wins
+
 1. **SIMD Vectorization**: Batch operations process 4-8 values per cycle using hardware vectors.
 2. **FMA Optimization**: `fastmath` uses Fused Multiply-Add instructions to evaluate polynomials in fewer cycles.
 3. **Optimized Integer Powers**: `PowInt` avoids the overhead of the general power function.
@@ -127,6 +131,7 @@ Chunk size automatically adjusts based on array size and CPU count for optimal c
 5. **Cache-Aware Parallelization**: Dynamic chunk sizing reduces cache misses.
 
 ### Remaining Overheads
+
 1. **Function Call Indirection**: Unlike `math.Sqrt`, our assembly kernels are not inlined by the compiler as intrinsics.
 2. **Dispatch Logic**: Selecting between AVX2 and AVX512 at runtime adds a small branch overhead.
 
@@ -135,6 +140,7 @@ Chunk size automatically adjusts based on array size and CPU count for optimal c
 ## Recommendations & Roadmap
 
 ### Completed
+
 - `[x]` **True SIMD assembly**: AVX2/AVX512/NEON batch operations.
 - `[x]` **Scalar kernels**: Direct assembly for Sqrt and FMA.
 - `[x]` **FastMath package**: Relaxed accuracy for maximum throughput.
@@ -143,6 +149,7 @@ Chunk size automatically adjusts based on array size and CPU count for optimal c
 - `[x]` **Adaptive Parallelization**: Cache-aware chunk sizing.
 
 ### Future Work
+
 1. **GPU Acceleration**: CUDA/Metal kernels for massive parallel workloads.
 2. **Hardware Transcendentals**: Use VGETEXP, VGETMANT where accuracy permits.
 3. **ARM SVE Support**: Scalable vector extension for Graviton/Neoverse.

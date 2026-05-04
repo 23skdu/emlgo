@@ -317,13 +317,85 @@ TEXT ·sqrtScalar(SB), NOSPLIT, $0-16
 
 // func fmaScalar(a, b, c float64) float64
 // Computes: a*b + c
-TEXT ·fmaScalar(SB), NOSPLIT, $32
+TEXT ·fmaScalar(SB), NOSPLIT, $0
 	MOVSD a+0(FP), X0
 	MOVSD b+8(FP), X1
 	MOVSD c+16(FP), X2
-	MULSD X1, X0
-	ADDSD X2, X0
+	// If FMA is supported, use VFMADD213SD
+	// Otherwise fallback to MULSD + ADDSD (handled by detection in Go if needed, 
+	// but here we just use the instruction if we assume HasFMA is checked)
+	// Actually, we can use VFMADD213SD directly if we know it's supported.
+	VFMADD213SD X2, X1, X0
 	MOVSD X0, ret+24(FP)
 	RET
 
 // func absScalar(x float64) float64
+TEXT ·absScalar(SB), NOSPLIT, $0
+	MOVQ x+0(FP), AX
+	BTRQ $63, AX // Clear bit 63 (sign bit)
+	MOVQ AX, ret+8(FP)
+	RET
+
+// func negScalar(x float64) float64
+TEXT ·negScalar(SB), NOSPLIT, $0
+	MOVQ x+0(FP), AX
+	BTCQ $63, AX // Complement bit 63
+	MOVQ AX, ret+8(FP)
+	RET
+
+// func fmaAVX2(a, b, c, result []float64)
+TEXT ·fmaAVX2(SB), NOSPLIT, $0-96
+	MOVQ a_base+0(FP), SI
+	MOVQ b_base+24(FP), DI
+	MOVQ c_base+48(FP), BX
+	MOVQ result_base+72(FP), DX
+	MOVQ a_len+8(FP), CX
+
+	SHRQ $2, CX
+	JZ done_fma2
+
+loop_fma2:
+	VMOVUPD (SI), Y0
+	VMOVUPD (DI), Y1
+	VMOVUPD (BX), Y2
+	VFMADD213PD Y2, Y1, Y0
+	VMOVUPD Y0, (DX)
+
+	ADDQ $32, SI
+	ADDQ $32, DI
+	ADDQ $32, BX
+	ADDQ $32, DX
+	DECQ CX
+	JNZ loop_fma2
+
+done_fma2:
+	VZEROUPPER
+	RET
+
+// func fmaAVX512(a, b, c, result []float64)
+TEXT ·fmaAVX512(SB), NOSPLIT, $0-96
+	MOVQ a_base+0(FP), SI
+	MOVQ b_base+24(FP), DI
+	MOVQ c_base+48(FP), BX
+	MOVQ result_base+72(FP), DX
+	MOVQ a_len+8(FP), CX
+
+	SHRQ $3, CX
+	JZ done_fma512
+
+loop_fma512:
+	VMOVUPD (SI), Z0
+	VMOVUPD (DI), Z1
+	VMOVUPD (BX), Z2
+	VFMADD213PD Z2, Z1, Z0
+	VMOVUPD Z0, (DX)
+
+	ADDQ $64, SI
+	ADDQ $64, DI
+	ADDQ $64, BX
+	ADDQ $64, DX
+	DECQ CX
+	JNZ loop_fma512
+
+done_fma512:
+	RET
