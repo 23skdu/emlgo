@@ -155,15 +155,15 @@ func TestLogSubBatch(t *testing.T) {
 
 func TestBranchless(t *testing.T) {
 	tests := []struct {
-		fn    func(float64) float64
 		name string
+		fn   func(float64) float64
 		x    float64
 		want float64
 	}{
-		{AbsBranchless, "AbsBranchless", -5, 5},
-		{AbsBranchless, "AbsBranchless", 5, 5},
-		{AbsBranchless, "AbsBranchless", 0, 0},
-		{AbsBranchless, "AbsBranchless", -0.0, 0},
+		{ "AbsBranchless", AbsBranchless, -5, 5},
+		{ "AbsBranchless", AbsBranchless, 5, 5},
+		{ "AbsBranchless", AbsBranchless, 0, 0},
+		{ "AbsBranchless", AbsBranchless, math.Copysign(0, -1), 0},
 	}
 
 	for _, tt := range tests {

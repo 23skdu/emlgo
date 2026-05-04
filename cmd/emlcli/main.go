@@ -5,6 +5,8 @@ import (
 	"os"
 
 	"github.com/emlgo/eml/internal/eml"
+	"github.com/emlgo/eml/internal/gpu"
+	"github.com/emlgo/eml/internal/jit"
 	"github.com/emlgo/eml/pkg/arithmetic"
 	"github.com/emlgo/eml/pkg/hyper"
 	"github.com/emlgo/eml/pkg/logexp"
@@ -12,8 +14,38 @@ import (
 )
 
 func main() {
-	fmt.Println("EML (Exp-Minus-Log) Library Demo")
-	fmt.Println("==================================")
+	if len(os.Args) < 2 {
+		printUsage()
+		os.Exit(1)
+	}
+
+	command := os.Args[1]
+	switch command {
+	case "demo":
+		runDemo()
+	case "gpu-status":
+		fmt.Println(gpu.Status())
+	case "jit-test":
+		runJitTest()
+	default:
+		fmt.Printf("Unknown command: %s\n", command)
+		printUsage()
+		os.Exit(1)
+	}
+}
+
+func printUsage() {
+	fmt.Println("EML (Exp-Minus-Log) CLI Tool")
+	fmt.Println("Usage: eml [command]")
+	fmt.Println("\nCommands:")
+	fmt.Println("  demo        Run library demo")
+	fmt.Println("  gpu-status  Check GPU availability and status")
+	fmt.Println("  jit-test    Test JIT polynomial compilation")
+}
+
+func runDemo() {
+	fmt.Println("EML Library Demo")
+	fmt.Println("==================")
 
 	fmt.Println("\n--- Core EML Operator ---")
 	fmt.Printf("eml(1, 1) = %v (should be e - 0 = e)\n", eml.Eml(1, 1))
@@ -43,7 +75,18 @@ func main() {
 	fmt.Println("\n--- SIMD Support ---")
 	fmt.Printf("Has AVX2: %v\n", eml.HasAVX2())
 	fmt.Printf("Has AVX512: %v\n", eml.HasAVX512())
+	fmt.Printf("Has Neon: %v\n", eml.HasNeon())
 
 	fmt.Println("\nDone!")
-	os.Exit(0)
+}
+
+func runJitTest() {
+	fmt.Println("JIT Polynomial Compilation Test")
+	c := jit.NewCompiler()
+	f, err := c.Compile("x^2 + 2x + 1")
+	if err != nil {
+		fmt.Printf("JIT Error: %v\n", err)
+		return
+	}
+	fmt.Printf("JIT Compiled f(2) = %v\n", f(2))
 }

@@ -60,6 +60,7 @@ func main() {
 ## SIMD Support
 
 The library automatically detects and uses SIMD instructions:
+
 - **AMD64**: AVX-512 (8-wide), AVX2 (4-wide)
 - **ARM64**: NEON/ASIMD (4-wide)
 
