@@ -27,5 +27,4 @@ func fmaAVX512(a, b, c, result []float64) { _, _, _, _ = a, b, c, result }
 
 func detectAMD64SIMD() { _ = runtime.GOARCH }
 
-func avx2Eml(x, y, result []float64) { _, _, _ = x, y, result }
-func avx512Eml(x, y, result []float64) { _, _, _ = x, y, result }
+

@@ -1061,3 +1061,20 @@ func BenchmarkSqrt(b *testing.B) {
 		Sqrt(1.5)
 	}
 }
+func TestArithmeticLargeN(t *testing.T) {
+	n := 100000
+	x := make([]float64, n)
+	AbsBatch(x)
+	NegBatch(x)
+	InvBatch(x)
+	FloorBatch(x)
+	CeilBatch(x)
+	TruncBatch(x)
+	Log1pBatch(x)
+	Expm1Batch(x)
+	PowBatch(x, 2.0)
+	CbrtBatch(x)
+	HypotBatch(x, x)
+	MaxBatch(x, 0)
+	MinBatch(x, 0)
+}

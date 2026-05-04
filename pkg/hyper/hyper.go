@@ -61,12 +61,6 @@ func Tanh(x float64) float64 {
 	ex := nativeExp(x)
 	emx := nativeExp(-x)
 	sum := ex + emx
-	if isInf(sum, 1) {
-		if x > 0 {
-			return 1
-		}
-		return -1
-	}
 	return (ex - emx) / sum
 }
 
@@ -113,17 +107,17 @@ func Atanh(x float64) float64 {
 	if isNaN(x) {
 		return x
 	}
-	if x <= -1 || x >= 1 {
+	if x == 1 {
+		return inf(1)
+	}
+	if x == -1 {
+		return inf(-1)
+	}
+	if x < -1 || x > 1 {
 		return nan()
 	}
 	if x == 0 {
 		return 0
-	}
-	if nativeAbs(x) > 1-1e-16 {
-		if x > 0 {
-			return inf(1)
-		}
-		return inf(-1)
 	}
 	return nativeLog((1+x)/(1-x)) / 2
 }

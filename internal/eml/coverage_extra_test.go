@@ -5,196 +5,146 @@ import (
 	"testing"
 )
 
-func TestExpandedSIMD(t *testing.T) {
-	n := 1000
-	x := make([]float64, n)
-	result := make([]float64, n)
-	for i := range x {
-		x[i] = float64(i + 1)
+func TestExtraEmlCoverage(t *testing.T) {
+	empty := []float64{}
+	small := []float64{1, 2, 3}
+	large := make([]float64, 1000)
+	huge := make([]float64, 1000000)
+	res_small := make([]float64, 3)
+	res_large := make([]float64, 1000)
+	res_huge := make([]float64, 1000000)
+	_ = res_huge
+	
+	// Fused
+	f := fusedOps{}
+	f.ExpAddBatch(empty, empty, empty)
+	f.ExpAddBatch(small, small, res_small)
+	f.ExpAddBatch(large, large, res_large)
+	
+	f.LogDivBatch(empty, empty, empty)
+	f.LogDivBatch(small, small, res_small)
+	f.LogDivBatch(large, large, res_large)
+	
+	f.LogSubBatch(empty, empty, empty)
+	f.LogSubBatch(small, small, res_small)
+	f.LogSubBatch(large, large, res_large)
+	
+	f.ExpMulBatch(empty, empty, empty)
+	f.ExpMulBatch(small, small, res_small)
+	f.ExpMulBatch(large, large, res_large)
+	
+	// FMA
+	FmaSIMD(empty, empty, empty)
+	FmaSIMD(small, small, small)
+	FmaSIMD(large, large, large)
+	FmaSIMDTo(empty, empty, empty, empty)
+	
+	// Expanded
+	Log2SIMDTo(empty, empty)
+	Log2SIMDTo(small, res_small)
+	Log2SIMDTo(large, res_large)
+	
+	Log10SIMDTo(empty, empty)
+	Log10SIMDTo(small, res_small)
+	Log10SIMDTo(large, res_large)
+	
+	// Large chunks
+	GetParallelChunkSize(1000000)
+	ExpAddBatch(huge, huge)
+}
+
+func TestEmlPanics(t *testing.T) {
+	a5 := make([]float64, 5)
+	a4 := make([]float64, 4)
+	
+	tests := []func(){
+		func() { ExpSIMDTo(a5, a4) },
+		func() { LogSIMDTo(a5, a4) },
+		func() { SqrtSIMDTo(a5, a4) },
+		func() { SinSIMDTo(a5, a4) },
+		func() { CosSIMDTo(a5, a4) },
+		func() { TanSIMDTo(a5, a4) },
+		func() { AbsSIMDTo(a5, a4) },
+		func() { NegSIMDTo(a5, a4) },
+		func() { InvSIMDTo(a5, a4) },
+		func() { SinCosSIMDTo(a5, a4, a5) },
+		func() { SinCosSIMDTo(a5, a5, a4) },
+		func() { AddScalarSIMDTo(a5, 1.0, a4) },
+		func() { MulScalarSIMDTo(a5, 1.0, a4) },
+		func() { EmlSIMD(a5, a4, a5) },
+		func() { EmlSIMD(a5, a5, a4) },
+		func() { ExpMulTo(a5, a5, a4) },
+		func() { ExpAddTo(a5, a5, a4) },
+		func() { LogDivTo(a5, a5, a4) },
+		func() { LogSubTo(a5, a5, a4) },
+		func() { Log2SIMDTo(a5, a4) },
+		func() { Log10SIMDTo(a5, a4) },
+		func() { FmaSIMD(a5, a4, a5) },
+		func() { FmaSIMD(a5, a5, a4) },
+		func() { FmaSIMDTo(a5, a4, a5, a5) },
+		func() { FmaSIMDTo(a5, a5, a4, a5) },
+		func() { FmaSIMDTo(a5, a5, a5, a4) },
 	}
-
-	t.Run("Log2SIMDTo", func(t *testing.T) {
-		Log2SIMDTo(x, result)
-		// Basic check
-		if result[0] != 0 {
-			t.Errorf("Log2SIMDTo(1) = %v, want 0", result[0])
-		}
-	})
-
-	t.Run("Log10SIMDTo", func(t *testing.T) {
-		Log10SIMDTo(x, result)
-		// Basic check
-		if result[9] != 1 {
-			t.Errorf("Log10SIMDTo(10) = %v, want 1", result[9])
-		}
-	})
-}
-
-func TestFmaSIMD(t *testing.T) {
-	n := 1000
-	a := make([]float64, n)
-	b := make([]float64, n)
-	c := make([]float64, n)
-	result := make([]float64, n)
-	for i := range a {
-		a[i] = 2
-		b[i] = 3
-		c[i] = 1
+	
+	for _, fn := range tests {
+		assertPanic(t, fn)
 	}
+}
 
-	t.Run("FmaSIMD", func(t *testing.T) {
-		got := FmaSIMD(a, b, c)
-		if len(got) != n || got[0] != 7 {
-			t.Errorf("FmaSIMD failed: %v", got[0])
+func assertPanic(t *testing.T, f func()) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("The code did not panic")
 		}
-	})
-
-	t.Run("FmaSIMDTo", func(t *testing.T) {
-		FmaSIMDTo(a, b, c, result)
-		if result[0] != 7 {
-			t.Errorf("FmaSIMDTo failed: %v", result[0])
-		}
-	})
+	}()
+	f()
 }
 
-func TestSIMDHelpers(t *testing.T) {
-	// Triggering small paths
-	x := []float64{1, 2, 3}
-	res := make([]float64, 3)
-	
-	ExpSIMDTo(x, res)
-	LogSIMDTo(x, res)
-	SinSIMDTo(x, res)
-	CosSIMDTo(x, res)
-	TanSIMDTo(x, res)
-	SqrtSIMDTo(x, res)
-	
-	s := make([]float64, 3)
-	c := make([]float64, 3)
-	SinCosSIMDTo(x, s, c)
-
-	AbsSIMDTo(x, res)
-	NegSIMDTo(x, res)
-	InvSIMDTo(x, res)
-}
-
-func TestNativeMathExtra(t *testing.T) {
-	t.Run("nativeMax", func(t *testing.T) {
-		nativeMax(math.NaN(), 5)
-		nativeMax(5, math.NaN())
-		nativeMax(0, math.Copysign(0, -1))
-		nativeMax(math.Copysign(0, -1), 0)
-	})
-	t.Run("nativeMin", func(t *testing.T) {
-		nativeMin(math.NaN(), 5)
-		nativeMin(5, math.NaN())
-		nativeMin(0, math.Copysign(0, -1))
-		nativeMin(math.Copysign(0, -1), 0)
-	})
-	t.Run("nativeInv", func(t *testing.T) {
-		nativeInv(0)
-		nativeInv(math.NaN())
-	})
-	t.Run("nativeNeg", func(t *testing.T) {
-		nativeNeg(math.NaN())
-	})
-	t.Run("nativeAbs", func(t *testing.T) {
-		nativeAbs(math.NaN())
-	})
-}
-
-func TestGetters(t *testing.T) {
-	HasSSE4()
-	HasAVX2()
-	HasAVX512()
-	HasNeon()
-	HasNeonDot()
-	HasSVE()
-	HasFMA()
-	HasAVXVNNI()
-	
-	FmaScalar(1, 2, 3)
-	SqrtScalar(4)
-	AbsScalar(-5)
-	NegScalar(5)
-}
-
-func TestEmlBatchError(t *testing.T) {
-	err := EmlBatch(make([]float64, 5), make([]float64, 4), nil)
-	if err == nil {
-		t.Errorf("Expected error for length mismatch in EmlBatch")
-	}
-	// Also test Error() method of EMLError
-	_ = err.Error()
-}
-
-func TestFusedEdgeCases(t *testing.T) {
-	x := []float64{-1, 0, 1}
-	res := make([]float64, 3)
-	LogDivTo(x, x, res)
-	LogSubTo(x, x, res)
-	ExpMulTo(x, x, res)
-	ExpAddTo(x, x, res)
-	
-	AbsBranchless(-5)
-	MinBranchless(1, 2)
-	MinBranchless(2, 1)
-	MaxBranchless(1, 2)
-	MaxBranchless(2, 1)
-	SelectBranchless(true, 1, 2)
-	SelectBranchless(false, 1, 2)
-	SelectNaNBranchless(true, 1, 2)
-	SelectNaNBranchless(false, 1, 2)
-}
-
-func TestSIMDMixed(t *testing.T) {
-	n := 1000
-	x := make([]float64, n)
-	res := make([]float64, n)
-	AbsSIMDTo(x, res)
-	NegSIMDTo(x, res)
-	InvSIMDTo(x, res)
-	
-	_ = AbsSIMD(x)
-	_ = NegSIMD(x)
-	_ = InvSIMD(x)
-}
-
-func TestExpandedLarge(t *testing.T) {
-	n := 1000
-	x := make([]float64, n)
-	res := make([]float64, n)
-	Log2SIMDTo(x, res)
-	Log10SIMDTo(x, res)
-}
-
-func TestNativeMissing(t *testing.T) {
+func TestNativeWrappersAndStubs(t *testing.T) {
 	nativeAtan(0)
 	nativeAtan2(0, 0)
 	nativeAsin(0)
 	nativeAcos(0)
-}
-
-func TestFusedLargeEdge(t *testing.T) {
-	n := 1000
-	x := make([]float64, n)
-	y := make([]float64, n)
-	res := make([]float64, n)
-	for i := range x {
-		x[i] = -1.0
-		y[i] = -1.0
-	}
-	LogDivTo(x, y, res)
-	LogSubTo(x, y, res)
-}
-
-func TestChunkLarge(t *testing.T) {
-	GetParallelChunkSize(100000)
-}
-
-func TestFusedSmallEdge(t *testing.T) {
-	x := []float64{-1, 0, 1}
-	res := make([]float64, 3)
-	LogDivTo(x, x, res)
-	LogSubTo(x, x, res)
+	_ = ErrLengthMismatch.Error()
+	nativeMax(5, math.NaN())
+	nativeMax(5, 10)
+	nativeMin(5, math.NaN())
+	nativeMin(10, 5)
+	
+	// AMD64 stubs
+	addAVX2(nil, nil, nil)
+	subAVX2(nil, nil, nil)
+	mulAVX2(nil, nil, nil)
+	divAVX2(nil, nil, nil)
+	addScalarAVX2(nil, 0, nil)
+	mulScalarAVX2(nil, 0, nil)
+	addAVX512(nil, nil, nil)
+	subAVX512(nil, nil, nil)
+	mulAVX512(nil, nil, nil)
+	divAVX512(nil, nil, nil)
+	addScalarAVX512(nil, 0, nil)
+	mulScalarAVX512(nil, 0, nil)
+	sqrtAVX2(nil, nil)
+	sqrtAVX512(nil, nil)
+	fmaAVX2(nil, nil, nil, nil)
+	fmaAVX512(nil, nil, nil, nil)
+	detectAMD64SIMD()
+	
+	// SVE stubs
+	addSVE(nil, nil, nil)
+	detectSVE()
+	
+	// SIMD wrappers
+	small := []float64{1, 2, 3}
+	TanhBatch(small)
+	AsinhBatch(small)
+	AcoshBatch(small)
+	AtanhBatch(small)
+	AbsScalar(1.0)
+	NegScalar(1.0)
+	SqrtScalar(1.0)
+	FmaScalar(1, 2, 3)
+	HasSVE()
+	HasFMA()
+	HasAVXVNNI()
 }

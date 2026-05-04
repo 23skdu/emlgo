@@ -28,3 +28,12 @@ func TestGetParallelChunk(t *testing.T) {
 func TestDetectCheck2(t *testing.T) {
 	detectSIMD()
 }
+func TestFusedLarge(t *testing.T) {
+	n := 1000
+	a := make([]float64, n)
+	b := make([]float64, n)
+	ExpMulBatch(a, b)
+	ExpAddBatch(a, b)
+	LogDivBatch(a, b)
+	LogSubBatch(a, b)
+}

@@ -24,3 +24,13 @@ func TestHyperFinal(t *testing.T) {
 	Atanh(0.9999999999999999)
 	Atanh(-0.9999999999999999)
 }
+
+func TestHyperCoverageFinal(t *testing.T) {
+	Atanh(0)
+	Atanh(0.9999999999999999)
+	Atanh(-0.9999999999999999)
+	Acosh(1)
+	Acosh(math.Inf(1))
+	Asinh(0)
+	Asinh(-1e200)
+}

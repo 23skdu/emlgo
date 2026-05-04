@@ -73,3 +73,31 @@ func TestArithmeticEdgeExtra(t *testing.T) {
 	LCM(5, 0)
 	LCM(0, 0)
 }
+
+func TestArithmeticCoverageFinal(t *testing.T) {
+	GCD(5, -5)
+	LCM(5, -5)
+	
+	// Pow coverage
+	Pow(0, 2)
+	Pow(0, -2)
+	Pow(-2, 0.5) // NaN
+}
+
+func TestArithmeticLCMOverflow(t *testing.T) {
+	LCM(math.MaxInt64, 2)
+	LCM(math.MinInt64, 2)
+}
+
+func TestArithmeticPowOdd(t *testing.T) {
+	Pow(-2, 3)
+	Max(5, 5)
+	Min(5, 5)
+}
+
+func TestArithmeticMaxMinEquality(t *testing.T) {
+	Max(0, 0)
+	Max(5, 5)
+	Min(0, 0)
+	Min(5, 5)
+}
