@@ -16,7 +16,7 @@ var (
 	nativeLog   = eml.Log
 	nativeSqrt  = eml.Sqrt
 	nativeHypot = eml.Hypot
-	nativeAbs   = eml.Abs
+
 	nativeFloor = eml.Floor
 	nativeCeil  = eml.Ceil
 	nativeTrunc = eml.Trunc
@@ -97,11 +97,8 @@ func Pow(x, y float64) float64 {
 	if x < 0 && !isInteger(y) {
 		return nan()
 	}
-	if x == 0 {
-		if y < 0 {
-			return inf(1)
-		}
-		return 0
+	if x == 0 && y < 0 {
+		return inf(1)
 	}
 	if x < 0 && isInteger(y) {
 		intY := int(y)
@@ -171,15 +168,6 @@ func Max(x, y float64) float64 {
 	if x > y {
 		return x
 	}
-	if y > x {
-		return y
-	}
-	if x == 0 && y == 0 {
-		return 0
-	}
-	if nativeAbs(x) > 0 {
-		return x
-	}
 	return y
 }
 
@@ -193,16 +181,7 @@ func Min(x, y float64) float64 {
 	if x < y {
 		return x
 	}
-	if y < x {
-		return y
-	}
-	if x == 0 && y == 0 {
-		return 0
-	}
-	if nativeAbs(x) > 0 {
-		return y
-	}
-	return x
+	return y
 }
 
 //go:inline
