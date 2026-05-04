@@ -3,6 +3,7 @@ package hyper
 import (
 	"math"
 	"testing"
+	"github.com/emlgo/eml/internal/eml"
 )
 
 func TestSinhAll(t *testing.T) {
@@ -97,6 +98,8 @@ func TestTanhAll(t *testing.T) {
 		{"nan", math.NaN(), math.NaN()},
 		{"inf_pos", math.Inf(1), 1},
 		{"inf_neg", math.Inf(-1), -1},
+		{"near_limit_pos", 709.78, 1},
+		{"near_limit_neg", -709.78, -1},
 		{"half", 0.5, math.Tanh(0.5)},
 	}
 
@@ -131,6 +134,9 @@ func TestAsinhAll(t *testing.T) {
 		{"inf_pos", math.Inf(1), math.Inf(1)},
 		{"inf_neg", math.Inf(-1), math.Inf(-1)},
 		{"half", 0.5, math.Asinh(0.5)},
+		{"very_large", 1e160, math.Asinh(1e160)},
+		{"very_large_neg", -1e160, math.Asinh(-1e160)},
+		{"extreme", eml.MaxFloat64, math.Asinh(eml.MaxFloat64)},
 	}
 
 	for _, tt := range tests {
@@ -189,7 +195,11 @@ func TestAtanhAll(t *testing.T) {
 		{"neg_one", -1, math.NaN()},
 		{"greater_one", 2, math.NaN()},
 		{"less_neg_one", -2, math.NaN()},
+		{"one_exact", 1.0, math.NaN()},
+		{"neg_one_exact", -1.0, math.NaN()},
 		{"nan", math.NaN(), math.NaN()},
+		{"near_one", 0.9999999999999999, math.Atanh(0.9999999999999999)},
+		{"near_neg_one", -0.9999999999999999, math.Atanh(-0.9999999999999999)},
 	}
 
 	for _, tt := range tests {

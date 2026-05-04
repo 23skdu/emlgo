@@ -3,6 +3,11 @@
 
 package eml
 
+func absScalar(x float64) float64
+func negScalar(x float64) float64
+func sqrtScalar(x float64) float64
+func fmaScalar(a, b, c float64) float64
+
 func addNEON(a, b, result []float64) {
 	for i := range a {
 		result[i] = a[i] + b[i]
@@ -53,4 +58,7 @@ func detectARM64SIMD() {
 	hasAVX512 = false
 	hasNeon = true
 	hasNeonDot = true
+	detectSVE()
 }
+
+

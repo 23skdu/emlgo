@@ -1,34 +1,32 @@
 package hyper
 
 import (
-	"math"
 	"testing"
 )
 
-func TestTanhExhaustive(t *testing.T) {
-	values := []float64{-1e10, -1e5, -10, -1, -0.1, 0, 0.1, 1, 10, 1e5, 1e10, math.MaxFloat64, math.SmallestNonzeroFloat64}
-	for _, x := range values {
-		_ = Tanh(x)
+func TestLargeHyperBatchForCoverage(t *testing.T) {
+	n := 1000
+	data := make([]float64, n)
+	for i := range data {
+		data[i] = float64(i + 1) / 1000.0
 	}
-}
 
-func TestAsinhExhaustive(t *testing.T) {
-	values := []float64{-1e10, -1e5, -10, -1, -0.1, -1e-10, 0, 1e-10, 0.1, 1, 10, 1e5, 1e10, math.MaxFloat64, math.SmallestNonzeroFloat64}
-	for _, x := range values {
-		_ = Asinh(x)
-	}
-}
-
-func TestAtanhExhaustive(t *testing.T) {
-	values := []float64{-1 + 1e-10, -0.9, -0.5, -0.1, -1e-10, 0, 1e-10, 0.1, 0.5, 0.9, 1 - 1e-10}
-	for _, x := range values {
-		_ = Atanh(x)
-	}
-}
-
-func TestAcoshLarge(t *testing.T) {
-	values := []float64{1, 1.1, 2, 10, 100, 1e5, 1e10, math.MaxFloat64}
-	for _, x := range values {
-		_ = Acosh(x)
-	}
+	t.Run("SinhBatch_Large", func(t *testing.T) {
+		SinhBatch(data)
+	})
+	t.Run("CoshBatch_Large", func(t *testing.T) {
+		CoshBatch(data)
+	})
+	t.Run("TanhBatch_Large", func(t *testing.T) {
+		TanhBatch(data)
+	})
+	t.Run("AsinhBatch_Large", func(t *testing.T) {
+		AsinhBatch(data)
+	})
+	t.Run("AcoshBatch_Large", func(t *testing.T) {
+		AcoshBatch(data)
+	})
+	t.Run("AtanhBatch_Large", func(t *testing.T) {
+		AtanhBatch(data)
+	})
 }

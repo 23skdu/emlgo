@@ -34,3 +34,5 @@ go.work.sum
 # Test artifacts
 *.txt
 *.log
+*.prof
+benchmark_results.txt

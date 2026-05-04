@@ -27,7 +27,7 @@ func TestSIMDFunctionsExpanded(t *testing.T) {
 	})
 	t.Run("SinSIMD_empty", func(t *testing.T) {
 		r := SinSIMD(emptyData)
-		if r != nil && len(r) != 0 {
+		if len(r) != 0 {
 			t.Errorf("SinSIMD empty = %v", r)
 		}
 	})
@@ -36,7 +36,7 @@ func TestSIMDFunctionsExpanded(t *testing.T) {
 	})
 	t.Run("CosSIMD_empty", func(t *testing.T) {
 		r := CosSIMD(emptyData)
-		if r != nil && len(r) != 0 {
+		if len(r) != 0 {
 			t.Errorf("CosSIMD empty = %v", r)
 		}
 	})
@@ -45,7 +45,7 @@ func TestSIMDFunctionsExpanded(t *testing.T) {
 	})
 	t.Run("SinCosSIMD_empty", func(t *testing.T) {
 		sin, cos := SinCosSIMD(emptyData)
-		if (sin != nil && len(sin) != 0) || (cos != nil && len(cos) != 0) {
+		if len(sin) != 0 || len(cos) != 0 {
 			t.Errorf("SinCosSIMD empty = %v, %v", sin, cos)
 		}
 	})
@@ -56,7 +56,7 @@ func TestSIMDFunctionsExpanded(t *testing.T) {
 	})
 	t.Run("TanSIMD_empty", func(t *testing.T) {
 		r := TanSIMD(emptyData)
-		if r != nil && len(r) != 0 {
+		if len(r) != 0 {
 			t.Errorf("TanSIMD empty = %v", r)
 		}
 	})
@@ -65,7 +65,7 @@ func TestSIMDFunctionsExpanded(t *testing.T) {
 	})
 	t.Run("SqrtSIMD_empty", func(t *testing.T) {
 		r := SqrtSIMD(emptyData)
-		if r != nil && len(r) != 0 {
+		if len(r) != 0 {
 			t.Errorf("SqrtSIMD empty = %v", r)
 		}
 	})
@@ -207,7 +207,7 @@ func TestNegSIMDFunctions(t *testing.T) {
 
 	t.Run("NegSIMD_empty", func(t *testing.T) {
 		r := NegSIMD(emptyData)
-		if r != nil && len(r) != 0 {
+		if len(r) != 0 {
 			t.Errorf("NegSIMD empty = %v", r)
 		}
 	})
@@ -225,7 +225,7 @@ func TestInvSIMDFunctions(t *testing.T) {
 
 	t.Run("InvSIMD_empty", func(t *testing.T) {
 		r := InvSIMD(emptyData)
-		if r != nil && len(r) != 0 {
+		if len(r) != 0 {
 			t.Errorf("InvSIMD empty = %v", r)
 		}
 	})
@@ -288,7 +288,7 @@ func TestAbsSIMDFunctions(t *testing.T) {
 
 	t.Run("AbsSIMD_empty", func(t *testing.T) {
 		r := AbsSIMD(emptyData)
-		if r != nil && len(r) != 0 {
+		if len(r) != 0 {
 			t.Errorf("AbsSIMD empty = %v", r)
 		}
 	})

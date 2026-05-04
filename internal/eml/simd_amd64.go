@@ -24,28 +24,28 @@ func mulScalarAVX512(a []float64, b float64, result []float64)
 func sqrtAVX2(a, result []float64)
 func sqrtAVX512(a, result []float64)
 
+func fmaAVX2(a, b, c, result []float64)
+func fmaAVX512(a, b, c, result []float64)
+
+func avx2Eml(x, y, result []float64)
+func avx512Eml(x, y, result []float64)
+
 func sqrtScalar(x float64) float64
 func fmaScalar(a, b, c float64) float64
 
-func negScalar(x float64) float64 {
-	if x == 0 {
-		return copysign(0, -1)
-	}
-	return -x
-}
-
-func absScalar(x float64) float64 {
-	if x < 0 {
-		return -x
-	}
-	return x
-}
+func negScalar(x float64) float64
+func absScalar(x float64) float64
 
 func detectAMD64SIMD() {
 	_, _, ecx, _ := cpuid(1, 0)
 	hasSSE4 = (ecx & (1 << 19)) != 0
+	hasFMA = (ecx & (1 << 12)) != 0
 
 	_, ebx, _, _ := cpuid(7, 0)
 	hasAVX2 = (ebx & (1 << 5)) != 0
 	hasAVX512 = (ebx & (1 << 16)) != 0
+
+	// CPUID.7.1:EAX
+	eax71, _, _, _ := cpuid(7, 1)
+	hasAVXVNNI = (eax71 & (1 << 4)) != 0
 }
