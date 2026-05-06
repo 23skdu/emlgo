@@ -17,7 +17,7 @@ func TestSIMDDetection(t *testing.T) {
 	}
 }
 
-func TestEmlSIMD(t *testing.T) {
+func TestSIMD(t *testing.T) {
 	sizes := []int{1, 7, 8, 15, 16, 31, 32, 64, 127, 128, 255, 256}
 
 	for _, n := range sizes {
@@ -31,17 +31,18 @@ func TestEmlSIMD(t *testing.T) {
 				y[i] = float64(i+1) * 0.1
 			}
 
-			EmlSIMD(x, y, result)
+			SIMD(x, y, result)
 
 			for i := 0; i < n; i++ {
 				want := math.Exp(x[i]) - math.Log(y[i])
 				if math.Abs(result[i]-want) > 1e-10 {
-					t.Errorf("EmlSIMD[%d] = %v, want %v", i, result[i], want)
+					t.Errorf("SIMD[%d] = %v, want %v", i, result[i], want)
 				}
 			}
 		})
 	}
 }
+
 
 func TestExpSIMD(t *testing.T) {
 	x := []float64{0, 0.5, 1, 1.5, 2, math.E, 10}
@@ -124,12 +125,13 @@ func TestSIMDEmptySlice(t *testing.T) {
 	y := make([]float64, 0)
 	result := make([]float64, 0)
 
-	EmlSIMD(x, y, result)
+	SIMD(x, y, result)
 
 	if len(result) != 0 {
 		t.Error("Expected empty result")
 	}
 }
+
 
 func TestSIMDLargeSlice(t *testing.T) {
 	n := 10000
@@ -142,23 +144,24 @@ func TestSIMDLargeSlice(t *testing.T) {
 		y[i] = float64(i%100+1) * 0.1
 	}
 
-	EmlSIMD(x, y, result)
+	SIMD(x, y, result)
 
 	for i := 0; i < n; i++ {
 		want := math.Exp(x[i]) - math.Log(y[i])
 		if math.Abs(result[i]-want) > 1e-10 {
-			t.Errorf("EmlSIMD[%d] = %v, want %v", i, result[i], want)
+			t.Errorf("SIMD[%d] = %v, want %v", i, result[i], want)
 			break
 		}
 	}
 }
+
 
 func TestSIMDNaNHandling(t *testing.T) {
 	x := []float64{math.NaN(), 1, 2}
 	y := []float64{1, math.NaN(), 2}
 	result := make([]float64, 3)
 
-	EmlSIMD(x, y, result)
+	SIMD(x, y, result)
 
 	if !math.IsNaN(result[0]) {
 		t.Error("Expected NaN for NaN input")
@@ -168,12 +171,13 @@ func TestSIMDNaNHandling(t *testing.T) {
 	}
 }
 
+
 func TestSIMDInfHandling(t *testing.T) {
 	x := []float64{math.Inf(1), math.Inf(-1), 0}
 	y := []float64{1, 1, 0}
 	result := make([]float64, 3)
 
-	EmlSIMD(x, y, result)
+	SIMD(x, y, result)
 
 	if !math.IsInf(result[0], 1) {
 		t.Error("Expected +Inf for +Inf input")
@@ -186,25 +190,27 @@ func TestSIMDInfHandling(t *testing.T) {
 	}
 }
 
-func TestEmlBatch(t *testing.T) {
+
+func TestBatch(t *testing.T) {
 	x := []float64{1, 2, 3}
 	y := []float64{2, 3, 4}
 
-	err := EmlBatch(x, y, func(x, y, result []float64) error {
-		EmlSIMD(x, y, result)
+	err := Batch(x, y, func(x, y, result []float64) error {
+		SIMD(x, y, result)
 		return nil
 	})
 
 	if err != nil {
-		t.Errorf("EmlBatch error: %v", err)
+		t.Errorf("Batch error: %v", err)
 	}
 }
 
-func TestEmlBatchLengthMismatch(t *testing.T) {
+
+func TestBatchLengthMismatch(t *testing.T) {
 	x := []float64{1, 2, 3}
 	y := []float64{2, 3}
 
-	err := EmlBatch(x, y, func(x, y, result []float64) error {
+	err := Batch(x, y, func(x, y, result []float64) error {
 		return nil
 	})
 
@@ -213,7 +219,8 @@ func TestEmlBatchLengthMismatch(t *testing.T) {
 	}
 }
 
-func BenchmarkEmlSIMD(b *testing.B) {
+
+func BenchmarkSIMD(b *testing.B) {
 	sizes := []int{64, 256, 1024, 4096}
 
 	for _, n := range sizes {
@@ -229,11 +236,12 @@ func BenchmarkEmlSIMD(b *testing.B) {
 
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				EmlSIMD(x, y, result)
+				SIMD(x, y, result)
 			}
 		})
 	}
 }
+
 
 func BenchmarkExpSIMD(b *testing.B) {
 	n := 4096

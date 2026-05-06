@@ -72,20 +72,22 @@ func TestSIMDExhaustive(t *testing.T) {
 	})
 }
 
-func TestEmlSIMDExhaustive(t *testing.T) {
+func TestCoreSIMDExhaustive(t *testing.T) {
 	large := make([]float64, 10000)
 	for i := range large {
 		large[i] = float64(i) * 0.1
 	}
 	result := make([]float64, len(large))
 
-	t.Run("EmlSIMD", func(t *testing.T) {
-		EmlSIMD(large, large, result)
+	t.Run("SIMD", func(t *testing.T) {
+		SIMD(large, large, result)
 		if len(result) != len(large) {
 			t.Error("len mismatch")
 		}
 	})
 }
+
+
 
 func TestExpSIMDExhaustive(t *testing.T) {
 	large := make([]float64, 10000)

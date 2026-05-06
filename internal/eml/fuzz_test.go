@@ -54,7 +54,7 @@ func FuzzExpSIMD(f *testing.F) {
 	f.Add([]byte{0, 0, 0, 0, 0, 0, 0, 0})
 	f.Fuzz(func(t *testing.T, a []byte) {
 		fa := bytesToFloat64(a)
-		result := ExpSIMDTo_(fa)
+		result := ExpSIMD(fa)
 		if len(result) != len(fa) {
 			t.Fatalf("length mismatch: got %d, want %d", len(result), len(fa))
 		}
@@ -78,7 +78,7 @@ func FuzzLogSIMD(f *testing.F) {
 				fa[i] = 1.0
 			}
 		}
-		result := LogSIMDTo_(fa)
+		result := LogSIMD(fa)
 		if len(result) != len(fa) {
 			t.Fatalf("length mismatch: got %d, want %d", len(result), len(fa))
 		}
@@ -94,7 +94,7 @@ func FuzzSinSIMD(f *testing.F) {
 	f.Add([]byte{0, 0, 0, 0, 0, 0, 0, 0})
 	f.Fuzz(func(t *testing.T, a []byte) {
 		fa := bytesToFloat64(a)
-		result := SinSIMDTo_(fa)
+		result := SinSIMD(fa)
 		if len(result) != len(fa) {
 			t.Fatalf("length mismatch: got %d, want %d", len(result), len(fa))
 		}
@@ -105,7 +105,7 @@ func FuzzCosSIMD(f *testing.F) {
 	f.Add([]byte{0, 0, 0, 0, 0, 0, 0, 0})
 	f.Fuzz(func(t *testing.T, a []byte) {
 		fa := bytesToFloat64(a)
-		result := CosSIMDTo_(fa)
+		result := CosSIMD(fa)
 		if len(result) != len(fa) {
 			t.Fatalf("length mismatch: got %d, want %d", len(result), len(fa))
 		}
@@ -160,38 +160,3 @@ func bytesToFloat64(b []byte) []float64 {
 	return res
 }
 
-func ExpSIMDTo_(x []float64) []float64 {
-	if len(x) == 0 {
-		return x
-	}
-	result := make([]float64, len(x))
-	ExpSIMDTo(x, result)
-	return result
-}
-
-func LogSIMDTo_(x []float64) []float64 {
-	if len(x) == 0 {
-		return x
-	}
-	result := make([]float64, len(x))
-	LogSIMDTo(x, result)
-	return result
-}
-
-func SinSIMDTo_(x []float64) []float64 {
-	if len(x) == 0 {
-		return x
-	}
-	result := make([]float64, len(x))
-	SinSIMDTo(x, result)
-	return result
-}
-
-func CosSIMDTo_(x []float64) []float64 {
-	if len(x) == 0 {
-		return x
-	}
-	result := make([]float64, len(x))
-	CosSIMDTo(x, result)
-	return result
-}

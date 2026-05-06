@@ -93,14 +93,15 @@ func TestSinhCoshBatch2(t *testing.T) {
 	}
 }
 
-func TestEmlSIMD2(t *testing.T) {
+func TestSIMD2(t *testing.T) {
 	for _, n := range []int{1, 8, 16, 64} {
 		x := make([]float64, n)
 		y := make([]float64, n)
 		out := make([]float64, n)
-		EmlSIMD(x, y, out)
+		SIMD(x, y, out)
 	}
 }
+
 
 func TestVariousSIMD2(t *testing.T) {
 	for _, n := range []int{1, 8, 16, 64} {
