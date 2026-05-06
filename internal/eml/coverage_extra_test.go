@@ -10,28 +10,28 @@ func TestExtraEmlCoverage(t *testing.T) {
 	small := []float64{1, 2, 3}
 	large := make([]float64, 1000)
 	huge := make([]float64, 1000000)
-	res_small := make([]float64, 3)
-	res_large := make([]float64, 1000)
-	res_huge := make([]float64, 1000000)
-	_ = res_huge
+	resSmall := make([]float64, 3)
+	resLarge := make([]float64, 1000)
+	resHuge := make([]float64, 1000000)
+	_ = resHuge
 	
 	// Fused
 	f := fusedOps{}
 	f.ExpAddBatch(empty, empty, empty)
-	f.ExpAddBatch(small, small, res_small)
-	f.ExpAddBatch(large, large, res_large)
+	f.ExpAddBatch(small, small, resSmall)
+	f.ExpAddBatch(large, large, resLarge)
 	
 	f.LogDivBatch(empty, empty, empty)
-	f.LogDivBatch(small, small, res_small)
-	f.LogDivBatch(large, large, res_large)
+	f.LogDivBatch(small, small, resSmall)
+	f.LogDivBatch(large, large, resLarge)
 	
 	f.LogSubBatch(empty, empty, empty)
-	f.LogSubBatch(small, small, res_small)
-	f.LogSubBatch(large, large, res_large)
+	f.LogSubBatch(small, small, resSmall)
+	f.LogSubBatch(large, large, resLarge)
 	
 	f.ExpMulBatch(empty, empty, empty)
-	f.ExpMulBatch(small, small, res_small)
-	f.ExpMulBatch(large, large, res_large)
+	f.ExpMulBatch(small, small, resSmall)
+	f.ExpMulBatch(large, large, resLarge)
 	
 	// FMA
 	FmaSIMD(empty, empty, empty)
@@ -41,12 +41,13 @@ func TestExtraEmlCoverage(t *testing.T) {
 	
 	// Expanded
 	Log2SIMDTo(empty, empty)
-	Log2SIMDTo(small, res_small)
-	Log2SIMDTo(large, res_large)
+	Log2SIMDTo(small, resSmall)
+	Log2SIMDTo(large, resLarge)
 	
 	Log10SIMDTo(empty, empty)
-	Log10SIMDTo(small, res_small)
-	Log10SIMDTo(large, res_large)
+	Log10SIMDTo(small, resSmall)
+	Log10SIMDTo(large, resLarge)
+
 	
 	// Large chunks
 	GetParallelChunkSize(1000000)
@@ -71,8 +72,8 @@ func TestEmlPanics(t *testing.T) {
 		func() { SinCosSIMDTo(a5, a5, a4) },
 		func() { AddScalarSIMDTo(a5, 1.0, a4) },
 		func() { MulScalarSIMDTo(a5, 1.0, a4) },
-		func() { EmlSIMD(a5, a4, a5) },
-		func() { EmlSIMD(a5, a5, a4) },
+		func() { SIMD(a5, a4, a5) },
+		func() { SIMD(a5, a5, a4) },
 		func() { ExpMulTo(a5, a5, a4) },
 		func() { ExpAddTo(a5, a5, a4) },
 		func() { LogDivTo(a5, a5, a4) },

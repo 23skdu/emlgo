@@ -145,6 +145,7 @@ func (f fusedOps) LogSubBatch(a, b []float64, result []float64) {
 
 var fused fusedOps
 
+// ExpMulBatch returns a new slice containing Exp(a[i]) * b[i].
 func ExpMulBatch(a, b []float64) []float64 {
 	n := len(a)
 	if n == 0 || len(a) != len(b) {
@@ -155,6 +156,8 @@ func ExpMulBatch(a, b []float64) []float64 {
 	return result
 }
 
+
+// ExpAddBatch returns a new slice containing Exp(a[i]) + b[i].
 func ExpAddBatch(a, b []float64) []float64 {
 	n := len(a)
 	if n == 0 || len(a) != len(b) {
@@ -165,6 +168,8 @@ func ExpAddBatch(a, b []float64) []float64 {
 	return result
 }
 
+
+// LogDivBatch returns a new slice containing Log(a[i]) / b[i].
 func LogDivBatch(a, b []float64) []float64 {
 	n := len(a)
 	if n == 0 || len(a) != len(b) {
@@ -175,6 +180,8 @@ func LogDivBatch(a, b []float64) []float64 {
 	return result
 }
 
+
+// LogSubBatch returns a new slice containing Log(a[i]) - b[i].
 func LogSubBatch(a, b []float64) []float64 {
 	n := len(a)
 	if n == 0 || len(a) != len(b) {
@@ -185,6 +192,8 @@ func LogSubBatch(a, b []float64) []float64 {
 	return result
 }
 
+
+// ExpMulTo computes Exp(a[i]) * b[i] and stores the result in the provided slice.
 func ExpMulTo(a, b, result []float64) {
 	if len(a) != len(b) || len(a) != len(result) {
 		panic("slice length mismatch")
@@ -192,6 +201,8 @@ func ExpMulTo(a, b, result []float64) {
 	fused.ExpMulBatch(a, b, result)
 }
 
+
+// ExpAddTo computes Exp(a[i]) + b[i] and stores the result in the provided slice.
 func ExpAddTo(a, b, result []float64) {
 	if len(a) != len(b) || len(a) != len(result) {
 		panic("slice length mismatch")
@@ -199,6 +210,8 @@ func ExpAddTo(a, b, result []float64) {
 	fused.ExpAddBatch(a, b, result)
 }
 
+
+// LogDivTo computes Log(a[i]) / b[i] and stores the result in the provided slice.
 func LogDivTo(a, b, result []float64) {
 	if len(a) != len(b) || len(a) != len(result) {
 		panic("slice length mismatch")
@@ -206,6 +219,8 @@ func LogDivTo(a, b, result []float64) {
 	fused.LogDivBatch(a, b, result)
 }
 
+
+// LogSubTo computes Log(a[i]) - b[i] and stores the result in the provided slice.
 func LogSubTo(a, b, result []float64) {
 	if len(a) != len(b) || len(a) != len(result) {
 		panic("slice length mismatch")
@@ -213,6 +228,8 @@ func LogSubTo(a, b, result []float64) {
 	fused.LogSubBatch(a, b, result)
 }
 
+
+// AbsBranchless returns the absolute value of x without using explicit branches (where possible).
 func AbsBranchless(x float64) float64 {
 	if x < 0 {
 		return -x
@@ -220,6 +237,8 @@ func AbsBranchless(x float64) float64 {
 	return x
 }
 
+
+// MinBranchless returns the minimum of a and b.
 func MinBranchless(a, b float64) float64 {
 	if a <= b {
 		return a
@@ -227,6 +246,8 @@ func MinBranchless(a, b float64) float64 {
 	return b
 }
 
+
+// MaxBranchless returns the maximum of a and b.
 func MaxBranchless(a, b float64) float64 {
 	if a >= b {
 		return a
@@ -234,6 +255,8 @@ func MaxBranchless(a, b float64) float64 {
 	return b
 }
 
+
+// SelectBranchless returns ifTrue if cond is true, else ifFalse.
 func SelectBranchless(cond bool, ifTrue, ifFalse float64) float64 {
 	if cond {
 		return ifTrue
@@ -241,6 +264,8 @@ func SelectBranchless(cond bool, ifTrue, ifFalse float64) float64 {
 	return ifFalse
 }
 
+
+// SelectNaNBranchless returns alt if isNaN is true, else val.
 func SelectNaNBranchless(isNaN bool, val, alt float64) float64 {
 	if isNaN {
 		return alt

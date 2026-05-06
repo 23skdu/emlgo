@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestEmlComplexAll(t *testing.T) {
+func TestComplexAll(t *testing.T) {
 	tests := []struct {
 		name     string
 		x        complex128
@@ -22,16 +22,16 @@ func TestEmlComplexAll(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := EmlComplex(tt.x, tt.y)
+			got := Complex(tt.x, tt.y)
 			want := tt.expected
 			if !closeComplex(got, want, 1e-10) {
-				t.Errorf("EmlComplex(%v, %v) = %v, want %v", tt.x, tt.y, got, want)
+				t.Errorf("Complex(%v, %v) = %v, want %v", tt.x, tt.y, got, want)
 			}
 		})
 	}
 }
 
-func TestEmlComplexOneAll(t *testing.T) {
+func TestComplexOneAll(t *testing.T) {
 	tests := []struct {
 		name     string
 		x        complex128
@@ -46,16 +46,16 @@ func TestEmlComplexOneAll(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := EmlComplexOne(tt.x)
+			got := ComplexOne(tt.x)
 			want := tt.expected
 			if !closeComplex(got, want, 1e-10) {
-				t.Errorf("EmlComplexOne(%v) = %v, want %v", tt.x, got, want)
+				t.Errorf("ComplexOne(%v) = %v, want %v", tt.x, got, want)
 			}
 		})
 	}
 }
 
-func TestOneEmlComplexAll(t *testing.T) {
+func TestOneComplexAll(t *testing.T) {
 	tests := []struct {
 		name     string
 		x        complex128
@@ -69,10 +69,10 @@ func TestOneEmlComplexAll(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := OneEmlComplex(tt.x)
+			got := OneComplex(tt.x)
 			want := tt.expected
 			if !closeComplex(got, want, 1e-10) {
-				t.Errorf("OneEmlComplex(%v) = %v, want %v", tt.x, got, want)
+				t.Errorf("OneComplex(%v) = %v, want %v", tt.x, got, want)
 			}
 		})
 	}
@@ -88,14 +88,14 @@ func closeComplex(a, b complex128, tol float64) bool {
 	return math.Abs(real(a)-real(b)) <= tol && math.Abs(imag(a)-imag(b)) <= tol
 }
 
-func BenchmarkEmlComplex(b *testing.B) {
+func BenchmarkComplex(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		EmlComplex(complex(1.5, 0.5), complex(2.5, 0))
+		Complex(complex(1.5, 0.5), complex(2.5, 0))
 	}
 }
 
-func BenchmarkEmlComplexOne(b *testing.B) {
+func BenchmarkComplexOne(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		EmlComplexOne(complex(1.5, 0.5))
+		ComplexOne(complex(1.5, 0.5))
 	}
 }
