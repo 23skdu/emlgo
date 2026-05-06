@@ -34,15 +34,15 @@ func TestEmlProperty(t *testing.T) {
 	}
 }
 
-func TestEmlOneProperty(t *testing.T) {
+func TestOneProperty(t *testing.T) {
 	f := func(x float64) bool {
 		if math.IsInf(x, 0) || math.IsNaN(x) || x > 700 {
 			return true
 		}
-		got := EmlOne(x)
+		got := One(x)
 		want := math.Exp(x)
 		if !math.IsInf(got, 0) && math.Abs(got-want) > 1e-10 {
-			t.Logf("EmlOne(%v) = %v, want %v", x, got, want)
+			t.Logf("One(%v) = %v, want %v", x, got, want)
 			return false
 		}
 		return true
@@ -52,6 +52,7 @@ func TestEmlOneProperty(t *testing.T) {
 		t.Error(err)
 	}
 }
+
 
 func TestOneEmlProperty(t *testing.T) {
 	f := func(y float64) bool {
@@ -77,7 +78,7 @@ func TestULPAccuracy(t *testing.T) {
 		name string
 		fn   func(float64) float64
 	}{
-		{"EmlOne", func(x float64) float64 { return EmlOne(x) }},
+		{"One", func(x float64) float64 { return One(x) }},
 		{"OneEml", func(x float64) float64 { return OneEml(x) }},
 	}
 
@@ -87,7 +88,7 @@ func TestULPAccuracy(t *testing.T) {
 			for _, x := range inputs {
 				got := tc.fn(x)
 				var want float64
-				if tc.name == "EmlOne" {
+				if tc.name == "One" {
 					want = math.Exp(x)
 				} else {
 					want = -math.Log(x)

@@ -44,7 +44,7 @@ func TestEmlAll(t *testing.T) {
 	}
 }
 
-func TestEmlOneAll(t *testing.T) {
+func TestOneAll(t *testing.T) {
 	tests := []struct {
 		name     string
 		x        float64
@@ -65,17 +65,17 @@ func TestEmlOneAll(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := EmlOne(tt.x)
+			got := One(tt.x)
 			if math.IsNaN(tt.expected) {
 				if !math.IsNaN(got) {
-					t.Errorf("EmlOne(%v) = %v, want NaN", tt.x, got)
+					t.Errorf("One(%v) = %v, want NaN", tt.x, got)
 				}
 			} else if math.IsInf(tt.expected, 0) {
 				if !math.IsInf(got, 0) {
-					t.Errorf("EmlOne(%v) = %v, want %v", tt.x, got, tt.expected)
+					t.Errorf("One(%v) = %v, want %v", tt.x, got, tt.expected)
 				}
 			} else if !close(got, tt.expected, 1e-10) {
-				t.Errorf("EmlOne(%v) = %v, want %v", tt.x, got, tt.expected)
+				t.Errorf("One(%v) = %v, want %v", tt.x, got, tt.expected)
 			}
 		})
 	}
@@ -114,9 +114,9 @@ func TestOneEmlAll(t *testing.T) {
 	}
 }
 
-func TestOne(t *testing.T) {
-	if One != 1.0 {
-		t.Errorf("One = %v, want 1.0", One)
+func TestOneConst(t *testing.T) {
+	if one != 1.0 {
+		t.Errorf("one = %v, want 1.0", one)
 	}
 }
 
@@ -139,9 +139,9 @@ func BenchmarkEml(b *testing.B) {
 	}
 }
 
-func BenchmarkEmlOne(b *testing.B) {
+func BenchmarkOne(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		EmlOne(1.5)
+		One(1.5)
 	}
 }
 

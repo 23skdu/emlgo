@@ -40,8 +40,8 @@ func GeneratePi() float64 {
 	// Using eml.EmlComplex(0, z) = 1 - log(z)
 	// log(z) = 1 - eml.EmlComplex(0, z)
 	i := complex(0, 1)
-	log1minusI := 1 - eml.EmlComplex(0, 1-i)
-	log1plusI := 1 - eml.EmlComplex(0, 1+i)
+	log1minusI := 1 - eml.Complex(0, 1-i)
+	log1plusI := 1 - eml.Complex(0, 1+i)
 	atan1 := (i / 2) * (log1minusI - log1plusI)
 	return 4 * real(atan1)
 }
@@ -91,7 +91,7 @@ func GenerateHalf() float64 {
 }
 
 func ComplexExp(z complex128) complex128 {
-	return eml.EmlComplexOne(z)
+	return eml.ComplexOne(z)
 }
 
 func ComplexLog(z complex128) complex128 {
@@ -107,14 +107,14 @@ func ComplexSin(z complex128) complex128 {
 		return 0
 	}
 	iz := complex(-imag(z), real(z))
-	e := eml.EmlComplexOne(iz)
-	neiz := eml.EmlComplexOne(-iz)
+	e := eml.ComplexOne(iz)
+	neiz := eml.ComplexOne(-iz)
 	return (e - neiz) / (2 * complex(0, 1))
 }
 
 func ComplexCos(z complex128) complex128 {
 	conj := complex(-imag(z), real(z))
-	exp_z := eml.EmlComplexOne(z)
-	exp_conj := eml.EmlComplexOne(conj)
+	exp_z := eml.ComplexOne(z)
+	exp_conj := eml.ComplexOne(conj)
 	return (exp_z + exp_conj) / 2
 }

@@ -2,14 +2,17 @@ package eml
 
 import "math/cmplx"
 
-func EmlComplex(x, y complex128) complex128 {
+// Complex returns Exp(x) - Log(y) for complex128.
+func Complex(x, y complex128) complex128 {
 	return cmplx.Exp(x) - cmplx.Log(y)
 }
 
-func EmlComplexOne(x complex128) complex128 {
-	return EmlComplex(x, 1)
+// ComplexOne returns Complex(x, 1).
+func ComplexOne(x complex128) complex128 {
+	return Complex(x, 1)
 }
 
-func OneEmlComplex(x complex128) complex128 {
-	return EmlComplex(1, x)
+// OneComplex returns Complex(1, x).
+func OneComplex(x complex128) complex128 {
+	return Complex(1, x)
 }
