@@ -27,9 +27,6 @@ func sqrtAVX512(a, result []float64)
 func fmaAVX2(a, b, c, result []float64)
 func fmaAVX512(a, b, c, result []float64)
 
-func avx2Eml(x, y, result []float64)
-func avx512Eml(x, y, result []float64)
-
 func sqrtScalar(x float64) float64
 func fmaScalar(a, b, c float64) float64
 
