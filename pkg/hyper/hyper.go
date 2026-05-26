@@ -52,10 +52,10 @@ func Tanh(x float64) float64 {
 	if isNaN(x) {
 		return x
 	}
-	if x > 709.78 || isInf(x, 1) {
+	if x >= 709.78 || isInf(x, 1) {
 		return 1
 	}
-	if x < -709.78 || isInf(x, -1) {
+	if x <= -709.78 || isInf(x, -1) {
 		return -1
 	}
 	ex := nativeExp(x)
