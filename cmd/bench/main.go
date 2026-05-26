@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/emlgo/eml/internal/gpu"
 	"github.com/emlgo/eml/pkg/arithmetic"
 	"github.com/emlgo/eml/pkg/fastmath"
 	"github.com/emlgo/eml/pkg/hyper"
@@ -28,6 +29,7 @@ var (
 	testAccuracy bool
 	typeFilter   string
 	profile     string
+	device      string
 )
 
 func init() {
@@ -37,6 +39,7 @@ func init() {
 	flag.BoolVar(&testAccuracy, "accuracy", false, "Test accuracy (ULP) against math library")
 	flag.StringVar(&typeFilter, "type", "all", "Type to test: all, int, uint, float32, float64, complex64, complex128")
 	flag.StringVar(&profile, "profile", "", "Profile type: cpu, mem, or block (requires pprof binary)")
+	flag.StringVar(&device, "device", "cpu", "Device to run on: cpu or gpu")
 }
 
 type BenchmarkResult struct {
@@ -51,6 +54,11 @@ type BenchmarkResult struct {
 func main() {
 	flag.Parse()
 	rand.Seed(42)
+
+	if device == "gpu" {
+		runGpuBenchmarks()
+		return
+	}
 
 	if profile != "" {
 		runProfiling()
@@ -75,6 +83,58 @@ func main() {
 	results = append(results, runFastMathBenchmarks()...)
 	printResults(results)
 	checkRegression(results)
+}
+
+// ==================== GPU BENCHMARKS ====================
+
+func runGpuBenchmarks() {
+	fmt.Println("=== GPU Device Benchmark ===")
+
+	devices, err := gpu.GetDevices()
+	if err != nil {
+		fmt.Printf("GPU error: %v\n", err)
+		os.Exit(1)
+	}
+	if len(devices) == 0 {
+		fmt.Println("No GPU devices found (build with -tags cuda and ensure CUDA is available)")
+		os.Exit(1)
+	}
+
+	device := devices[0]
+	fmt.Printf("Using device: %s (SM %d.%d, %d MB)\n",
+		device.Name, device.ComputeMajor, device.ComputeMinor,
+		device.MemoryBytes/1024/1024)
+
+	sizes := []int{1024, 4096, 16384, 65536, 262144, 1048576}
+
+	fmt.Printf("\n%-12s %-12s %14s %14s %12s\n", "Size", "Function", "GPU Time (s)", "CPU Time (s)", "Speedup")
+	fmt.Println(strings.Repeat("-", 70))
+
+	for _, n := range sizes {
+		data := make([]float64, n)
+		for i := range data {
+			data[i] = float64(i%100) / 100.0 + 0.1
+		}
+
+		// GPU Exp
+		start := time.Now()
+		_, err := device.ExpBatch(data)
+		if err != nil {
+			fmt.Printf("%-12d %-12s %14s %14s %12s\n", n, "Exp", "N/A", "N/A", err)
+			continue
+		}
+		gpuTime := time.Since(start).Seconds()
+
+		// CPU Exp baseline
+		start = time.Now()
+		for range 10 {
+			_ = logexp.ExpBatch(data)
+		}
+		cpuTime := time.Since(start).Seconds() / 10
+
+		speedup := cpuTime / gpuTime
+		fmt.Printf("%-12d %-12s %14.6f %14.6f %11.2fx\n", n, "Exp", gpuTime, cpuTime, speedup)
+	}
 }
 
 func runProfiling() {

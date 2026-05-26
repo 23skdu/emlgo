@@ -17,16 +17,21 @@ This document outlines the roadmap for enhancing performance and stability of th
 ### 1. GPU/CUDA Production Readiness
 
 - **Core Implementation:**
-  - [ ] Port all major math operators (Exp, Log, Sin, Cos, Add, Mul) to CUDA kernels.
-  - [ ] Implement zero-copy pinned memory support for host-to-device transfers to minimize latency.
-  - [ ] Add asynchronous execution streams to overlap compute and data transfer.
+  - [x] Port all major math operators (Exp, Log, Sin, Cos, Tan, Sinh, Cosh, Tanh, Sqrt, EML) to CUDA kernels.
+  - [x] Create a pure C API layer (`cuda/eml_capi.h`/`.cu`) bridging Go cgo to CUDA kernels.
+  - [x] Implement cgo bridge (`internal/gpu/bridge.go`) with `//go:build cuda` tag for conditional compilation.
+  - [x] Implement zero-copy pinned memory support for host-to-device transfers to minimize latency.
+  - [x] Add asynchronous execution streams to overlap compute and data transfer.
+  - [x] Provide stub fallback (`internal/gpu/stub.go`) when `-tags cuda` is not set.
 - **Tooling & Validation:**
-  - [ ] **Benchtool:** Add `--device gpu` flag to track GPU vs CPU performance ratios.
-  - [ ] **CLI:** Add `eml gpu-status` to verify hardware availability, driver version, and compute capability.
+  - [x] **Benchtool:** Add `--device gpu` flag to track GPU vs CPU performance ratios.
+  - [x] **CLI:** Add `eml gpu-status` to verify hardware availability, driver version, and compute capability.
+  - [ ] **CLI:** Add `eml gpu-bench` for quick GPU batch performance test.
   - [ ] **Validation:** Implement ULP-based verification specifically for GPU results against Go's `math` library.
 - **Testing:**
-  - [ ] **Unit Tests:** Verify kernel launch parameters and grid/block size calculations.
-  - [ ] **Fuzz Tests:** Fuzz GPU kernels with extreme edge cases (NaN, Inf, subnormal numbers).
+  - [x] **Unit Tests:** Verify kernel launch parameters and grid/block size calculations.
+  - [x] **Fuzz Tests:** Fuzz GPU kernel launch configs with extreme edge cases.
+  - [ ] **End-to-End Tests:** Validate GPU results match CPU results within 1 ULP (requires CUDA hardware).
 
 ### 2. ARM SVE/SVE2 Support
 
