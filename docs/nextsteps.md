@@ -37,8 +37,9 @@ This document outlines the roadmap for enhancing performance and stability of th
 ### 2. ARM SVE/SVE2 Support
 
 - **Core Implementation:**
-  - [ ] Implement runtime detection for SVE vector length (VL).
-  - [ ] Create Vector-Length Agnostic (VLA) assembly kernels for all SIMD-accelerated paths.
+  - [x] Implement runtime detection for SVE vector length (VL) via `/proc/self/auxv` HWCAP_SVE parsing + `prctl(PR_SVE_GET_VL)`.
+  - [x] Create Vector-Length Agnostic (VLA) Go-level kernels for all 11 SIMD-accelerated paths, chunking by detected VL.
+  - [ ] Write SVE assembly kernels (`simd_sve_arm64.s`) using Go's SVE asm support — requires arm64 SVE hardware to verify.
   - [ ] Leverage SVE2 specific instructions for complex number arithmetic and cryptography-adjacent ops.
 - **Tooling & Validation:**
   - [ ] **Benchtool:** Report active SVE vector length and performance scaling metrics.

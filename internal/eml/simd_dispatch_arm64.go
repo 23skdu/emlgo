@@ -3,10 +3,12 @@
 
 package eml
 
-
-
 func arm64AddSIMD(a, b, result []float64) {
 	n := len(a)
+	if hasSVE {
+		addSVE(a, b, result)
+		return
+	}
 	simdLen := (n / 2) * 2
 	addNEON(a[:simdLen], b[:simdLen], result[:simdLen])
 	for i := simdLen; i < n; i++ {
@@ -16,6 +18,10 @@ func arm64AddSIMD(a, b, result []float64) {
 
 func arm64SubSIMD(a, b, result []float64) {
 	n := len(a)
+	if hasSVE {
+		subSVE(a, b, result)
+		return
+	}
 	simdLen := (n / 2) * 2
 	subNEON(a[:simdLen], b[:simdLen], result[:simdLen])
 	for i := simdLen; i < n; i++ {
@@ -25,6 +31,10 @@ func arm64SubSIMD(a, b, result []float64) {
 
 func arm64MulSIMD(a, b, result []float64) {
 	n := len(a)
+	if hasSVE {
+		mulSVE(a, b, result)
+		return
+	}
 	simdLen := (n / 2) * 2
 	mulNEON(a[:simdLen], b[:simdLen], result[:simdLen])
 	for i := simdLen; i < n; i++ {
@@ -34,6 +44,10 @@ func arm64MulSIMD(a, b, result []float64) {
 
 func arm64DivSIMD(a, b, result []float64) {
 	n := len(a)
+	if hasSVE {
+		divSVE(a, b, result)
+		return
+	}
 	simdLen := (n / 2) * 2
 	divNEON(a[:simdLen], b[:simdLen], result[:simdLen])
 	for i := simdLen; i < n; i++ {
@@ -43,6 +57,10 @@ func arm64DivSIMD(a, b, result []float64) {
 
 func arm64AddScalarSIMD(a []float64, b float64, result []float64) {
 	n := len(a)
+	if hasSVE {
+		addScalarSVE(a, b, result)
+		return
+	}
 	simdLen := (n / 2) * 2
 	addScalarNEON(a[:simdLen], b, result[:simdLen])
 	for i := simdLen; i < n; i++ {
@@ -52,6 +70,10 @@ func arm64AddScalarSIMD(a []float64, b float64, result []float64) {
 
 func arm64MulScalarSIMD(a []float64, b float64, result []float64) {
 	n := len(a)
+	if hasSVE {
+		mulScalarSVE(a, b, result)
+		return
+	}
 	simdLen := (n / 2) * 2
 	mulScalarNEON(a[:simdLen], b, result[:simdLen])
 	for i := simdLen; i < n; i++ {
@@ -60,6 +82,10 @@ func arm64MulScalarSIMD(a []float64, b float64, result []float64) {
 }
 
 func arm64SqrtSIMD(a, result []float64) {
+	if hasSVE {
+		sqrtSVE(a, result)
+		return
+	}
 	n := len(a)
 	simdLen := (n / 2) * 2
 	sqrtNEON(a[:simdLen], result[:simdLen])
@@ -69,18 +95,30 @@ func arm64SqrtSIMD(a, result []float64) {
 }
 
 func arm64AbsSIMD(a, result []float64) {
+	if hasSVE {
+		absSVE(a, result)
+		return
+	}
 	for i := range a {
 		result[i] = nativeAbs(a[i])
 	}
 }
 
 func arm64NegSIMD(a, result []float64) {
+	if hasSVE {
+		negSVE(a, result)
+		return
+	}
 	for i := range a {
 		result[i] = nativeNeg(a[i])
 	}
 }
 
 func arm64InvSIMD(a, result []float64) {
+	if hasSVE {
+		invSVE(a, result)
+		return
+	}
 	for i := range a {
 		result[i] = nativeInv(a[i])
 	}
@@ -88,7 +126,9 @@ func arm64InvSIMD(a, result []float64) {
 
 func emlSIMD(x, y, result []float64) {
 	n := len(x)
-	if n >= 8 {
+	if hasSVE && n >= sveVL() {
+		neonEml(x, y, result)
+	} else if n >= 8 {
 		neonEml(x, y, result)
 	} else {
 		scalarEml(x, y, result)
@@ -122,6 +162,10 @@ func detectPlatformSIMD() {
 
 func fmaSIMD(a, b, c, result []float64) {
 	n := len(a)
+	if hasSVE {
+		fmaSVE(a, b, c, result)
+		return
+	}
 	for i := 0; i < n; i++ {
 		result[i] = a[i]*b[i] + c[i]
 	}
