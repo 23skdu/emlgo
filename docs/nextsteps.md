@@ -26,12 +26,13 @@ This document outlines the roadmap for enhancing performance and stability of th
 - **Tooling & Validation:**
   - [x] **Benchtool:** Add `--device gpu` flag to track GPU vs CPU performance ratios.
   - [x] **CLI:** Add `eml gpu-status` to verify hardware availability, driver version, and compute capability.
-  - [ ] **CLI:** Add `eml gpu-bench` for quick GPU batch performance test.
-  - [ ] **Validation:** Implement ULP-based verification specifically for GPU results against Go's `math` library.
+  - [x] **CLI:** Add `eml gpu-bench` for quick GPU batch performance test (all 9 ops, multiple sizes, GPU vs CPU timing, speedup).
+  - [x] **CLI:** Add `eml gpu-verify` for ULP-based GPU result verification against Go's `math` library.
+  - [x] **Validation:** Implement `BatchVerifier` with configurable ULP tolerance and per-element error reporting.
 - **Testing:**
   - [x] **Unit Tests:** Verify kernel launch parameters and grid/block size calculations.
   - [x] **Fuzz Tests:** Fuzz GPU kernel launch configs with extreme edge cases.
-  - [ ] **End-to-End Tests:** Validate GPU results match CPU results within 1 ULP (requires CUDA hardware).
+  - [x] **End-to-End Tests:** Validate GPU results match CPU results within 1 ULP (requires CUDA hardware; build tag `cuda`).
 
 ### 2. ARM SVE/SVE2 Support
 
