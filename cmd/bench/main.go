@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/emlgo/eml/internal/gpu"
+	"github.com/emlgo/eml/internal/jit"
 	"github.com/emlgo/eml/pkg/arithmetic"
 	"github.com/emlgo/eml/pkg/fastmath"
 	"github.com/emlgo/eml/pkg/hyper"
@@ -39,7 +40,7 @@ func init() {
 	flag.BoolVar(&testAccuracy, "accuracy", false, "Test accuracy (ULP) against math library")
 	flag.StringVar(&typeFilter, "type", "all", "Type to test: all, int, uint, float32, float64, complex64, complex128")
 	flag.StringVar(&profile, "profile", "", "Profile type: cpu, mem, or block (requires pprof binary)")
-	flag.StringVar(&device, "device", "cpu", "Device to run on: cpu or gpu")
+	flag.StringVar(&device, "device", "cpu", "Device to run on: cpu, gpu, or jit")
 }
 
 type BenchmarkResult struct {
@@ -57,6 +58,11 @@ func main() {
 
 	if device == "gpu" {
 		runGpuBenchmarks()
+		return
+	}
+
+	if device == "jit" {
+		runJitBenchmarks()
 		return
 	}
 
@@ -135,6 +141,90 @@ func runGpuBenchmarks() {
 		speedup := cpuTime / gpuTime
 		fmt.Printf("%-12d %-12s %14.6f %14.6f %11.2fx\n", n, "Exp", gpuTime, cpuTime, speedup)
 	}
+}
+
+// ==================== JIT BENCHMARKS ====================
+
+func runJitBenchmarks() {
+	fmt.Println("=== JIT Polynomial Compilation Benchmark ===")
+
+	type polyExpr struct {
+		name string
+		expr string
+		goFn func(float64) float64
+	}
+
+	polys := []polyExpr{
+		{"linear", "2*x + 1", func(x float64) float64 { return 2*x + 1 }},
+		{"quadratic", "x^2 + 2*x + 1", func(x float64) float64 { return x*x + 2*x + 1 }},
+		{"cubic", "x^3 - 3*x^2 + 3*x - 1", func(x float64) float64 { return x*x*x - 3*x*x + 3*x - 1 }},
+		{"quintic", "x^5 - 3*x^4 + 2*x^3 - x^2 + 5*x - 7", func(x float64) float64 {
+			return x*x*x*x*x - 3*x*x*x*x + 2*x*x*x - x*x + 5*x - 7
+		}},
+		{"horner", "(((x + 2)*x + 3)*x + 4)*x + 5", func(x float64) float64 {
+			return (((x+2)*x+3)*x+4)*x + 5
+		}},
+	}
+
+	n := 500000
+
+	fmt.Printf("\n%-14s %14s %14s %14s %14s %12s\n",
+		"Expression", "JIT exec (s)", "Eval exec (s)", "Native exec (s)",
+		"JIT/Eval", "JIT/Go")
+	fmt.Println(strings.Repeat("-", 95))
+
+	compiler := jit.NewCompiler()
+	var compileTotal time.Duration
+
+	for _, p := range polys {
+		start := time.Now()
+		fn, err := compiler.Compile(p.expr)
+		compileTime := time.Since(start)
+		compileTotal += compileTime
+
+		if err != nil {
+			fmt.Printf("%-14s %14s %14s %14s %12s %12s\n",
+				p.name, "ERR", "ERR", "ERR", "ERR", err.Error())
+			continue
+		}
+
+		data := make([]float64, n)
+		rng := rand.New(rand.NewSource(42)) // #nosec G404 - benchmark determinism
+		for i := range data {
+			data[i] = rng.Float64()*10 - 5
+		}
+
+		ast, _ := jit.Parse(p.expr)
+
+		start = time.Now()
+		for i := 0; i < n; i++ {
+			_ = fn(data[i])
+		}
+		jitTime := time.Since(start).Seconds()
+
+		start = time.Now()
+		for i := 0; i < n; i++ {
+			_ = jit.Eval(ast, data[i])
+		}
+		evalTime := time.Since(start).Seconds()
+
+		start = time.Now()
+		for i := 0; i < n; i++ {
+			_ = p.goFn(data[i])
+		}
+		goTime := time.Since(start).Seconds()
+
+		jitEvalRatio := jitTime / evalTime
+		jitGoRatio := jitTime / goTime
+
+		fmt.Printf("%-14s %14.6f %14.6f %14.6f %13.2fx %11.2fx\n",
+			p.name, jitTime, evalTime, goTime, jitEvalRatio, jitGoRatio)
+	}
+
+	fmt.Println(strings.Repeat("-", 95))
+	avgCompile := compileTotal / time.Duration(len(polys))
+	fmt.Printf("\nAverage compilation time: %v\n", avgCompile)
+	fmt.Printf("Note: Ratio < 1 means JIT is faster than reference\n")
 }
 
 func runProfiling() {

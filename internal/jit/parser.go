@@ -269,7 +269,15 @@ func FormatAST(n Node) string {
 func FormatExpr(n Node) string {
 	switch v := n.(type) {
 	case Number:
-		return strings.TrimRight(strings.TrimRight(strconv.FormatFloat(v.Value, 'g', -1, 64), "0"), ".")
+		s := strconv.FormatFloat(v.Value, 'f', -1, 64)
+		if strings.ContainsRune(s, '.') {
+			s = strings.TrimRight(s, "0")
+			s = strings.TrimRight(s, ".")
+		}
+		if s == "" || s == "-" {
+			s = "0"
+		}
+		return s
 	case Variable:
 		return "x"
 	case UnaryOp:
@@ -314,7 +322,7 @@ func wrapBinOp(n Node, parentOp rune, left bool) string {
 	if prec(bin.Op) < prec(parentOp) {
 		return "(" + FormatExpr(n) + ")"
 	}
-	if prec(bin.Op) == prec(parentOp) && !left && bin.Op == '-' {
+	if prec(bin.Op) == prec(parentOp) && !left && (parentOp == '-' || parentOp == '/') {
 		return "(" + FormatExpr(n) + ")"
 	}
 	if prec(bin.Op) == prec(parentOp) && parentOp == '^' {

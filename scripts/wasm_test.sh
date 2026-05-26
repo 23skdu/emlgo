@@ -12,7 +12,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJ_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 WASM_DIR="$PROJ_DIR/wasm"
-WASM_EXEC_JS="$(go env GOROOT)/misc/wasm/wasm_exec.js"
+WASM_EXEC_JS="$(go env GOROOT)/lib/wasm/wasm_exec.js"
+[ ! -f "$WASM_EXEC_JS" ] && WASM_EXEC_JS="$(go env GOROOT)/misc/wasm/wasm_exec.js"
 
 MODE="${1:-test}"
 
