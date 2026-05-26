@@ -4,5 +4,3 @@
 package eml
 
 func detectSVE() { _ = hasSVE }
-
-func addSVE(a, b, result []float64) { _, _, _ = a, b, result }
