@@ -32,6 +32,13 @@ go.work.sum
 /validate
 /[Bb]ench*
 
+# CUDA build artifacts
+cuda/*.o
+cuda/eml_cuda_example
+
+# Object files
+*.o
+
 # Editor/IDE
 # .idea/
 # .vscode/

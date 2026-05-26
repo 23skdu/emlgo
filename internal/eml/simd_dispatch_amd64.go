@@ -132,14 +132,7 @@ func amd64InvSIMD(a, result []float64) {
 }
 
 func emlSIMD(x, y, result []float64) {
-	n := len(x)
-	if n >= 16 && hasAVX512 {
-		avx512Eml(x, y, result)
-	} else if n >= 8 && hasAVX2 {
-		avx2Eml(x, y, result)
-	} else {
-		scalarEml(x, y, result)
-	}
+	scalarEml(x, y, result)
 }
 
 func scalarEml(x, y, result []float64) {
