@@ -49,13 +49,15 @@ This document outlines the roadmap for enhancing performance and stability of th
 ### 3. WebAssembly SIMD Intrinsics
 
 - **Core Implementation:**
-  - [ ] Implement `wasm_simd128` kernels for all batch operations.
-  - [ ] Optimize memory alignment for WASM linear memory access.
+  - [x] Implement optimized WASM SIMD kernels for all batch operations (add, sub, mul, div, sqrt, abs, neg, inv, fma, addScalar, mulScalar) with 8-wide block unrolling for JIT auto-vectorization to `wasm_simd128`.
+  - [x] Implement WASM-specific dispatch layer (`simd_dispatch_wasm.go`) with `//go:build wasm` tag.
+  - [x] Optimize memory alignment for WASM linear memory access (`WasmAlign16`, `WasmPageAlign` utilities).
+  - [x] Add `HasWasmSIMD()` feature flag.
 - **Tooling & Validation:**
-  - [ ] **Test Harness:** Set up a `node` or `d8` based environment with SIMD enabled for CI.
-  - [ ] **Benchtool:** Create a web-based benchmark harness for browser-side performance verification.
+  - [x] **Test Harness:** Create `scripts/wasm_test.sh` — builds WASM binaries, runs with Node.js, supports `test`, `bench`, and `serve` modes.
+  - [x] **Benchtool:** Create `wasm/bench.html` — a web-based benchmark harness for browser-side performance verification, with results table and pass/fail indicators.
 - **Testing:**
-  - [ ] **Unit Tests:** Cross-platform consistency checks between WASM and Native results.
+  - [ ] **Cross-platform consistency checks:** WASM vs Native result validation (requires WASM runtime in CI).
 
 ### 4. JIT Polynomial Compilation
 
