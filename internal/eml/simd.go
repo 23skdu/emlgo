@@ -12,9 +12,10 @@ var (
 	hasAVX512 bool
 	hasNeon   bool
 	hasNeonDot bool
-	hasSVE    bool
-	hasFMA    bool
-	hasAVXVNNI bool
+	hasSVE      bool
+	hasFMA      bool
+	hasAVXVNNI  bool
+	hasWasmSIMD bool
 )
 
 func init() {
@@ -59,6 +60,8 @@ func HasSVE() bool { return hasSVE }
 func HasFMA() bool { return hasFMA }
 // HasAVXVNNI reports whether the CPU supports AVX-VNNI instructions.
 func HasAVXVNNI() bool { return hasAVXVNNI }
+// HasWasmSIMD reports whether WASM SIMD is available.
+func HasWasmSIMD() bool { return hasWasmSIMD }
 
 
 // FmaScalar returns a * b + c.

@@ -85,6 +85,7 @@ func runDemo() {
 	fmt.Printf("Has AVX2: %v\n", eml.HasAVX2())
 	fmt.Printf("Has AVX512: %v\n", eml.HasAVX512())
 	fmt.Printf("Has Neon: %v\n", eml.HasNeon())
+	fmt.Printf("Has WASM SIMD: %v\n", eml.HasWasmSIMD())
 
 	fmt.Println("\nDone!")
 }

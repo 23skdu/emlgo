@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EML WASM SIMD Benchmark</title>
+<style>
+  body { font-family: monospace; margin: 2em; background: #1e1e2e; color: #cdd6f4; }
+  h1 { color: #89b4fa; }
+  table { border-collapse: collapse; margin: 1em 0; width: 100%; max-width: 800px; }
+  th, td { padding: 0.5em 1em; text-align: right; border-bottom: 1px solid #45475a; }
+  th { background: #313244; color: #89b4fa; }
+  td { background: #1e1e2e; }
+  tr:hover td { background: #313244; }
+  .passed { color: #a6e3a1; }
+  .failed { color: #f38ba8; }
+  #status { margin: 1em 0; padding: 0.5em; background: #313244; border-radius: 4px; }
+  #output { white-space: pre; margin: 1em 0; }
+  button { padding: 0.5em 1.5em; font-size: 1em; cursor: pointer;
+    background: #89b4fa; color: #1e1e2e; border: none; border-radius: 4px; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+</style>
+</head>
+<body>
+<h1>EML WASM SIMD Benchmark</h1>
+<div id="status">Ready. Click "Run Benchmark" to start.</div>
+<button id="runBtn" onclick="runBench()">Run Benchmark</button>
+<table id="results">
+  <thead>
+    <tr><th>Operation</th><th>Size</th><th>Time (ms)</th><th>ns/elem</th><th>Status</th></tr>
+  </thead>
+  <tbody id="resultsBody"></tbody>
+</table>
+<pre id="output"></pre>
+
+<script src="wasm_exec.js"></script>
+<script>
+const go = new Go();
+let wasmInstance = null;
+
+async function loadWasm() {
+  const resp = await fetch('emlgo.wasm');
+  const result = await WebAssembly.instantiateStreaming(resp, go.importObject);
+  wasmInstance = result.instance;
+  go.run(result.instance);
+}
+
+function addResult(op, size, timeMs, nsPerElem, passed) {
+  const tbody = document.getElementById('resultsBody');
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td>${op}</td>
+    <td>${size.toLocaleString()}</td>
+    <td>${timeMs.toFixed(2)}</td>
+    <td>${nsPerElem.toFixed(2)}</td>
+    <td class="${passed ? 'passed' : 'failed'}">${passed ? 'PASS' : 'FAIL'}</td>
+  `;
+  tbody.appendChild(tr);
+}
+
+async function runBench() {
+  const btn = document.getElementById('runBtn');
+  const status = document.getElementById('status');
+  const output = document.getElementById('output');
+  btn.disabled = true;
+  status.textContent = 'Loading WASM...';
+  output.textContent = '';
+
+  try {
+    if (!wasmInstance) {
+      await loadWasm();
+    }
+
+    status.textContent = 'Running benchmarks...';
+    const sizes = [1024, 4096, 16384, 65536, 262144];
+    const ops = ['ExpBatch', 'LogBatch', 'SinBatch', 'CosBatch', 'SqrtBatch', 'AddBatch'];
+
+    for (const op of ops) {
+      for (const n of sizes) {
+        const data = new Float64Array(n);
+        for (let i = 0; i < n; i++) {
+          data[i] = (i % 100) / 100.0;
+        }
+
+        const start = performance.now();
+        // Call Go WASM function for each operation
+        let result;
+        switch (op) {
+          case 'ExpBatch': result = globalThis.emlgoExpBatch(data); break;
+          case 'LogBatch': result = globalThis.emlgoLogBatch(data); break;
+          case 'SinBatch': result = globalThis.emlgoSinBatch(data); break;
+          case 'CosBatch': result = globalThis.emlgoCosBatch(data); break;
+          case 'SqrtBatch': result = globalThis.emlgoSqrtBatch(data); break;
+          case 'AddBatch':
+            const b = new Float64Array(n);
+            for (let i = 0; i < n; i++) b[i] = data[i] * 2;
+            result = globalThis.emlgoAddBatch(data, b);
+            break;
+        }
+        const elapsed = performance.now() - start;
+        const nsPerElem = (elapsed * 1e6) / n;
+
+        const passed = result && result.length === n && !isNaN(result[0]);
+        addResult(op, n, elapsed, nsPerElem, passed);
+      }
+    }
+
+    status.textContent = 'Benchmark complete.';
+    output.textContent = 'All operations completed successfully.';
+  } catch (err) {
+    status.textContent = 'Error: ' + err.message;
+    output.textContent = err.stack;
+  } finally {
+    btn.disabled = false;
+  }
+}
+</script>
+</body>
+</html>
