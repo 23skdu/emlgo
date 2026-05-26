@@ -24,7 +24,9 @@ func main() {
 	case "demo":
 		runDemo()
 	case "gpu-status":
-		fmt.Println(gpu.Status())
+		runGpuStatus()
+	case "gpu-bench":
+		runGpuBench()
 	case "jit-test":
 		runJitTest()
 	default:
@@ -40,6 +42,7 @@ func printUsage() {
 	fmt.Println("\nCommands:")
 	fmt.Println("  demo        Run library demo")
 	fmt.Println("  gpu-status  Check GPU availability and status")
+	fmt.Println("  gpu-bench   Run a quick GPU batch performance test")
 	fmt.Println("  jit-test    Test JIT polynomial compilation")
 }
 
@@ -78,6 +81,74 @@ func runDemo() {
 	fmt.Printf("Has Neon: %v\n", eml.HasNeon())
 
 	fmt.Println("\nDone!")
+}
+
+func runGpuStatus() {
+	fmt.Println(gpu.Status())
+
+	devices, err := gpu.GetDevices()
+	if err != nil {
+		fmt.Printf("Error querying devices: %v\n", err)
+		return
+	}
+
+	if len(devices) == 0 {
+		fmt.Println("\nNo CUDA-capable GPUs detected.")
+		fmt.Println("Tip: Build with -tags cuda and ensure libeml_capi.so is in your library path.")
+		return
+	}
+
+	fmt.Println("\n--- GPU Details ---")
+	for _, d := range devices {
+		fmt.Printf("  Device %d: %s\n", d.ID, d.Name)
+		fmt.Printf("    Compute Capability: %d.%d\n", d.ComputeMajor, d.ComputeMinor)
+		fmt.Printf("    Memory: %.1f GB\n", float64(d.MemoryBytes)/1e9)
+		fmt.Printf("    Max Threads/Block: %d\n", d.MaxThreadsPerBlock)
+		fmt.Printf("    Warp Size: %d\n", d.WarpSize)
+		fmt.Printf("    Clock Rate: %.2f GHz\n", float64(d.ClockRateKHz)/1e6)
+	}
+}
+
+func runGpuBench() {
+	devices, err := gpu.GetDevices()
+	if err != nil {
+		fmt.Printf("GPU error: %v\n", err)
+		return
+	}
+	if len(devices) == 0 {
+		fmt.Println("No GPU devices available.")
+		return
+	}
+
+	device := devices[0]
+	fmt.Printf("Running GPU benchmark on %s...\n", device.Name)
+
+	sizes := []int{1024, 16384, 262144, 1048576}
+	for _, n := range sizes {
+		data := make([]float64, n)
+		for i := range data {
+			data[i] = float64(i%100) / 100.0
+		}
+
+		result, err := device.ExpBatch(data)
+		if err != nil {
+			fmt.Printf("  n=%d: ExpBatch failed: %v\n", n, err)
+			continue
+		}
+		// Verify a few results
+		ok := true
+		for i := 0; i < 10 && i < n; i++ {
+			if result[i] == 0 {
+				ok = false
+				break
+			}
+		}
+		if ok {
+			fmt.Printf("  n=%d: ExpBatch OK (first=%.6f, last=%.6f)\n", n, result[0], result[n-1])
+		} else {
+			fmt.Printf("  n=%d: ExpBatch produced zeros - possible kernel issue\n", n)
+		}
+	}
 }
 
 func runJitTest() {
