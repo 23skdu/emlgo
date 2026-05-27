@@ -3,10 +3,13 @@
 
 package eml
 
-func absScalar(x float64) float64
-func negScalar(x float64) float64
-func sqrtScalar(x float64) float64
-func fmaScalar(a, b, c float64) float64
+// Go implementations for scalar ops that the compiler inlines.
+// On arm64, hasFMA is false so FmaScalar already uses a*b+c; and
+// abs/neg/sqrt are single-instruction intrinsics from the runtime.
+func absScalar(x float64) float64  { return nativeAbs(x) }
+func negScalar(x float64) float64  { return -x }
+func sqrtScalar(x float64) float64 { return nativeSqrt(x) }
+func fmaScalar(a, b, c float64) float64 { return a*b + c }
 
 var sveVectorLength int
 
