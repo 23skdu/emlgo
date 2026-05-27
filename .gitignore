@@ -51,3 +51,6 @@ cuda/eml_cuda_example
 benchmark_results.txt
 /metal/eml_metal_shaders.air
 /metal/eml_metal_shaders.metallib
+
+# opencode config (personal)
+opencode.json
