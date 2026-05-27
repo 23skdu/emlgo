@@ -30,6 +30,7 @@ go.work.sum
 # Compiled binaries from go build
 /bench
 /validate
+/emlcli
 /[Bb]ench*
 
 # CUDA build artifacts
@@ -48,3 +49,5 @@ cuda/eml_cuda_example
 *.log
 *.prof
 benchmark_results.txt
+/metal/eml_metal_shaders.air
+/metal/eml_metal_shaders.metallib
