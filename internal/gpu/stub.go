@@ -1,4 +1,4 @@
-//go:build !cuda
+//go:build !cuda && !(darwin && arm64)
 
 package gpu
 

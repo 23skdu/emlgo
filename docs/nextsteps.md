@@ -14,7 +14,9 @@ This document outlines the roadmap for enhancing performance and stability of th
 
 ## FUTURE CONSIDERATIONS (Beyond v2.1)
 
-### 1. GPU/CUDA Production Readiness
+### 1. GPU Backend
+
+#### CUDA (Linux/Windows with NVIDIA GPU)
 
 - **Core Implementation:**
   - [x] Port all major math operators (Exp, Log, Sin, Cos, Tan, Sinh, Cosh, Tanh, Sqrt, EML) to CUDA kernels.
@@ -33,6 +35,24 @@ This document outlines the roadmap for enhancing performance and stability of th
   - [x] **Unit Tests:** Verify kernel launch parameters and grid/block size calculations.
   - [x] **Fuzz Tests:** Fuzz GPU kernel launch configs with extreme edge cases.
   - [x] **End-to-End Tests:** Validate GPU results match CPU results within 1 ULP (requires CUDA hardware; build tag `cuda`).
+
+#### Metal (macOS, Apple Silicon)
+
+- **Core Implementation:**
+  - [x] Implement all math operators (Exp, Log, Sin, Cos, Tan, Sinh, Cosh, Tanh, Sqrt, Abs, Neg, Inv, Add, Sub, Mul, Div, FMA, AddScalar, MulScalar, EML) as Metal compute kernels.
+  - [x] Create Objective-C bridge (`internal/gpu/metal_bridge.m`) with cgo integration for darwin/arm64.
+  - [x] Provide automatic Metal GPU detection on Apple Silicon (no build tags required).
+  - [x] Automatic float64<->float32 conversion at the bridge layer.
+  - [x] Unified memory usage via `MTLResourceStorageModeShared`.
+- **Tooling & Validation:**
+  - [x] **CLI:** `eml gpu-status` automatically shows Metal devices on darwin/arm64.
+  - [x] **CLI:** `eml gpu-bench` runs benchmarks on the Metal GPU.
+  - [ ] **CLI:** `eml gpu-verify` for ULP-based verification (requires double-precision shaders).
+- **Optimization Opportunities:**
+  - [ ] **Double-precision shaders:** Use `double` type in Metal for full float64 accuracy.
+  - [ ] **Buffer reuse:** Cache Metal buffers across calls to reduce allocation overhead.
+  - [ ] **Async command submission:** Use Metal command queues with multiple command buffers.
+  - [ ] **NEON SIMD assembly:** Write hand-tuned NEON assembly for 2-wide float64 arithmetic.
 
 ### 2. ARM SVE/SVE2 Support
 
