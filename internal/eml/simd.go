@@ -66,7 +66,12 @@ func HasWasmSIMD() bool { return hasWasmSIMD }
 
 // FmaScalar returns a * b + c.
 //go:inline
-func FmaScalar(a, b, c float64) float64 { return fmaScalar(a, b, c) }
+func FmaScalar(a, b, c float64) float64 {
+	if hasFMA {
+		return fmaScalar(a, b, c)
+	}
+	return a*b + c
+}
 
 // SqrtScalar returns the square root of x.
 //go:inline

@@ -2,47 +2,24 @@
 
 This document outlines the roadmap for enhancing performance and stability of the `emlgo` library.
 
-## PO BLOCKERS 🚫 (Must-Fix Before Further Work)
+## RESOLVED PO BLOCKERS
 
-### Critical
+All 12 previously identified blockers were fixed in `1c573cc`:
 
-1. **Integer overflow in GCD when negating `math.MinInt64`** — `pkg/arithmetic/arith.go:281-284`
-   `a = -a` when `a == math.MinInt64` overflows (two's complement), producing a negative value that breaks the GCD algorithm and corrupts LCM results.
-
-2. **Integer overflow in `PowInt` with `math.MinInt64` exponent** — `pkg/arithmetic/arith.go:113-125`
-   `PowInt(x, math.MinInt64)` causes `-n` to overflow back to `MinInt64`, resulting in infinite recursion and stack overflow.
-
-3. **LCM overflow guard insufficient** — `pkg/arithmetic/arith.go:293-302`
-   The bounds check only covers `a/gcd` but not the subsequent multiplication `(a/gcd) * b`. Large inputs silently overflow.
-
-4. **`fmaScalar` SIGILL on pre-Haswell CPUs** — `internal/eml/simd_amd64.s:318-330`
-   `VFMADD213SD` is issued unconditionally with no runtime `hasFMA` check. Any CPU without FMA support (pre-Haswell, non-Intel) will crash with SIGILL.
-
-5. **`WasmAlign16` alignment logic is broken** — `internal/eml/wasm_utils.go:13-24`
-   The skip calculation `(16 - int(offset>>3)) & 1` can only produce 0 or 1 regardless of actual misalignment. Silently drops elements from the slice.
-
-### Major
-
-6. **Dead SVE branch in arm64 `emlSIMD` dispatch** — `internal/eml/simd_dispatch_arm64.go:127-136`
-   The `hasSVE && n >= sveVL()` branch calls `neonEml()` — the same function as the `else if` fallback. The SVE path is dead code with no actual SVE kernel.
-
-7. **Stack buffer escapes in `AbsBatch` and `FloorBatch`** — `pkg/arithmetic/arith.go:389-413, 508-530`
-   When `64 < n < 256`, returns a slice backed by a stack-allocated `[64]float64` array — use-after-return undefined behavior.
-
-8. **Incorrect parallelization heuristic** — `pkg/arithmetic/arith.go` (all batch functions use `runtime.GOMAXPROCS(0)` instead of `runtime.NumCPU()`)
-   `GOMAXPROCS` is the Go scheduler thread limit, not the CPU count. Internal `eml` package correctly uses `NumCPU()`.
-
-9. **IEEE 754 signed zero lost in `trig.Sin`** — `pkg/trig/trig.go:35-38`
-   `if x == 0 { return 0 }` flattens both `+0.0` and `-0.0` to `+0.0`. Should use `return x` to preserve sign bit.
-
-10. **`bench/main.go` complex128 Tan benchmark compares `cmplx.Tan` to itself** — `cmd/bench/main.go:811-815`
-    Both the emlgo path and the math path call `cmplx.Tan(x)`. The benchmark produces a meaningless ratio of ~1.0.
-
-11. **Hardcoded magic thresholds duplicated across packages** — `pkg/hyper/hyper.go`, `pkg/logexp/exp.go`, `pkg/fastmath/fastmath.go`
-    `709.78` (near `math.Ln(math.MaxFloat64)`) and `-745.13` are repeated as raw float literals with no named constants.
-
-12. **`PowInt` uses O(n) loop** — `pkg/arithmetic/arith.go:120-124`
-    Exponentiation by repeated multiplication instead of O(log n) binary exponentiation.
+| # | Issue | Fix |
+|---|-------|-----|
+| 1 | GCD MinInt64 overflow | Substituted `math.MaxInt64` when input equals `math.MinInt64` (can't negate) |
+| 2 | PowInt MinInt64 overflow | Special-cased `n == math.MinInt64` → compute as `1 / (PowInt(x, MaxInt64) * x)` |
+| 3 | LCM overflow guard | Added full signed overflow check on `quot * b` (all 4 sign combinations) |
+| 4 | fmaScalar SIGILL | Added `if hasFMA` runtime guard in the Go wrapper before calling `VFMADD213SD` |
+| 5 | WasmAlign16 alignment | Replaced broken bit-fiddling with direct `uintptr & 15` check; skip at most 1 element |
+| 6 | Dead SVE branch in emlSIMD | Removed the `hasSVE` branch (was calling `neonEml` anyway) |
+| 7 | Stack buffer escape in AbsBatch/FloorBatch | Always heap-allocate with `make([]float64, n)`, removed `[64]float64` stack buffer |
+| 8 | GOMAXPROCS(0) → NumCPU() | Replaced all 12 occurrences in batch functions |
+| 9 | Signed zero in trig.Sin | Changed `return 0` to `return x` to preserve IEEE 754 signed zero |
+| 10 | complex128 Tan benchmark | Implemented `trigComplexTan` using emlgo's Sin/Cos, benchmark now measures real code |
+| 11 | Magic thresholds | Named constants: `expOverflow`, `expUnderflow` in each package with doc comments |
+| 12 | PowInt O(n) → O(log n) | Replaced linear loop with binary exponentiation (exponentiation by squaring) |
 
 ---
 

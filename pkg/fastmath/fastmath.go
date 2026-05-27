@@ -20,6 +20,11 @@ func FMA(x, y, z float64) float64 {
 // Exp returns e^x.
 // It uses a polynomial approximation optimized with FMA.
 // Accuracy: ~1e-7 in the primary range.
+//
+// Overflow/underflow thresholds approximate ln(MaxFloat64) and ln(SmallestNonzeroFloat64).
+const expOverflowFm = 709.78
+const expUnderflowFm = -745.13
+
 func Exp(x float64) float64 {
 	const (
 		Log2E = 1.44269504088896340736 // 1/ln(2)
@@ -27,8 +32,8 @@ func Exp(x float64) float64 {
 		Ln2Lo = 1.9082149292705877000e-10
 	)
 	
-	if x > 709.78 { return math.Inf(1) }
-	if x < -745.13 { return 0 }
+	if x > expOverflowFm { return math.Inf(1) }
+	if x < expUnderflowFm { return 0 }
 	
 	k := math.Round(x * Log2E)
 	r := x - k*Ln2Hi - k*Ln2Lo

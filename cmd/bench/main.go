@@ -809,7 +809,7 @@ func runComplex128Benchmarks() []BenchmarkResult {
 	}))
 
 	results = append(results, benchmarkComplex128("complex128", "Tan", func(x complex128) complex128 {
-		return cmplx.Tan(x)
+		return trigComplexTan(real(x), imag(x))
 	}, func(x complex128) complex128 {
 		return cmplx.Tan(x)
 	}))
@@ -985,6 +985,10 @@ func trigComplexCos(r, i float64) complex128 {
 	sinX, cosX := trig.SinCos(r)
 	sinhI, coshI := trig.SinhCosh(i)
 	return complex(cosX*coshI, -sinX*sinhI)
+}
+
+func trigComplexTan(r, i float64) complex128 {
+	return trigComplexSin(r, i) / trigComplexCos(r, i)
 }
 
 func complexExp(r, i float64) complex128 {

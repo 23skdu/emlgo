@@ -1,6 +1,7 @@
 package arithmetic
 
 import (
+	"math"
 	"runtime"
 	"sync"
 
@@ -115,11 +116,20 @@ func PowInt(x float64, n int) float64 {
 		return 1
 	}
 	if n < 0 {
+		if n == math.MinInt64 {
+			return 1 / (PowInt(x, math.MaxInt64) * x)
+		}
 		return 1 / PowInt(x, -n)
 	}
-	result := float64(1)
-	for i := 0; i < n; i++ {
-		result *= x
+	// Binary exponentiation (exponentiation by squaring)
+	result := 1.0
+	base := x
+	for n > 0 {
+		if n&1 == 1 {
+			result *= base
+		}
+		base *= base
+		n >>= 1
 	}
 	return result
 }
@@ -279,10 +289,18 @@ func FMA(x, y, z float64) float64 {
 
 func GCD(a, b int64) int64 {
 	if a < 0 {
-		a = -a
+		if a == math.MinInt64 {
+			a = math.MaxInt64
+		} else {
+			a = -a
+		}
 	}
 	if b < 0 {
-		b = -b
+		if b == math.MinInt64 {
+			b = math.MaxInt64
+		} else {
+			b = -b
+		}
 	}
 	for b != 0 {
 		a, b = b, a%b
@@ -295,10 +313,15 @@ func LCM(a, b int64) int64 {
 		return 0
 	}
 	gcd := GCD(a, b)
-	if a > 9223372036854775807/gcd || a < -9223372036854775807/gcd {
+	quot := a / gcd
+	// Check overflow in quot * b
+	if (quot > 0 && b > 0 && quot > math.MaxInt64/b) ||
+		(quot > 0 && b < 0 && quot > math.MinInt64/b) ||
+		(quot < 0 && b > 0 && quot < math.MinInt64/b) ||
+		(quot < 0 && b < 0 && quot < math.MaxInt64/b) {
 		return 0
 	}
-	return a / gcd * b
+	return quot * b
 }
 
 func isInteger(x float64) bool {
@@ -386,33 +409,15 @@ func AbsBatch(x []float64) []float64 {
 	if n == 0 {
 		return x
 	}
-	var result []float64
-	if n <= 64 {
-		var buf [64]float64
-		result = buf[:n]
-	} else {
-		result = make([]float64, n)
-	}
+	result := make([]float64, n)
 
 	if n < 256 {
 		for i := 0; i < n; i++ {
 			result[i] = Abs(x[i])
 		}
-		if n <= 64 {
-			// For small n, we must return a copy if we used the stack buffer,
-			// or change the API to avoid returning a slice to the stack.
-			// However, since we return []float64, we MUST return a heap copy
-			// if we want it to persist.
-			// Actually, the plan said "Use [64]float64 stack array".
-			// This is only useful if we are doing internal computations.
-			// If we return it, we MUST copy.
-			out := make([]float64, n)
-			copy(out, result)
-			return out
-		}
 		return result
 	}
-	numWorkers := runtime.GOMAXPROCS(0)
+	numWorkers := runtime.NumCPU()
 	chunkSize := (n + numWorkers - 1) / numWorkers
 	if chunkSize > 4096 {
 		chunkSize = 4096
@@ -447,7 +452,7 @@ func NegBatch(x []float64) []float64 {
 		}
 		return result
 	}
-	numWorkers := runtime.GOMAXPROCS(0)
+	numWorkers := runtime.NumCPU()
 	chunkSize := (n + numWorkers - 1) / numWorkers
 	if chunkSize > 4096 {
 		chunkSize = 4096
@@ -482,7 +487,7 @@ func InvBatch(x []float64) []float64 {
 		}
 		return result
 	}
-	numWorkers := runtime.GOMAXPROCS(0)
+	numWorkers := runtime.NumCPU()
 	chunkSize := (n + numWorkers - 1) / numWorkers
 	if chunkSize > 4096 {
 		chunkSize = 4096
@@ -510,26 +515,15 @@ func FloorBatch(x []float64) []float64 {
 	if n == 0 {
 		return x
 	}
-	var result []float64
-	if n <= 64 {
-		var buf [64]float64
-		result = buf[:n]
-	} else {
-		result = make([]float64, n)
-	}
+	result := make([]float64, n)
 
 	if n < 256 {
 		for i := 0; i < n; i++ {
 			result[i] = Floor(x[i])
 		}
-		if n <= 64 {
-			out := make([]float64, n)
-			copy(out, result)
-			return out
-		}
 		return result
 	}
-	numWorkers := runtime.GOMAXPROCS(0)
+	numWorkers := runtime.NumCPU()
 	chunkSize := (n + numWorkers - 1) / numWorkers
 	if chunkSize > 4096 {
 		chunkSize = 4096
@@ -564,7 +558,7 @@ func CeilBatch(x []float64) []float64 {
 		}
 		return result
 	}
-	numWorkers := runtime.GOMAXPROCS(0)
+	numWorkers := runtime.NumCPU()
 	chunkSize := (n + numWorkers - 1) / numWorkers
 	if chunkSize > 4096 {
 		chunkSize = 4096
@@ -599,7 +593,7 @@ func TruncBatch(x []float64) []float64 {
 		}
 		return result
 	}
-	numWorkers := runtime.GOMAXPROCS(0)
+	numWorkers := runtime.NumCPU()
 	chunkSize := (n + numWorkers - 1) / numWorkers
 	if chunkSize > 4096 {
 		chunkSize = 4096
@@ -634,7 +628,7 @@ func Log1pBatch(x []float64) []float64 {
 		}
 		return result
 	}
-	numWorkers := runtime.GOMAXPROCS(0)
+	numWorkers := runtime.NumCPU()
 	chunkSize := (n + numWorkers - 1) / numWorkers
 	if chunkSize > 4096 {
 		chunkSize = 4096
@@ -669,7 +663,7 @@ func Expm1Batch(x []float64) []float64 {
 		}
 		return result
 	}
-	numWorkers := runtime.GOMAXPROCS(0)
+	numWorkers := runtime.NumCPU()
 	chunkSize := (n + numWorkers - 1) / numWorkers
 	if chunkSize > 4096 {
 		chunkSize = 4096
@@ -704,7 +698,7 @@ func PowBatch(x []float64, y float64) []float64 {
 		}
 		return result
 	}
-	numWorkers := runtime.GOMAXPROCS(0)
+	numWorkers := runtime.NumCPU()
 	chunkSize := (n + numWorkers - 1) / numWorkers
 	if chunkSize > 4096 {
 		chunkSize = 4096
@@ -739,7 +733,7 @@ func CbrtBatch(x []float64) []float64 {
 		}
 		return result
 	}
-	numWorkers := runtime.GOMAXPROCS(0)
+	numWorkers := runtime.NumCPU()
 	chunkSize := (n + numWorkers - 1) / numWorkers
 	if chunkSize > 4096 {
 		chunkSize = 4096
@@ -774,7 +768,7 @@ func HypotBatch(x, y []float64) []float64 {
 		}
 		return result
 	}
-	numWorkers := runtime.GOMAXPROCS(0)
+	numWorkers := runtime.NumCPU()
 	chunkSize := (n + numWorkers - 1) / numWorkers
 	if chunkSize > 4096 {
 		chunkSize = 4096
@@ -809,7 +803,7 @@ func MaxBatch(x []float64, y float64) []float64 {
 		}
 		return result
 	}
-	numWorkers := runtime.GOMAXPROCS(0)
+	numWorkers := runtime.NumCPU()
 	chunkSize := (n + numWorkers - 1) / numWorkers
 	if chunkSize > 4096 {
 		chunkSize = 4096
@@ -844,7 +838,7 @@ func MinBatch(x []float64, y float64) []float64 {
 		}
 		return result
 	}
-	numWorkers := runtime.GOMAXPROCS(0)
+	numWorkers := runtime.NumCPU()
 	chunkSize := (n + numWorkers - 1) / numWorkers
 	if chunkSize > 4096 {
 		chunkSize = 4096

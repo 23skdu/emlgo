@@ -126,9 +126,7 @@ func arm64InvSIMD(a, result []float64) {
 
 func emlSIMD(x, y, result []float64) {
 	n := len(x)
-	if hasSVE && n >= sveVL() {
-		neonEml(x, y, result)
-	} else if n >= 8 {
+	if n >= 8 {
 		neonEml(x, y, result)
 	} else {
 		scalarEml(x, y, result)
