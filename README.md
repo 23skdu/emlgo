@@ -2,6 +2,10 @@
 
 A high-performance mathematical library for Go, implementing elementary functions using the EML (Exp-Minus-Log) operator. Optimized for massive parallelization and SIMD-accelerated batch processing.
 
+This implementation is based on the research of **Andrzej Odrzywołek**, who proved that all elementary functions can be derived from a single EML operator. See the original paper:
+
+> [All elementary functions from a single operator](https://arxiv.org/abs/2603.21852v2) — Andrzej Odrzywołek (2026)
+
 ## Executive Summary
 
 `emlgo` is designed to bridge the gap between pure Go portability and the performance of native C/C++ math libraries. By leveraging architecture-specific assembly kernels (AVX2, AVX512, NEON) and the novel EML operator, it provides:
@@ -139,7 +143,3 @@ emlgo/
 - **Performance**: SIMD batch operations for large data processing
 - **Accuracy**: Matches math library to within tolerance (validation: 375/375 pass)
 
-## References
-
-- [All elementary functions from a single operator](https://arxiv.org/abs/2603.21852v2) - Andrzej Odrzywołek (2026)
-- Related: Kolmogorov-Arnold Networks (KAN) for similar tree structures
