@@ -6,21 +6,19 @@ import "unsafe"
 
 // WasmAlign16 returns a slice whose underlying array is aligned to 16 bytes.
 // This enables WASM JIT to emit aligned wasm_simd128 load/store instructions.
+// Go guarantees float64 slices are 8-byte aligned; this skips at most one
+// element to reach 16-byte alignment.
 func WasmAlign16(x []float64) []float64 {
 	if len(x) == 0 {
 		return x
 	}
-	ptr := uintptr(unsafe.Pointer(&x[0]))
-	offset := ptr & 15
-	if offset == 0 {
+	if uintptr(unsafe.Pointer(&x[0]))&15 == 0 {
 		return x
 	}
-	// Drop up to 1 element to realign
-	skip := (16 - int(offset>>3)) & 1
-	if skip >= len(x) {
-		return x
+	if len(x) > 1 {
+		return x[1:]
 	}
-	return x[skip:]
+	return x
 }
 
 // WasmPageSize is the WASM page size (64 KiB).

@@ -15,6 +15,10 @@ var (
 	nativeAbs  = eml.Abs
 )
 
+// Overflow threshold for exp-based hyperbolic functions:
+// ln(MaxFloat64) ≈ 709.78 — exp(x) overflows to +Inf beyond this.
+const expOverflow = 709.78
+
 func Sinh(x float64) float64 {
 	if isNaN(x) {
 		return x
@@ -22,7 +26,7 @@ func Sinh(x float64) float64 {
 	if isInf(x, 0) {
 		return x
 	}
-	if x > 709.78 || x < -709.78 {
+	if x > expOverflow || x < -expOverflow {
 		if x > 0 {
 			return inf(1)
 		}
@@ -40,7 +44,7 @@ func Cosh(x float64) float64 {
 	if isInf(x, 0) {
 		return nativeAbs(x)
 	}
-	if x > 709.78 || x < -709.78 {
+	if x > expOverflow || x < -expOverflow {
 		return inf(1)
 	}
 	ex := nativeExp(x)
@@ -52,10 +56,10 @@ func Tanh(x float64) float64 {
 	if isNaN(x) {
 		return x
 	}
-	if x >= 709.78 || isInf(x, 1) {
+	if x >= expOverflow || isInf(x, 1) {
 		return 1
 	}
-	if x <= -709.78 || isInf(x, -1) {
+	if x <= -expOverflow || isInf(x, -1) {
 		return -1
 	}
 	ex := nativeExp(x)

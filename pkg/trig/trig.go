@@ -33,7 +33,7 @@ func Sin(x float64) float64 {
 		return nan()
 	}
 	if x == 0 {
-		return 0
+		return x // preserve signed zero
 	}
 	return nativeSin(x)
 }
@@ -276,7 +276,7 @@ func SinFast(x float64) float64 {
 		return nan()
 	}
 	if x == 0 {
-		return 0
+		return x // preserve signed zero
 	}
 	return math.Sin(x)
 }
