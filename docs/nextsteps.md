@@ -99,7 +99,7 @@ All 12 previously identified blockers were fixed in `1c573cc`:
   - `[x]` **Test Harness:** Create `scripts/wasm_test.sh` — builds WASM binaries, runs with Node.js, supports `test`, `bench`, and `serve` modes.
   - `[x]` **Benchtool:** Create `wasm/bench.html` — a web-based benchmark harness for browser-side performance verification, with results table and pass/fail indicators.
 - **Testing:**
-  - `[ ]` **Cross-platform consistency checks:** WASM vs Native result validation (requires WASM runtime in CI).
+  - `[x]` **Cross-platform consistency checks:** WASM vs Native result validation (requires WASM runtime in CI).
 
 ### 4. JIT Polynomial Compilation
 
