@@ -65,6 +65,7 @@ graph TD
 * **Current State:** Implemented.
 * **Implementation details:** Exponentiation is unrolled using a binary exponentiation algorithm. Powers of 2 require $O(\log n)$ squarings and 0 accumulator moves. Non-powers of 2 use `xmm1` as a temporary accumulator, completing in $O(\log n)$ multiplications without stack traffic.
 
-### 10. High-Accuracy branchless Cody-Waite Range Reductions in FastMath
-* **Current State:** `pkg/fastmath` functions revert to standard library `math.Sin` or `math.Cos` fallbacks for values outside $[-\pi/2, \pi/2]$.
-* **Proposed Plan:** Replace fallbacks with a branchless Cody-Waite range reduction scheme. High-degree minimax polynomials optimized with the Remez algorithm can then compute accurate trigonometric and transcendental approximations across the entire range with sub-5-ULP error margins while avoiding standard library context-switch overheads.
+### 10. High-Accuracy branchless Cody-Waite Range Reductions in FastMath [COMPLETED]
+* **Current State:** Implemented.
+* **Implementation details:** Replaced the fallback logic with a fully branchless Cody-Waite range reduction (modulo $\pi/4$) and minimax polynomials (Cephes coefficients) for Sin and Cos. The implementation matches `math.Sin` and `math.Cos` up to sub-5 ULP across the entire input range while avoiding branching and standard library context switches.
+
