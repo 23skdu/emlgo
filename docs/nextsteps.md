@@ -27,13 +27,13 @@ graph TD
     A --> E[10. Branchless Range Reductions]
 ```
 
-### 1. AVX2 & AVX512 Vectorization for Scalar & Unary Batch Ops
-* **Current State:** Unary/scalar batch operations (e.g. `AddScalarSIMD`, `MulScalarSIMD`, `SqrtSIMD`, `AbsSIMD`, `NegSIMD`, `InvSIMD`) in `internal/eml/simd_dispatch_amd64.go` are implemented using plain Go loops.
-* **Proposed Plan:** Rewrite these wrappers to call hand-tuned AVX2/AVX512 assembly kernels. Vectorizing unary ops (e.g., using `VSQRTPD` or bitwise masks for `VANDPD` absolute values) will unlock substantial throughput gains for large slices on x86_64.
+### 1. AVX2 & AVX512 Vectorization for Scalar & Unary Batch Ops [COMPLETED]
+* **Current State:** Implemented.
+* **Implementation details:** Added hand-tuned AVX2 and AVX512 assembly kernels for all scalar and unary batch operations (AddScalarSIMD, MulScalarSIMD, SqrtSIMD, AbsSIMD, NegSIMD, InvSIMD) utilizing YMM registers and branchless masking.
 
-### 2. AVX2 & AVX512 Vectorized Transcendental Batch Kernels
-* **Current State:** Batch transcendental functions (`Exp`, `Log`, `Sin`, `Cos`, `Tan`) are parallelized using goroutines but run scalar math code on each thread.
-* **Proposed Plan:** Implement vectorized minimax approximations directly inside the AVX2/AVX512 assembly files. Processing 4 (AVX2) or 8 (AVX512) `float64` values per instruction using fused multiply-add (`VFMADD213PD`) will remove the scalar transcendental bottleneck.
+### 2. AVX2 & AVX512 Vectorized Transcendental Batch Kernels [COMPLETED]
+* **Current State:** Implemented.
+* **Implementation details:** Hand-coded AVX2 and AVX512 vectorized approximations for exp, log, sin, cos, and tan. Optimized using high-precision Remez and Cody-Waite reduction algorithms and fused multiply-add.
 
 ### 3. Native ARM64 NEON & SVE/SVE2 Assembly Kernels
 * **Current State:** `internal/eml/simd_arm64.s` is empty. The SVE and NEON dispatchers in `simd_arm64.go` simulate SIMD execution using plain Go loops.
@@ -45,20 +45,17 @@ graph TD
 * **Current State:** Implemented. A channel-based lock-free worker pool is pre-allocated at package init based on the number of CPU cores.
 * **Implementation details:** Replaced dynamic `sync.WaitGroup` goroutine spawning in `parallelizeGeneric` and `parallelizeSinCos` with job queues dispatched to pre-started worker threads. Small payloads bypass the pool to execute synchronously without channel overhead.
 
-### 5. Zero-Copy Metal GPU Bridge & Pipeline Cache
-* **Current State:** The Metal C bridge (`internal/gpu/metal_bridge.m`) performs synchronous heap allocations, explicitly casts `double` to `float` (and back) on the CPU, compiles compute pipelines on every launch, and uses blocking command buffer waits.
-* **Proposed Plan:**
-  - Create a static pipeline state cache during initialization to avoid rebuilding compute pipelines on every run.
-  - Implement double-precision shader execution (`double` type in Metal) to eliminate CPU-side float/double conversions.
-  - Switch to async command queues and double-buffering to allow overlapping GPU execution with host calculations.
+### 5. Zero-Copy Metal GPU Bridge & Pipeline Cache [COMPLETED]
+* **Current State:** Implemented.
+* **Implementation details:** Rewrote the Metal bridge with zero-copy double-precision shaders, built static pipeline cache at initialization, and implemented an automatic GPU/CPU fallback mechanism to handle non-Apple/non-Metal platforms transparently.
 
 ### 6. Zero-Allocation GPU Device Memory Pool (CUDA) [COMPLETED]
 * **Current State:** Implemented. A thread-safe device memory allocator/pool buffers device pointers in Go.
 * **Implementation details:** The CUDA bridge uses a mutex-protected slice (`pool`) to cache and reuse `unsafe.Pointer` handles for device memory. The driver allocation overhead (`eml_allocate`) is reduced to zero for successive iterations of short GPU pipelines. Memory is gracefully released back to the driver during package shutdown.
 
-### 7. Vectorized Loop Code Generation in JIT Compiler
-* **Current State:** The JIT compiler (`internal/jit/codegen.go`) only compiles expressions to execute on a single scalar `float64` input.
-* **Proposed Plan:** Extend the JIT compilation engine to accept `[]float64` slices. The compiled machine code should emit a structured loop that handles loop setup, iterates over slice chunks using AVX2 or AVX512 registers, and performs remainder handling—allowing runtime-compiled mathematical expressions to run at full SIMD speeds.
+### 7. Vectorized Loop Code Generation in JIT Compiler [COMPLETED]
+* **Current State:** Implemented.
+* **Implementation details:** Extended JIT codegen to support batch vector operations (`EvaluateSIMD`) with auto-generated loop machinery, AVX2 SIMD compilation, and scalar remainder cleanup loops.
 
 ### 8. Register Allocation Engine for JIT Codegen [COMPLETED]
 * **Current State:** Implemented. The JIT engine now uses a simple register allocation tracker utilizing scratch registers `xmm0` through `xmm14` (excluding `xmm15` reserved for variable `x`).
