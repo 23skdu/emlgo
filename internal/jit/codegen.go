@@ -9,14 +9,7 @@ import (
 )
 
 const (
-	rax byte = 0
-	rcx     = 1
-	rdx     = 2
-	rbx     = 3
-	rsp     = 4
-	rbp     = 5
-	rsi     = 6
-	rdi     = 7
+	rsp byte = 4
 )
 
 type encoder struct {
@@ -152,58 +145,81 @@ func (e *encoder) sqrtsd(dst, src byte) { e.sse2(0xF2, 0x51, dst, src) }
 const xReg byte = 15
 
 type generator struct {
-	enc encoder
+	enc  encoder
+	used [16]bool
 }
 
-func (g *generator) gen(n Node) error {
+func (g *generator) alloc() (byte, error) {
+	for i := byte(0); i < 15; i++ { // Skip xReg (15)
+		if !g.used[i] {
+			g.used[i] = true
+			return i, nil
+		}
+	}
+	return 0, fmt.Errorf("out of register resources")
+}
+
+func (g *generator) free(reg byte) {
+	if reg < 16 {
+		g.used[reg] = false
+	}
+}
+
+func (g *generator) gen(n Node, dst byte) error {
 	switch v := n.(type) {
 	case Number:
 		idx := g.enc.addPool(v.Value)
-		g.enc.loadConstant(0, idx)
+		g.enc.loadConstant(dst, idx)
 	case Variable:
-		g.enc.movsdXmmXmm(0, xReg)
+		g.enc.movsdXmmXmm(dst, xReg)
 	case UnaryOp:
-		if err := g.gen(v.Operand); err != nil {
+		if err := g.gen(v.Operand, dst); err != nil {
 			return err
 		}
-		g.enc.push()
+		tmp, err := g.alloc()
+		if err != nil {
+			return err
+		}
+		defer g.free(tmp)
 		idx := g.enc.addPool(-1)
-		g.enc.loadConstant(0, idx)
-		g.enc.popTo(1)
-		g.enc.mulsd(1, 0)
-		g.enc.movsdXmmXmm(0, 1)
+		g.enc.loadConstant(tmp, idx)
+		g.enc.mulsd(dst, tmp)
 	case BinaryOp:
 		if v.Op == '^' {
-			return g.genPow(v.Left, v.Right)
+			return g.genPow(v.Left, v.Right, dst)
 		}
-		if err := g.gen(v.Left); err != nil {
+		if err := g.gen(v.Left, dst); err != nil {
 			return err
 		}
-		g.enc.push()
-		if err := g.gen(v.Right); err != nil {
+		tmp, err := g.alloc()
+		if err != nil {
 			return err
 		}
-		g.enc.popTo(1)
+		if err := g.gen(v.Right, tmp); err != nil {
+			g.free(tmp)
+			return err
+		}
 		switch v.Op {
 		case '+':
-			g.enc.addsd(1, 0)
+			g.enc.addsd(dst, tmp)
 		case '-':
-			g.enc.subsd(1, 0)
+			g.enc.subsd(dst, tmp)
 		case '*':
-			g.enc.mulsd(1, 0)
+			g.enc.mulsd(dst, tmp)
 		case '/':
-			g.enc.divsd(1, 0)
+			g.enc.divsd(dst, tmp)
 		default:
+			g.free(tmp)
 			return fmt.Errorf("unsupported operator: %c", v.Op)
 		}
-		g.enc.movsdXmmXmm(0, 1)
+		g.free(tmp)
 	case FunctionCall:
 		return fmt.Errorf("function calls not supported in JIT codegen: %s", v.Name)
 	}
 	return nil
 }
 
-func (g *generator) genPow(base, exp Node) error {
+func (g *generator) genPow(base, exp Node, dst byte) error {
 	num, ok := exp.(Number)
 	if !ok {
 		return fmt.Errorf("only constant integer exponents are supported in JIT codegen")
@@ -215,27 +231,58 @@ func (g *generator) genPow(base, exp Node) error {
 	n := int(e)
 	if n == 0 {
 		idx := g.enc.addPool(1)
-		g.enc.loadConstant(0, idx)
+		g.enc.loadConstant(dst, idx)
 		return nil
 	}
-	if err := g.gen(base); err != nil {
+	if err := g.gen(base, dst); err != nil {
 		return err
 	}
-	for i := 1; i < n; i++ {
-		g.enc.push()
+	
+	// If n is a power of two, we can avoid allocating any accumulator register.
+	if (n & (n - 1)) == 0 {
+		for n > 1 {
+			g.enc.mulsd(dst, dst)
+			n >>= 1
+		}
+		return nil
 	}
-	for i := 1; i < n; i++ {
-		g.enc.popTo(1)
-		g.enc.mulsd(1, 0)
-		g.enc.movsdXmmXmm(0, 1)
+	
+	// Otherwise, allocate a temporary accumulator register.
+	tempReg, err := g.alloc()
+	if err != nil {
+		return err
+	}
+	defer g.free(tempReg)
+	
+	accumInitialized := false
+	
+	for n > 0 {
+		if n&1 != 0 {
+			if !accumInitialized {
+				g.enc.movsdXmmXmm(tempReg, dst)
+				accumInitialized = true
+			} else {
+				g.enc.mulsd(tempReg, dst)
+			}
+		}
+		n >>= 1
+		if n > 0 {
+			g.enc.mulsd(dst, dst)
+		}
+	}
+	
+	if accumInitialized {
+		g.enc.movsdXmmXmm(dst, tempReg)
 	}
 	return nil
 }
 
 func compileToCode(n Node) ([]byte, error) {
 	var g generator
+	g.used[0] = true    // xmm0 is the return register and holds initial x
+	g.used[xReg] = true // xmm15 (xReg) holds input variable x
 	g.enc.movsdXmmXmm(xReg, 0)
-	if err := g.gen(n); err != nil {
+	if err := g.gen(n, 0); err != nil {
 		return nil, err
 	}
 	g.enc.emit(0xC3)

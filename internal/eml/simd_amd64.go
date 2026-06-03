@@ -24,6 +24,20 @@ func mulScalarAVX512(a []float64, b float64, result []float64)
 func sqrtAVX2(a, result []float64)
 func sqrtAVX512(a, result []float64)
 
+func absAVX2(a, result []float64)
+func negAVX2(a, result []float64)
+func invAVX2(a, result []float64)
+
+func absAVX512(a, result []float64)
+func negAVX512(a, result []float64)
+func invAVX512(a, result []float64)
+
+func expAVX2(a, result []float64)
+func logAVX2(a, result []float64)
+func sinAVX2(a, result []float64)
+func cosAVX2(a, result []float64)
+func tanAVX2(a, result []float64)
+
 func fmaAVX2(a, b, c, result []float64)
 func fmaAVX512(a, b, c, result []float64)
 

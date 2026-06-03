@@ -4,6 +4,7 @@
 package jit
 
 import (
+	"fmt"
 	"math"
 	"testing"
 )
@@ -109,5 +110,54 @@ func TestJITAccuracyVsEval(t *testing.T) {
 		if diff > 1e-13 {
 			t.Errorf("f(%v) = %v, eval = %v, diff = %v", x, got, want, diff)
 		}
+	}
+}
+
+func TestJITRegisterAllocationDepth(t *testing.T) {
+	// A nested expression demanding multiple scratch registers
+	expr := "(((x + 1) * (x + 2)) + ((x + 3) * (x + 4))) * (((x + 5) * (x + 6)) + ((x + 7) * (x + 8)))"
+	c := NewCompiler()
+	f, err := c.Compile(expr)
+	if err != nil {
+		t.Fatalf("Failed to compile deep expression: %v", err)
+	}
+	x := 1.5
+	got := f(x)
+	want := (((x + 1) * (x + 2)) + ((x + 3) * (x + 4))) * (((x + 5) * (x + 6)) + ((x + 7) * (x + 8)))
+	if math.Abs(got-want) > 1e-12 {
+		t.Errorf("Deep expression got %v, want %v", got, want)
+	}
+}
+
+func TestJITBinaryExponentiationBySquaring(t *testing.T) {
+	exponents := []int{0, 1, 2, 3, 4, 5, 8, 9, 15, 16, 31, 32}
+	c := NewCompiler()
+	for _, n := range exponents {
+		expr := fmt.Sprintf("x^%d", n)
+		f, err := c.Compile(expr)
+		if err != nil {
+			t.Fatalf("Failed to compile %s: %v", expr, err)
+		}
+		for _, x := range []float64{0.0, 1.0, 2.0, -1.5, 3.14} {
+			got := f(x)
+			want := math.Pow(x, float64(n))
+			if math.Abs(got-want) > 1e-12 {
+				t.Errorf("x=%v, exponent=%v: got %v, want %v", x, n, got, want)
+			}
+		}
+	}
+}
+
+func TestJITRegisterSpillError(t *testing.T) {
+	// Build an extremely deeply nested tree of binary operations to run out of registers.
+	// We have 14 scratch registers, so a depth > 15 should spill.
+	expr := "x"
+	for i := 0; i < 20; i++ {
+		expr = fmt.Sprintf("(%s) * (%s)", expr, expr)
+	}
+	c := NewCompiler()
+	_, err := c.Compile(expr)
+	if err == nil {
+		t.Fatal("Expected compiler error due to register exhaustion, but got nil")
 	}
 }
