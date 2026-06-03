@@ -90,15 +90,28 @@ func TestSin(t *testing.T) {
 		expected float64
 	}{
 		{"zero", 0, 0},
-		{"small_pos", 0.1, 0.0998},
-		{"small_neg", -0.1, -0.0998},
-		{"large", 10, math.Sin(10)},
+		{"small_pos", 0.1, math.Sin(0.1)},
+		{"small_neg", -0.1, math.Sin(-0.1)},
+		{"pi/2", math.Pi / 2, math.Sin(math.Pi / 2)},
+		{"-pi/2", -math.Pi / 2, math.Sin(-math.Pi / 2)},
+		{"pi", math.Pi, math.Sin(math.Pi)},
+		{"large_pos", 1000.5, math.Sin(1000.5)},
+		{"large_neg", -1000.5, math.Sin(-1000.5)},
+		{"nan", math.NaN(), math.NaN()},
+		{"inf", math.Inf(1), math.NaN()},
+		{"neg_inf", math.Inf(-1), math.NaN()},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := Sin(tt.x)
-			if math.Abs(got-tt.expected) > 1e-2 {
-				t.Errorf("Sin(%v) = %v, want ~%v", tt.x, got, tt.expected)
+			if math.IsNaN(tt.expected) {
+				if !math.IsNaN(got) {
+					t.Errorf("Sin(%v) = %v, want NaN", tt.x, got)
+				}
+				return
+			}
+			if math.Abs(got-tt.expected) > 1e-14 {
+				t.Errorf("Sin(%v) = %v, want %v (diff = %e)", tt.x, got, tt.expected, math.Abs(got-tt.expected))
 			}
 		})
 	}
@@ -111,14 +124,28 @@ func TestCos(t *testing.T) {
 		expected float64
 	}{
 		{"zero", 0, 1},
-		{"small_pos", 0.1, 0.995},
-		{"large", 10, math.Cos(10)},
+		{"small_pos", 0.1, math.Cos(0.1)},
+		{"small_neg", -0.1, math.Cos(-0.1)},
+		{"pi/2", math.Pi / 2, math.Cos(math.Pi / 2)},
+		{"-pi/2", -math.Pi / 2, math.Cos(-math.Pi / 2)},
+		{"pi", math.Pi, math.Cos(math.Pi)},
+		{"large_pos", 1000.5, math.Cos(1000.5)},
+		{"large_neg", -1000.5, math.Cos(-1000.5)},
+		{"nan", math.NaN(), math.NaN()},
+		{"inf", math.Inf(1), math.NaN()},
+		{"neg_inf", math.Inf(-1), math.NaN()},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := Cos(tt.x)
-			if math.Abs(got-tt.expected) > 1e-2 {
-				t.Errorf("Cos(%v) = %v, want ~%v", tt.x, got, tt.expected)
+			if math.IsNaN(tt.expected) {
+				if !math.IsNaN(got) {
+					t.Errorf("Cos(%v) = %v, want NaN", tt.x, got)
+				}
+				return
+			}
+			if math.Abs(got-tt.expected) > 1e-14 {
+				t.Errorf("Cos(%v) = %v, want %v (diff = %e)", tt.x, got, tt.expected, math.Abs(got-tt.expected))
 			}
 		})
 	}

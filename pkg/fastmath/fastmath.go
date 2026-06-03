@@ -49,37 +49,129 @@ func Exp(x float64) float64 {
 	return math.Ldexp(p, int(k))
 }
 
+var _sin = [...]float64{
+	1.58962301576546568060e-10, // 0x3de5d8fd1fd19ccd
+	-2.50507477628578072866e-8, // 0xbe5ae5e5a9291f5d
+	2.75573136213857245213e-6,  // 0x3ec71de3567d48a1
+	-1.98412698295895385996e-4, // 0xbf2a01a019bfdf03
+	8.33333333332211858878e-3,  // 0x3f8111111110f7d0
+	-1.66666666666666307295e-1, // 0xbfc5555555555548
+}
+
+var _cos = [...]float64{
+	-1.13585365213876817300e-11, // 0xbda8fa49a0861a9b
+	2.08757008419747316778e-9,   // 0x3e21ee9d7b4e3f05
+	-2.75573141792967388112e-7,  // 0xbe927e4f7eac4bc6
+	2.48015872888517045348e-5,   // 0x3efa01a019c844f5
+	-1.38888888888730564116e-3,  // 0xbf56c16c16c14f91
+	4.16666666666665929218e-2,   // 0x3fa555555555554b
+}
+
 // Sin returns the sine of x.
-// It uses a polynomial approximation optimized with FMA.
-// Optimized for x in [-pi/2, pi/2].
+// It uses a high-accuracy branchless Cody-Waite range reduction and minimax polynomial approximation.
 func Sin(x float64) float64 {
-	// Simple range reduction for FastMath
-	if x < -1.5707963267948966 || x > 1.5707963267948966 {
-		return math.Sin(x) // Fallback for large x
+	const (
+		TwoOverPi = 0.63661977236758134308
+		PI4A      = 7.85398125648498535156e-1
+		PI4B      = 3.77489470793079817668e-8
+		PI4C      = 2.69515142907905952645e-15
+	)
+
+	if math.IsNaN(x) || math.IsInf(x, 0) {
+		return math.NaN()
 	}
-	
-	x2 := x * x
-	p := -0.0001984126984126984
-	p = eml.FmaScalar(p, x2, 0.008333333333333333)
-	p = eml.FmaScalar(p, x2, -0.16666666666666666)
-	p = eml.FmaScalar(p, x2, 1.0)
-	return x * p
+
+	sign := 1.0
+	if x < 0 {
+		x = -x
+		sign = -1.0
+	}
+
+	y := math.Round(x*TwoOverPi) * 2.0
+	k := int(y)
+
+	z := ((x - y*PI4A) - y*PI4B) - y*PI4C
+	zz := z * z
+
+	// evaluate sin
+	p_sin := _sin[0]
+	p_sin = eml.FmaScalar(p_sin, zz, _sin[1])
+	p_sin = eml.FmaScalar(p_sin, zz, _sin[2])
+	p_sin = eml.FmaScalar(p_sin, zz, _sin[3])
+	p_sin = eml.FmaScalar(p_sin, zz, _sin[4])
+	p_sin = eml.FmaScalar(p_sin, zz, _sin[5])
+	y_sin := z + z*zz*p_sin
+
+	// evaluate cos
+	p_cos := _cos[0]
+	p_cos = eml.FmaScalar(p_cos, zz, _cos[1])
+	p_cos = eml.FmaScalar(p_cos, zz, _cos[2])
+	p_cos = eml.FmaScalar(p_cos, zz, _cos[3])
+	p_cos = eml.FmaScalar(p_cos, zz, _cos[4])
+	p_cos = eml.FmaScalar(p_cos, zz, _cos[5])
+	y_cos := 1.0 - 0.5*zz + zz*zz*p_cos
+
+	// select
+	isCos := float64((k & 2) >> 1)
+	res := (1.0-isCos)*y_sin + isCos*y_cos
+
+	// sign adjustment
+	signMask := 1.0 - float64((k&4)>>1)
+	sign *= signMask
+
+	return sign * res
 }
 
 // Cos returns the cosine of x.
-// It uses a polynomial approximation optimized with FMA.
-// Optimized for x in [-pi/2, pi/2].
+// It uses a high-accuracy branchless Cody-Waite range reduction and minimax polynomial approximation.
 func Cos(x float64) float64 {
-	if x < -1.5707963267948966 || x > 1.5707963267948966 {
-		return math.Cos(x) // Fallback
+	const (
+		TwoOverPi = 0.63661977236758134308
+		PI4A      = 7.85398125648498535156e-1
+		PI4B      = 3.77489470793079817668e-8
+		PI4C      = 2.69515142907905952645e-15
+	)
+
+	if math.IsNaN(x) || math.IsInf(x, 0) {
+		return math.NaN()
 	}
-	
-	x2 := x * x
-	p := -0.001388888888888889
-	p = eml.FmaScalar(p, x2, 0.041666666666666664)
-	p = eml.FmaScalar(p, x2, -0.5)
-	p = eml.FmaScalar(p, x2, 1.0)
-	return p
+
+	if x < 0 {
+		x = -x
+	}
+
+	y := math.Round(x*TwoOverPi) * 2.0
+	k := int(y)
+
+	z := ((x - y*PI4A) - y*PI4B) - y*PI4C
+	zz := z * z
+
+	// evaluate sin
+	p_sin := _sin[0]
+	p_sin = eml.FmaScalar(p_sin, zz, _sin[1])
+	p_sin = eml.FmaScalar(p_sin, zz, _sin[2])
+	p_sin = eml.FmaScalar(p_sin, zz, _sin[3])
+	p_sin = eml.FmaScalar(p_sin, zz, _sin[4])
+	p_sin = eml.FmaScalar(p_sin, zz, _sin[5])
+	y_sin := z + z*zz*p_sin
+
+	// evaluate cos
+	p_cos := _cos[0]
+	p_cos = eml.FmaScalar(p_cos, zz, _cos[1])
+	p_cos = eml.FmaScalar(p_cos, zz, _cos[2])
+	p_cos = eml.FmaScalar(p_cos, zz, _cos[3])
+	p_cos = eml.FmaScalar(p_cos, zz, _cos[4])
+	p_cos = eml.FmaScalar(p_cos, zz, _cos[5])
+	y_cos := 1.0 - 0.5*zz + zz*zz*p_cos
+
+	// select
+	isSin := float64((k & 2) >> 1)
+	res := (1.0-isSin)*y_cos + isSin*y_sin
+
+	// sign adjustment
+	sign := 1.0 - float64(2*(((k&2)>>1)^((k&4)>>2)))
+
+	return sign * res
 }
 
 // Log returns the natural logarithm of x.
