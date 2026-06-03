@@ -12,10 +12,47 @@ import "C"
 
 import (
 	"fmt"
+	"sync"
 	"unsafe"
 )
 
 var initialized bool
+
+type deviceBuffer struct {
+	ptr  unsafe.Pointer
+	size int64
+}
+
+var (
+	poolMu sync.Mutex
+	pool   []deviceBuffer
+)
+
+func allocDeviceBuffer(size int64) (unsafe.Pointer, error) {
+	poolMu.Lock()
+	for i, b := range pool {
+		if b.size >= size {
+			ptr := b.ptr
+			pool[i] = pool[len(pool)-1]
+			pool = pool[:len(pool)-1]
+			poolMu.Unlock()
+			return ptr, nil
+		}
+	}
+	poolMu.Unlock()
+
+	var ptr unsafe.Pointer
+	if err := C.eml_allocate(&ptr, C.longlong(size)); err != 0 {
+		return nil, fmt.Errorf("device memory allocation failed: error %d", int(err))
+	}
+	return ptr, nil
+}
+
+func freeDeviceBuffer(ptr unsafe.Pointer, size int64) {
+	poolMu.Lock()
+	pool = append(pool, deviceBuffer{ptr: ptr, size: size})
+	poolMu.Unlock()
+}
 
 func init() {
 	if C.eml_init() == 0 {
@@ -35,6 +72,12 @@ func Init() error {
 // Shutdown cleans up the GPU subsystem.
 func Shutdown() {
 	if initialized {
+		poolMu.Lock()
+		for _, b := range pool {
+			C.eml_free(b.ptr)
+		}
+		pool = nil
+		poolMu.Unlock()
 		C.eml_cleanup()
 		initialized = false
 	}
@@ -136,15 +179,17 @@ func launchBatch(x []float64, fn func(int, int) C.int) ([]float64, error) {
 	var d_x, d_result unsafe.Pointer
 
 	size := C.longlong(n * 8) // float64 = 8 bytes
-	if err := C.eml_allocate(&d_x, size); err != 0 {
-		return nil, fmt.Errorf("device memory allocation failed: error %d", int(err))
+	d_x, allocErr := allocDeviceBuffer(int64(size))
+	if allocErr != nil {
+		return nil, allocErr
 	}
-	defer C.eml_free(d_x)
+	defer freeDeviceBuffer(d_x, int64(size))
 
-	if err := C.eml_allocate(&d_result, size); err != 0 {
-		return nil, fmt.Errorf("device memory allocation failed: error %d", int(err))
+	d_result, allocErr := allocDeviceBuffer(int64(size))
+	if allocErr != nil {
+		return nil, allocErr
 	}
-	defer C.eml_free(d_result)
+	defer freeDeviceBuffer(d_result, int64(size))
 
 	if err := C.eml_copy_to_device(d_x, unsafe.Pointer(&x[0]), size); err != 0 {
 		return nil, fmt.Errorf("copy to device failed: error %d", int(err))
@@ -271,14 +316,18 @@ func (d *Device) EmlBatch(x, y []float64) ([]float64, error) {
 	var d_x, d_y, d_result unsafe.Pointer
 
 	size := C.longlong(n * 8)
-	for _, ptr := range []*unsafe.Pointer{&d_x, &d_y, &d_result} {
-		if err := C.eml_allocate(ptr, size); err != 0 {
-			return nil, fmt.Errorf("device memory allocation failed: error %d", int(err))
-		}
-	}
-	defer C.eml_free(d_x)
-	defer C.eml_free(d_y)
-	defer C.eml_free(d_result)
+	
+	d_x, allocErr := allocDeviceBuffer(int64(size))
+	if allocErr != nil { return nil, allocErr }
+	defer freeDeviceBuffer(d_x, int64(size))
+	
+	d_y, allocErr = allocDeviceBuffer(int64(size))
+	if allocErr != nil { return nil, allocErr }
+	defer freeDeviceBuffer(d_y, int64(size))
+	
+	d_result, allocErr = allocDeviceBuffer(int64(size))
+	if allocErr != nil { return nil, allocErr }
+	defer freeDeviceBuffer(d_result, int64(size))
 
 	if err := C.eml_copy_to_device(d_x, unsafe.Pointer(&x[0]), size); err != 0 {
 		return nil, fmt.Errorf("copy x to device failed: error %d", int(err))
@@ -351,13 +400,13 @@ func launchBatchStream(x []float64, stream *Stream, fn func(int, int, uintptr) C
 	var d_x, d_result unsafe.Pointer
 
 	size := C.longlong(n * 8)
-	for _, ptr := range []*unsafe.Pointer{&d_x, &d_result} {
-		if err := C.eml_allocate(ptr, size); err != 0 {
-			return nil, fmt.Errorf("device memory allocation failed: error %d", int(err))
-		}
-	}
-	defer C.eml_free(d_x)
-	defer C.eml_free(d_result)
+	d_x, allocErr := allocDeviceBuffer(int64(size))
+	if allocErr != nil { return nil, allocErr }
+	defer freeDeviceBuffer(d_x, int64(size))
+
+	d_result, allocErr := allocDeviceBuffer(int64(size))
+	if allocErr != nil { return nil, allocErr }
+	defer freeDeviceBuffer(d_result, int64(size))
 
 	if err := C.eml_copy_to_device(d_x, unsafe.Pointer(&x[0]), size); err != 0 {
 		return nil, fmt.Errorf("copy to device failed: error %d", int(err))

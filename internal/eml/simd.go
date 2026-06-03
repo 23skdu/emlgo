@@ -21,6 +21,7 @@ var (
 func init() {
 	detectSIMD()
 	detectCacheTopology()
+	initWorkerPool()
 }
 
 func detectSIMD() {
@@ -367,21 +368,71 @@ func AtanhBatch(x []float64) []float64 {
 }
 
 
+type parallelJob struct {
+	x        []float64
+	result   []float64
+	sinOut   []float64
+	cosOut   []float64
+	start    int
+	end      int
+	fn       func(float64) float64
+	isSinCos bool
+	wg       *sync.WaitGroup
+}
+
+var jobQueue chan parallelJob
+
+func initWorkerPool() {
+	numWorkers := cpuNum
+	if numWorkers < 1 {
+		numWorkers = 1
+	}
+	jobQueue = make(chan parallelJob, numWorkers*8)
+	for i := 0; i < numWorkers; i++ {
+		go workerPoolWorker()
+	}
+}
+
+func workerPoolWorker() {
+	for job := range jobQueue {
+		if job.isSinCos {
+			for j := job.start; j < job.end; j++ {
+				job.sinOut[j], job.cosOut[j] = Sincos(job.x[j])
+			}
+		} else {
+			for j := job.start; j < job.end; j++ {
+				job.result[j] = job.fn(job.x[j])
+			}
+		}
+		job.wg.Done()
+	}
+}
+
 func parallelizeGeneric(x, result []float64, fn func(float64) float64) {
 	n := len(x)
 	if n == 0 { return }
+	
+	if n < SmallCutoff {
+		for j := 0; j < n; j++ {
+			result[j] = fn(x[j])
+		}
+		return
+	}
+
 	chunkSize := GetParallelChunkSize(n)
 	var wg sync.WaitGroup
 	for i := 0; i < n; i += chunkSize {
 		end := i + chunkSize
 		if end > n { end = n }
 		wg.Add(1)
-		go func(start, end int) {
-			defer wg.Done()
-			for j := start; j < end; j++ {
-				result[j] = fn(x[j])
-			}
-		}(i, end)
+		jobQueue <- parallelJob{
+			x:      x,
+			result: result,
+			start:  i,
+			end:    end,
+			fn:     fn,
+			wg:     &wg,
+		}
 	}
 	wg.Wait()
 }
@@ -389,18 +440,29 @@ func parallelizeGeneric(x, result []float64, fn func(float64) float64) {
 func parallelizeSinCos(x, sin, cos []float64) {
 	n := len(x)
 	if n == 0 { return }
+	
+	if n < SmallCutoff {
+		for j := 0; j < n; j++ {
+			sin[j], cos[j] = Sincos(x[j])
+		}
+		return
+	}
+
 	chunkSize := GetParallelChunkSize(n)
 	var wg sync.WaitGroup
 	for i := 0; i < n; i += chunkSize {
 		end := i + chunkSize
 		if end > n { end = n }
 		wg.Add(1)
-		go func(start, end int) {
-			defer wg.Done()
-			for j := start; j < end; j++ {
-				sin[j], cos[j] = Sincos(x[j])
-			}
-		}(i, end)
+		jobQueue <- parallelJob{
+			x:        x,
+			sinOut:   sin,
+			cosOut:   cos,
+			start:    i,
+			end:      end,
+			isSinCos: true,
+			wg:       &wg,
+		}
 	}
 	wg.Wait()
 }

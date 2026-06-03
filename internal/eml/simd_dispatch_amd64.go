@@ -96,36 +96,138 @@ func amd64DivSIMD(a, b, result []float64) {
 }
 
 func amd64AddScalarSIMD(a []float64, b float64, result []float64) {
+	n := len(a)
+	if hasAVX512 {
+		simdLen := (n / 8) * 8
+		addScalarAVX512(a[:simdLen], b, result[:simdLen])
+		for i := simdLen; i < n; i++ {
+			result[i] = a[i] + b
+		}
+		return
+	}
+	if hasAVX2 {
+		simdLen := (n / 4) * 4
+		addScalarAVX2(a[:simdLen], b, result[:simdLen])
+		for i := simdLen; i < n; i++ {
+			result[i] = a[i] + b
+		}
+		return
+	}
 	for i := range a {
 		result[i] = a[i] + b
 	}
 }
 
 func amd64MulScalarSIMD(a []float64, b float64, result []float64) {
+	n := len(a)
+	if hasAVX512 {
+		simdLen := (n / 8) * 8
+		mulScalarAVX512(a[:simdLen], b, result[:simdLen])
+		for i := simdLen; i < n; i++ {
+			result[i] = a[i] * b
+		}
+		return
+	}
+	if hasAVX2 {
+		simdLen := (n / 4) * 4
+		mulScalarAVX2(a[:simdLen], b, result[:simdLen])
+		for i := simdLen; i < n; i++ {
+			result[i] = a[i] * b
+		}
+		return
+	}
 	for i := range a {
 		result[i] = a[i] * b
 	}
 }
 
 func amd64SqrtSIMD(a, result []float64) {
+	n := len(a)
+	if hasAVX512 {
+		simdLen := (n / 8) * 8
+		sqrtAVX512(a[:simdLen], result[:simdLen])
+		for i := simdLen; i < n; i++ {
+			result[i] = nativeSqrt(a[i])
+		}
+		return
+	}
+	if hasAVX2 {
+		simdLen := (n / 4) * 4
+		sqrtAVX2(a[:simdLen], result[:simdLen])
+		for i := simdLen; i < n; i++ {
+			result[i] = nativeSqrt(a[i])
+		}
+		return
+	}
 	for i := range a {
 		result[i] = nativeSqrt(a[i])
 	}
 }
 
 func amd64AbsSIMD(a, result []float64) {
+	n := len(a)
+	if hasAVX512 {
+		simdLen := (n / 8) * 8
+		absAVX512(a[:simdLen], result[:simdLen])
+		for i := simdLen; i < n; i++ {
+			result[i] = nativeAbs(a[i])
+		}
+		return
+	}
+	if hasAVX2 {
+		simdLen := (n / 4) * 4
+		absAVX2(a[:simdLen], result[:simdLen])
+		for i := simdLen; i < n; i++ {
+			result[i] = nativeAbs(a[i])
+		}
+		return
+	}
 	for i := range a {
 		result[i] = nativeAbs(a[i])
 	}
 }
 
 func amd64NegSIMD(a, result []float64) {
+	n := len(a)
+	if hasAVX512 {
+		simdLen := (n / 8) * 8
+		negAVX512(a[:simdLen], result[:simdLen])
+		for i := simdLen; i < n; i++ {
+			result[i] = nativeNeg(a[i])
+		}
+		return
+	}
+	if hasAVX2 {
+		simdLen := (n / 4) * 4
+		negAVX2(a[:simdLen], result[:simdLen])
+		for i := simdLen; i < n; i++ {
+			result[i] = nativeNeg(a[i])
+		}
+		return
+	}
 	for i := range a {
 		result[i] = nativeNeg(a[i])
 	}
 }
 
 func amd64InvSIMD(a, result []float64) {
+	n := len(a)
+	if hasAVX512 {
+		simdLen := (n / 8) * 8
+		invAVX512(a[:simdLen], result[:simdLen])
+		for i := simdLen; i < n; i++ {
+			result[i] = nativeInv(a[i])
+		}
+		return
+	}
+	if hasAVX2 {
+		simdLen := (n / 4) * 4
+		invAVX2(a[:simdLen], result[:simdLen])
+		for i := simdLen; i < n; i++ {
+			result[i] = nativeInv(a[i])
+		}
+		return
+	}
 	for i := range a {
 		result[i] = nativeInv(a[i])
 	}
@@ -169,12 +271,84 @@ func fmaSIMD(a, b, c, result []float64) {
 	}
 }
 
-func dispatchExpSIMDTo(x, result []float64) { parallelizeGeneric(x, result, nativeExp) }
-func dispatchLogSIMDTo(x, result []float64) { parallelizeGeneric(x, result, nativeLog) }
-func dispatchSinSIMDTo(x, result []float64) { parallelizeGeneric(x, result, nativeSin) }
-func dispatchCosSIMDTo(x, result []float64) { parallelizeGeneric(x, result, nativeCos) }
-func dispatchTanSIMDTo(x, result []float64) { parallelizeGeneric(x, result, nativeTan) }
-func dispatchSinCosSIMDTo(x, sin, cos []float64) { parallelizeSinCos(x, sin, cos) }
+func dispatchExpSIMDTo(x, result []float64) {
+	n := len(x)
+	if hasAVX2 {
+		simdLen := (n / 4) * 4
+		expAVX2(x[:simdLen], result[:simdLen])
+		for i := simdLen; i < n; i++ {
+			result[i] = nativeExp(x[i])
+		}
+		return
+	}
+	parallelizeGeneric(x, result, nativeExp)
+}
+
+func dispatchLogSIMDTo(x, result []float64) {
+	n := len(x)
+	if hasAVX2 {
+		simdLen := (n / 4) * 4
+		logAVX2(x[:simdLen], result[:simdLen])
+		for i := simdLen; i < n; i++ {
+			result[i] = nativeLog(x[i])
+		}
+		return
+	}
+	parallelizeGeneric(x, result, nativeLog)
+}
+
+func dispatchSinSIMDTo(x, result []float64) {
+	n := len(x)
+	if hasAVX2 {
+		simdLen := (n / 4) * 4
+		sinAVX2(x[:simdLen], result[:simdLen])
+		for i := simdLen; i < n; i++ {
+			result[i] = nativeSin(x[i])
+		}
+		return
+	}
+	parallelizeGeneric(x, result, nativeSin)
+}
+
+func dispatchCosSIMDTo(x, result []float64) {
+	n := len(x)
+	if hasAVX2 {
+		simdLen := (n / 4) * 4
+		cosAVX2(x[:simdLen], result[:simdLen])
+		for i := simdLen; i < n; i++ {
+			result[i] = nativeCos(x[i])
+		}
+		return
+	}
+	parallelizeGeneric(x, result, nativeCos)
+}
+
+func dispatchTanSIMDTo(x, result []float64) {
+	n := len(x)
+	if hasAVX2 {
+		simdLen := (n / 4) * 4
+		tanAVX2(x[:simdLen], result[:simdLen])
+		for i := simdLen; i < n; i++ {
+			result[i] = nativeTan(x[i])
+		}
+		return
+	}
+	parallelizeGeneric(x, result, nativeTan)
+}
+
+func dispatchSinCosSIMDTo(x, sin, cos []float64) {
+	n := len(x)
+	if hasAVX2 {
+		simdLen := (n / 4) * 4
+		sinAVX2(x[:simdLen], sin[:simdLen])
+		cosAVX2(x[:simdLen], cos[:simdLen])
+		for i := simdLen; i < n; i++ {
+			sin[i], cos[i] = Sincos(x[i])
+		}
+		return
+	}
+	parallelizeSinCos(x, sin, cos)
+}
 func dispatchSqrtSIMDTo(x, result []float64) { amd64SqrtSIMD(x, result) }
 func dispatchAddSIMD(a, b, result []float64) { amd64AddSIMD(a, b, result) }
 func dispatchSubSIMD(a, b, result []float64) { amd64SubSIMD(a, b, result) }
