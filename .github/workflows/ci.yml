@@ -39,6 +39,12 @@ jobs:
       - name: Run benchmarks
         run: go test -bench=. -benchmem ./...
 
+      - name: Run WASM Tests and Benchmarks
+        if: matrix.platform == 'ubuntu-latest' && matrix.go-version == '1.23'
+        run: |
+          bash scripts/wasm_test.sh
+          bash scripts/wasm_test.sh bench
+
   lint:
     runs-on: ubuntu-latest
 
