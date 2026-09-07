@@ -370,15 +370,26 @@ func AtanhBatch(x []float64) []float64 {
 
 type parallelJob struct {
 	x        []float64
+	a        []float64
+	b        []float64
 	result   []float64
 	sinOut   []float64
 	cosOut   []float64
 	start    int
 	end      int
 	fn       func(float64) float64
+	fusedOp  int
 	isSinCos bool
 	wg       *sync.WaitGroup
 }
+
+const (
+	fusedNone  = 0
+	fusedExpMul = 1
+	fusedExpAdd = 2
+	fusedLogDiv = 3
+	fusedLogSub = 4
+)
 
 var jobQueue chan parallelJob
 
@@ -395,16 +406,49 @@ func initWorkerPool() {
 
 func workerPoolWorker() {
 	for job := range jobQueue {
-		if job.isSinCos {
+		switch {
+		case job.isSinCos:
 			for j := job.start; j < job.end; j++ {
 				job.sinOut[j], job.cosOut[j] = Sincos(job.x[j])
 			}
-		} else {
+		case job.fusedOp != fusedNone:
+			applyFusedOp(job)
+		default:
 			for j := job.start; j < job.end; j++ {
 				job.result[j] = job.fn(job.x[j])
 			}
 		}
 		job.wg.Done()
+	}
+}
+
+func applyFusedOp(job parallelJob) {
+	a, b, result := job.a, job.b, job.result
+	switch job.fusedOp {
+	case fusedExpMul:
+		for j := job.start; j < job.end; j++ {
+			result[j] = nativeExp(a[j]) * b[j]
+		}
+	case fusedExpAdd:
+		for j := job.start; j < job.end; j++ {
+			result[j] = nativeExp(a[j]) + b[j]
+		}
+	case fusedLogDiv:
+		for j := job.start; j < job.end; j++ {
+			if a[j] > 0 && b[j] > 0 {
+				result[j] = nativeLog(a[j]) / b[j]
+			} else {
+				result[j] = nan()
+			}
+		}
+	case fusedLogSub:
+		for j := job.start; j < job.end; j++ {
+			if a[j] > 0 {
+				result[j] = nativeLog(a[j]) - b[j]
+			} else {
+				result[j] = nan()
+			}
+		}
 	}
 }
 
@@ -462,6 +506,34 @@ func parallelizeSinCos(x, sin, cos []float64) {
 			end:      end,
 			isSinCos: true,
 			wg:       &wg,
+		}
+	}
+	wg.Wait()
+}
+
+func parallelizeFused(a, b, result []float64, fusedOp int) {
+	n := len(a)
+	if n == 0 { return }
+
+	if n < SmallCutoff {
+		applyFusedOp(parallelJob{a: a, b: b, result: result, fusedOp: fusedOp, start: 0, end: n})
+		return
+	}
+
+	chunkSize := GetParallelChunkSize(n)
+	var wg sync.WaitGroup
+	for i := 0; i < n; i += chunkSize {
+		end := i + chunkSize
+		if end > n { end = n }
+		wg.Add(1)
+		jobQueue <- parallelJob{
+			a:       a,
+			b:       b,
+			result:  result,
+			fusedOp: fusedOp,
+			start:   i,
+			end:     end,
+			wg:      &wg,
 		}
 	}
 	wg.Wait()

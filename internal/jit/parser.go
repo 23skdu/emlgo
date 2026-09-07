@@ -35,7 +35,8 @@ const (
 
 func isFuncName(s string) bool {
 	switch s {
-	case "sin", "cos", "exp", "log", "sqrt", "tan", "asin", "acos", "atan", "abs":
+	case "sin", "cos", "exp", "log", "sqrt", "tan", "asin", "acos", "atan", "abs",
+		"cbrt", "log2", "log10", "ceil", "floor", "trunc":
 		return true
 	}
 	return false
@@ -66,7 +67,7 @@ func (l *lexer) next() token {
 	}
 	if unicode.IsLetter(rune(c)) {
 		start := l.pos
-		for l.pos < len(l.input) && unicode.IsLetter(rune(l.input[l.pos])) {
+		for l.pos < len(l.input) && (unicode.IsLetter(rune(l.input[l.pos])) || (l.input[l.pos] >= '0' && l.input[l.pos] <= '9')) {
 			l.pos++
 		}
 		name := l.input[start:l.pos]
