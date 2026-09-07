@@ -156,12 +156,13 @@ Chunk size automatically adjusts based on array size and CPU count for optimal c
 - `[x]` **JIT Compiler**: x86-64 SSE2 codegen with register allocation and binary exponentiation.
 - `[x]` **Fused Operations**: ExpMul, ExpAdd, LogDiv, LogSub combined passes.
 - `[x]` **Adaptive Parallelization**: Cache-aware chunk sizing with pre-allocated worker pool.
+- `[x]` **JIT Function Calls**: 16 math functions (sin, cos, exp, log, sqrt, tan, asin, acos, atan, abs, cbrt, log2, log10, ceil, floor, trunc).
+- `[x]` **JIT Negative Exponents**: `x^-n` decomposed as `1.0/x^n`.
 
 ### Remaining Work
 
 1. **ARM64 NEON Assembly**: Write native NEON assembly kernels (currently Go loops only).
 2. **ARM64 Transcendentals**: Vectorize Exp/Log/Sin/Cos/Tan for ARM64.
-3. **JIT Function Calls**: Enable sin/cos/exp/log/sqrt codegen in JIT compiler.
 
 ---
 

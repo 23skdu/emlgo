@@ -4,18 +4,22 @@ import "math"
 
 type fusedOps struct{}
 
+// ExpMulBatch computes Exp(a[i]) * b[i] in parallel using the worker pool.
 func (f fusedOps) ExpMulBatch(a, b []float64, result []float64) {
 	parallelizeFused(a, b, result, fusedExpMul)
 }
 
+// ExpAddBatch computes Exp(a[i]) + b[i] in parallel using the worker pool.
 func (f fusedOps) ExpAddBatch(a, b []float64, result []float64) {
 	parallelizeFused(a, b, result, fusedExpAdd)
 }
 
+// LogDivBatch computes Log(a[i]) / b[i] in parallel using the worker pool.
 func (f fusedOps) LogDivBatch(a, b []float64, result []float64) {
 	parallelizeFused(a, b, result, fusedLogDiv)
 }
 
+// LogSubBatch computes Log(a[i]) - b[i] in parallel using the worker pool.
 func (f fusedOps) LogSubBatch(a, b []float64, result []float64) {
 	parallelizeFused(a, b, result, fusedLogSub)
 }

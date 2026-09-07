@@ -553,6 +553,7 @@ var ErrLengthMismatch = Error("slice length mismatch")
 // Error represents an EML package error.
 type Error string
 
+// Error returns the string representation of the error.
 func (e Error) Error() string { return string(e) }
 
 
