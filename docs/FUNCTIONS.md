@@ -207,12 +207,12 @@ Mathematical constants.
 
 ## Implementation Notes
 
-All functions in this library are implemented using the EML operator `eml(x,y) = exp(x) - ln(y)` as the single primitive. This includes:
+The core EML operator `eml(x,y) = exp(x) - ln(y)` serves as the theoretical foundation for all elementary functions. However, the actual implementations use platform-optimized paths:
 
-- **Exp/Log**: Direct EML implementations
-- **Sin/Cos/Tan**: Using complex exponentials with EML-based magnitude
-- **Sinh/Cosh/Tanh**: Using EML via logexp.Exp
-- **Sqrt**: Using exp(log(x)/2) via EML
-- **Pow**: Using exp(y * log(x)) via EML
+- **Scalar operations**: Direct implementations using `math.*` functions or hand-coded assembly (AVX2/AVX512 on AMD64).
+- **Batch operations**: SIMD-vectorized kernels that process 4-8 elements per cycle using architecture-specific assembly.
+- **FastMath**: FMA-optimized polynomial approximations with relaxed IEEE 754 compliance.
+- **JIT compiler**: x86-64 SSE2 codegen for math expressions parsed from strings.
+- **GPU backends**: CUDA and Metal kernels for massive parallel workloads.
 
-This approach follows the mathematical framework from the original EML paper.
+The EML operator is used in the `Eml()` scalar function and the GPU `EmlBatch` kernel. The mathematical framework from the original EML paper (arXiv:2603.21852v2) demonstrates that all elementary functions can be derived from this single operator, which is the theoretical basis for the library's unified design.

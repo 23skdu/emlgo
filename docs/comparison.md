@@ -148,11 +148,20 @@ Chunk size automatically adjusts based on array size and CPU count for optimal c
 - `[x]` **Fused Operations**: ExpMul, LogDiv combined passes.
 - `[x]` **Adaptive Parallelization**: Cache-aware chunk sizing.
 
-### Future Work
+### Completed (Since Last Update)
 
-1. **GPU Acceleration**: CUDA/Metal kernels for massive parallel workloads.
-2. **Hardware Transcendentals**: Use VGETEXP, VGETMANT where accuracy permits.
-3. **ARM SVE Support**: Scalable vector extension for Graviton/Neoverse.
+- `[x]` **GPU Acceleration**: CUDA and Metal kernels for massive parallel workloads.
+- `[x]` **ARM SVE/SVE2 Support**: VLA dispatch with Go-level kernels for Graviton/Neoverse.
+- `[x]` **WASM SIMD**: 8-wide unrolled kernels for browser auto-vectorization.
+- `[x]` **JIT Compiler**: x86-64 SSE2 codegen with register allocation and binary exponentiation.
+- `[x]` **Fused Operations**: ExpMul, ExpAdd, LogDiv, LogSub combined passes.
+- `[x]` **Adaptive Parallelization**: Cache-aware chunk sizing with pre-allocated worker pool.
+
+### Remaining Work
+
+1. **ARM64 NEON Assembly**: Write native NEON assembly kernels (currently Go loops only).
+2. **ARM64 Transcendentals**: Vectorize Exp/Log/Sin/Cos/Tan for ARM64.
+3. **JIT Function Calls**: Enable sin/cos/exp/log/sqrt codegen in JIT compiler.
 
 ---
 

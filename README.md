@@ -65,8 +65,8 @@ func main() {
 
 The library automatically detects and uses SIMD instructions:
 
-- **AMD64**: AVX-512 (8-wide), AVX2 (4-wide)
-- **ARM64**: NEON/ASIMD (4-wide)
+- **AMD64**: AVX-512 (8-wide float64), AVX2 (4-wide float64)
+- **ARM64**: NEON (2-wide float64), SVE/SVE2 (scalable)
 
 Batch operations automatically use SIMD:
 
@@ -125,12 +125,18 @@ emlgo/
 │   └── emlcli/       # CLI demo
 ├── internal/
 │   ├── eml/          # Core EML operator + SIMD
+│   ├── gpu/          # CUDA & Metal GPU backends
+│   ├── jit/          # JIT compiler (x86-64 codegen)
 │   └── constants/   # Mathematical constants
 ├── pkg/
 │   ├── logexp/       # Exp, Log functions
 │   ├── trig/         # Trig functions + batch ops
 │   ├── hyper/        # Hyperbolic functions
-│   └── arithmetic/   # Basic arithmetic
+│   ├── arithmetic/   # Basic arithmetic
+│   └── fastmath/     # High-performance scalar ops
+├── cuda/             # CUDA kernel source
+├── metal/            # Metal shader source
+├── wasm/             # WASM benchmark page
 ├── docs/             # Documentation
 └── scripts/          # Benchmark & validation scripts
 ```

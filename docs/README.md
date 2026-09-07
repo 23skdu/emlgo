@@ -12,7 +12,7 @@ eml(x, y) = exp(x) - ln(y)
 
 This approach enables:
 
-- **No external dependencies** - Pure Go with optional SIMD support
+- **Minimal dependencies** - Pure Go with only `golang.org/x/sys` for platform-specific primitives
 - **Unified implementation** - All functions derived from a single primitive
 - **SIMD optimizations** - Batch processing with AVX2/AVX512/NEON support
 
@@ -80,12 +80,12 @@ The library provides comparable accuracy to the standard math library while bein
 
 ## Requirements
 
-- Go 1.21 or later
-- Optional: `golang.org/x/sys/cpu` for SIMD detection
+- Go 1.26 or later
+- `golang.org/x/sys` for JIT mmap/mprotect and SIMD detection
 
 ## License
 
-MIT License - See LICENSE file for details
+The Unlicense (public domain) - See LICENSE file for details
 
 ## References
 
