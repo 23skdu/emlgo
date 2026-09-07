@@ -71,19 +71,70 @@ func TestJITLargePolynomial(t *testing.T) {
 	}
 }
 
-func TestJITFunctionError(t *testing.T) {
-	c := NewCompiler()
-	_, err := c.Compile("sin(x)")
-	if err == nil {
-		t.Fatal("expected error for function call")
+func TestJITFunctionCalls(t *testing.T) {
+	tests := []struct {
+		expr string
+		x    float64
+		want float64
+	}{
+		{"sin(x)", 0, 0},
+		{"sin(x)", 1.5707963267948966, 1},
+		{"cos(x)", 0, 1},
+		{"cos(x)", 3.141592653589793, -1},
+		{"exp(x)", 0, 1},
+		{"exp(x)", 1, math.E},
+		{"log(x)", 1, 0},
+		{"log(x)", math.E, 1},
+		{"sqrt(x)", 4, 2},
+		{"sqrt(x)", 9, 3},
+		{"tan(x)", 0, 0},
+		{"abs(x)", -5, 5},
+		{"abs(x)", 5, 5},
+		{"floor(x)", 3.7, 3},
+		{"ceil(x)", 3.2, 4},
+		{"trunc(x)", -3.7, -3},
+		{"log2(x)", 8, 3},
+		{"log10(x)", 100, 2},
+		{"cbrt(x)", 27, 3},
+		{"asin(sin(x))", 0.5, 0.5},
+		{"atan(x)", 1, 0.7853981633974483},
+		{"sqrt(x^2 + 1)", 3, math.Sqrt(10)},
+		{"sin(x)^2 + cos(x)^2", 1.5, 1},
+	}
+	for _, tc := range tests {
+		c := NewCompiler()
+		f, err := c.Compile(tc.expr)
+		if err != nil {
+			t.Fatalf("compile %q: %v", tc.expr, err)
+		}
+		got := f(tc.x)
+		if math.Abs(got-tc.want) > 1e-10 {
+			t.Errorf("%s at x=%v: f = %v, want %v (diff=%v)", tc.expr, tc.x, got, tc.want, math.Abs(got-tc.want))
+		}
 	}
 }
 
-func TestJITNegativeExponentError(t *testing.T) {
-	c := NewCompiler()
-	_, err := c.Compile("x^-1")
-	if err == nil {
-		t.Fatal("expected error for negative exponent")
+func TestJITNegativeExponent(t *testing.T) {
+	tests := []struct {
+		expr string
+		x    float64
+		want float64
+	}{
+		{"x^-1", 2, 0.5},
+		{"x^-1", 4, 0.25},
+		{"x^-2", 3, 1.0 / 9.0},
+		{"x^-3", 2, 0.125},
+	}
+	for _, tc := range tests {
+		c := NewCompiler()
+		f, err := c.Compile(tc.expr)
+		if err != nil {
+			t.Fatalf("compile %q: %v", tc.expr, err)
+		}
+		got := f(tc.x)
+		if math.Abs(got-tc.want) > 1e-12 {
+			t.Errorf("%s at x=%v: f = %v, want %v", tc.expr, tc.x, got, tc.want)
+		}
 	}
 }
 

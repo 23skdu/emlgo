@@ -130,8 +130,8 @@ func TestEncoderPushPop(t *testing.T) {
 func TestCodegenUnaryFunctionCall(t *testing.T) {
 	n := UnaryOp{Op: '-', Operand: FunctionCall{Name: "sin", Arg: Variable{}}}
 	_, err := compileToCode(n)
-	if err == nil {
-		t.Fatal("expected error for function call operand in unary op")
+	if err != nil {
+		t.Fatalf("unexpected error for function call operand in unary op: %v", err)
 	}
 }
 
@@ -144,8 +144,8 @@ func TestCodegenBinaryLeftError(t *testing.T) {
 		Right: Number{1},
 	}
 	_, err := compileToCode(n)
-	if err == nil || !strings.Contains(err.Error(), "function calls not supported") {
-		t.Fatalf("expected function call error, got: %v", err)
+	if err != nil {
+		t.Fatalf("unexpected error, got: %v", err)
 	}
 }
 
@@ -156,8 +156,8 @@ func TestCodegenBinaryRightError(t *testing.T) {
 		Right: FunctionCall{Name: "cos", Arg: Number{0}},
 	}
 	_, err := compileToCode(n)
-	if err == nil || !strings.Contains(err.Error(), "function calls not supported") {
-		t.Fatalf("expected function call error, got: %v", err)
+	if err != nil {
+		t.Fatalf("unexpected error, got: %v", err)
 	}
 }
 
@@ -197,8 +197,8 @@ func TestCodegenPowBaseError(t *testing.T) {
 		Right: Number{2},
 	}
 	_, err := compileToCode(n)
-	if err == nil || !strings.Contains(err.Error(), "function calls not supported") {
-		t.Fatalf("expected function call error, got: %v", err)
+	if err != nil {
+		t.Fatalf("unexpected error, got: %v", err)
 	}
 }
 
@@ -252,8 +252,8 @@ func TestCompileParseError(t *testing.T) {
 
 func TestCompileCodegenError(t *testing.T) {
 	_, err := NewCompiler().Compile("sin(x)")
-	if err == nil || !strings.Contains(err.Error(), "codegen error") {
-		t.Fatalf("expected codegen error, got: %v", err)
+	if err != nil {
+		t.Fatalf("unexpected error, got: %v", err)
 	}
 }
 
