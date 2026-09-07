@@ -205,6 +205,53 @@ Mathematical constants.
 
 ---
 
+## Package: internal/jit
+
+JIT compiler for math expressions (amd64 only).
+
+### Supported Operators
+
+| Operator | Example | Description |
+|----------|---------|-------------|
+| `+` | `x + y` | Addition |
+| `-` | `x - y` | Subtraction |
+| `*` | `x * y` | Multiplication |
+| `/` | `x / y` | Division |
+| `^` | `x ^ 3` | Integer power (binary exponentiation) |
+| `^` | `x ^ -2` | Negative integer power (1/x^n) |
+| unary `-` | `-x` | Negation |
+
+### Supported Functions (JIT)
+
+| Function | Example | Description |
+|----------|---------|-------------|
+| sin | `sin(x)` | Sine |
+| cos | `cos(x)` | Cosine |
+| tan | `tan(x)` | Tangent |
+| exp | `exp(x)` | Exponential e^x |
+| log | `log(x)` | Natural logarithm ln(x) |
+| sqrt | `sqrt(x)` | Square root |
+| asin | `asin(x)` | Arcsine |
+| acos | `acos(x)` | Arccosine |
+| atan | `atan(x)` | Arctangent |
+| abs | `abs(x)` | Absolute value |
+| cbrt | `cbrt(x)` | Cube root |
+| log2 | `log2(x)` | Log base 2 |
+| log10 | `log10(x)` | Log base 10 |
+| ceil | `ceil(x)` | Ceiling |
+| floor | `floor(x)` | Floor |
+| trunc | `trunc(x)` | Truncate |
+
+### Composition Example
+
+```go
+c, err := jit.Compile("sin(x)^2 + cos(x)^2")
+f := c.Func()
+result := f(0.0) // 1.0
+```
+
+---
+
 ## Implementation Notes
 
 The core EML operator `eml(x,y) = exp(x) - ln(y)` serves as the theoretical foundation for all elementary functions. However, the actual implementations use platform-optimized paths:
@@ -212,7 +259,7 @@ The core EML operator `eml(x,y) = exp(x) - ln(y)` serves as the theoretical foun
 - **Scalar operations**: Direct implementations using `math.*` functions or hand-coded assembly (AVX2/AVX512 on AMD64).
 - **Batch operations**: SIMD-vectorized kernels that process 4-8 elements per cycle using architecture-specific assembly.
 - **FastMath**: FMA-optimized polynomial approximations with relaxed IEEE 754 compliance.
-- **JIT compiler**: x86-64 SSE2 codegen for math expressions parsed from strings.
+- **JIT compiler**: x86-64 SSE2 codegen for math expressions parsed from strings, supporting 16 built-in functions, integer powers, and negative exponents.
 - **GPU backends**: CUDA and Metal kernels for massive parallel workloads.
 
 The EML operator is used in the `Eml()` scalar function and the GPU `EmlBatch` kernel. The mathematical framework from the original EML paper (arXiv:2603.21852v2) demonstrates that all elementary functions can be derived from this single operator, which is the theoretical basis for the library's unified design.

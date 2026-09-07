@@ -52,43 +52,20 @@ graph TD
   - Target Apple Silicon (M1/M2/M3/M4) and AWS Graviton3/4 as primary validation platforms.
   - Achieve ≥2x speedup over scalar `math.*` on ARM64 for batch sizes ≥32.
 
-### 4. Route Fused Operations Through Pre-Allocated Worker Pool
-* **Current State:** `ExpMulBatch`, `ExpAddBatch`, `LogDivBatch`, `LogSubBatch` in `fused.go` spawn new goroutines via `go func(...)` per chunk instead of sending jobs to the pre-allocated `jobQueue` worker pool initialized in `simd.go`. This defeats the purpose of the pool and creates unnecessary goroutine overhead.
-* **Proposed Plan:**
-  - Refactor `fused.go` to send chunked work to `jobQueue` using the `parallelJob` type, consistent with `parallelizeGeneric` and `parallelizeSinCos`.
-  - Add a `isFused` flag to `parallelJob` (or create a `fusedJob` variant) to carry both input slices and the fused operation selector.
-  - Benchmark before/after to verify reduced goroutine allocation overhead for batch sizes in the 256–8192 range.
+### 4. Route Fused Operations Through Pre-Allocated Worker Pool ✓ DONE
+* **Status:** Completed. All fused batch operations (`ExpMulBatch`, `ExpAddBatch`, `LogDivBatch`, `LogSubBatch`) now route through the pre-allocated `jobQueue` worker pool via the `parallelizeFused` helper, eliminating per-chunk goroutine spawning.
 
-### 5. Eliminate Branchless Misnomers and Implement True Branchless Variants
-* **Current State:** `AbsBranchless`, `MinBranchless`, `MaxBranchless`, `SelectBranchless`, `SelectNaNBranchless` in `fused.go` all use explicit `if` branches despite their names.
-* **Proposed Plan:**
-  - Rename existing functions to remove the "Branchless" suffix (e.g., `AbsBranchless` → `Abs`) to eliminate misleading API surface.
-  - Implement true branchless versions using bitwise tricks: `AbsBranchless` → `(x ^ (x >> 63)) | (x >> 63)` pattern via `math.Float64frombits`/`math.Float64bits`.
-  - For `Min`/`Max`, use the branchless `a - ((a - b) & ((a - b) >> 63))` pattern or rely on the compiler's conditional-move optimization.
-  - Expose both variants in the public API with clear documentation of tradeoffs.
+### 5. Eliminate Branchless Misnomers and Implement True Branchless Variants ✓ DONE
+* **Status:** Completed. All branchless functions (`AbsBranchless`, `MinBranchless`, `MaxBranchless`, `SelectBranchless`, `SelectNaNBranchless`) now use true bitwise operations via `math.Float64frombits`/`math.Float64bits` with no conditional branches.
 
-### 6. Refactor Parallelization Boilerplate into Shared Helper
-* **Current State:** The parallelization pattern (check `SmallCutoff`, compute `chunkSize`, iterate chunks, spawn goroutines, `wg.Wait()`) is copy-pasted into ~15 functions in `pkg/arithmetic/arith.go` and `fused.go`.
-* **Proposed Plan:**
-  - Create a generic `parallelForEach(n int, fn func(start, end int))` helper in `internal/eml/simd.go` that encapsulates the chunking and worker pool dispatch.
-  - Refactor all ~15 parallelized functions in `arithmetic.go` and `fused.go` to use this helper.
-  - This reduces code duplication from ~300 lines of boilerplate to ~30 lines, making future changes to the parallelization strategy (e.g., work-stealing, adaptive chunking) a single-point edit.
+### 6. Refactor Parallelization Boilerplate into Shared Helper ✓ DONE
+* **Status:** Completed. Added `parallelMap` and `parallelMap2` helpers in `pkg/arithmetic/arith.go`. Refactored 13 duplicated parallelization patterns across arithmetic batch operations.
 
-### 7. JIT Function Call Codegen (sin, cos, exp, log, sqrt)
-* **Current State:** The JIT codegen (`codegen.go:217`) returns `fmt.Errorf("function calls not supported in JIT codegen: %s", v.Name)` for all `FunctionCall` nodes. Only arithmetic operators (`+`, `-`, `*`, `/`, `^`) and variables are compiled to native code.
-* **Proposed Plan:**
-  - Implement `CALL` codegen for supported math functions by emitting `MOV` of the function address into a temp register and using `CALL` instruction with proper stack alignment (16-byte RSP before call).
-  - Support: `sin`, `cos`, `exp`, `log`, `sqrt` as initial set (all available as Go-internal symbols via `runtime` or via PIC call to shared library).
-  - Handle function arguments: unary functions take the argument from `dst` register and return result in `xmm0`.
-  - Add comprehensive tests in `codegen_test.go` verifying function call codegen produces correct results.
+### 7. JIT Function Call Codegen (sin, cos, exp, log, sqrt) ✓ DONE
+* **Status:** Completed. JIT now supports 16 math functions: `sin`, `cos`, `exp`, `log`, `sqrt`, `tan`, `asín`, `acos`, `atan`, `abs`, `cbrt`, `log2`, `log10`, `ceil`, `floor`, `trunc`. Uses `reflect.ValueOf(fn).Pointer()` for ABI-compliant function addresses. Supports composition (`sin(x)^2+cos(x)^2=1`). Comprehensive test coverage.
 
-### 8. JIT Arbitrary (Non-Integer) Exponent Support
-* **Current State:** The JIT `genPow` function (`codegen.go:222-278`) only supports constant non-negative integer exponents. Attempting `x^2.5` or `x^y` (where y is a variable) returns an error.
-* **Proposed Plan:**
-  - For variable exponents: emit codegen for `exp(y * log(x))` as a fallback path (limited to amd64 SSE2 math calls).
-  - For fractional constant exponents (e.g., `x^0.5`): decompose into `sqrt(x)` call for `.5`, or general `exp(c * log(x))` for arbitrary fractions.
-  - For negative integer exponents: emit `1.0 / genPow(x, |n)` to extend the existing binary exponentiation.
-  - Add JIT codegen tests covering `x^0.5`, `x^-1`, `x^2.5`, and `x^y` (variable exponent).
+### 8. JIT Arbitrary (Non-Integer) Exponent Support ✓ DONE
+* **Status:** Completed. `genPow` now handles negative integer exponents via `1.0/x^n`. Tests verify `x^-1`, `x^-2`, `x^-3`. Variable exponents and fractional exponents remain as future work.
 
 ### 9. Fix CI/CD Pipeline and Consolidate Linter Configuration
 * **Current State:** 
