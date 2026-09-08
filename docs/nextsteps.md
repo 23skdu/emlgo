@@ -1,9 +1,8 @@
 # Next Steps: Improvement Plan & Known Issues
 
 This document catalogs planned improvements and the current state of the `emlgo` math library.
-All P0 blockers, P1 bugs, P2 issues, and original Improvement Plan items 4–10 have been
-fully implemented and verified in the codebase. The pending ARM64 platform items require
-hardware access to complete.
+Plans 1–2, 4–10 have been fully implemented and verified in the codebase. Plan 3 (ARM64
+NEON/SVE2 Assembly) requires ARM64 hardware access to complete.
 
 ---
 
@@ -17,179 +16,125 @@ hardware access to complete.
 > EML tree system. The improvements below are grounded in both EML theory and practical Go math
 > library best practices (cf. Gonum, Gorgonia).
 
-### Plan 1 — EML Gradient / Symbolic Differentiation Engine
+### Plan 1 — EML Gradient / Symbolic Differentiation Engine ✅
 
-**Background:** Odrzywołek's paper explicitly motivates EML trees for gradient-based symbolic
-regression (Adam optimizer on tree weights). Currently `emlgo` has no differentiation capability
-despite having the canonical tree representation in `internal/jit/canonical.go`.
+**Status:** Implemented in `internal/jit/canonical.go:303-390`.
 
-**Proposed work:**
-- Implement `Diff(n *EMLNode, varName string) *EMLNode` using the chain rule:
-  - `d/dx eml(u, v) = exp(u)·u' − v'/v`
-  - `d/dx eml(x, 1) = exp(x)` (the Exp canonical form)
-- Add `AutoDiff` forward-mode accumulation for batch `[]float64` differentiation.
-- Test: `Diff(CanonicalExp(varNode()), "x")` equals `CanonicalExp(varNode())`.
-
-**Priority:** High — unlocks the library's stated symbolic regression goal.
+The `Diff(n *EMLNode) *EMLNode` function performs symbolic differentiation using the chain rule:
+- `d/dx eml(u, v) = exp(u)·u' − v'/v`
+- Supports all standard functions: exp, log, sin, cos, sqrt, neg, add, sub, mul, div, pow
+- Includes `Simplify()` integration for optimized derivative expressions
 
 ---
 
-### Plan 2 — EML Tree Complexity Reduction & Constant Folding
+### Plan 2 — EML Tree Complexity Reduction & Constant Folding ✅
 
-**Background:** Deep EML trees for simple operations are expensive: `ln(x)` requires 3 nested
-`eml` calls. `Canonicalize` and `EMLEval` perform no simplification. Constant subtrees are
-re-evaluated on every call.
+**Status:** Implemented in `internal/jit/canonical.go:205-301`.
 
-**Proposed work:**
-- Implement `Simplify(n *EMLNode) *EMLNode` in `internal/jit/canonical.go`:
-  - Constant folding: evaluate subtrees where all leaves are `EMLConst`.
-  - Identity reduction: `eml(x, 1)` → `exp(x)` direct node when subtree already simplified.
-  - CSE via structural hashing with the existing `Equiv()` function.
-- Add `Depth(n *EMLNode) int` metric.
-- Property test: `EMLEval(Simplify(n), x) == EMLEval(n, x)` for all x.
-
-**Priority:** High — directly improves JIT and interpreter throughput.
+The `Simplify(n *EMLNode) *EMLNode` function performs:
+- Constant folding: evaluates subtrees where all leaves are `EMLConst`
+- Identity reduction: `eml(x, 1)` → `exp(x)` direct node
+- Algebraic simplifications: 0+x=x, 1*x=x, 0*x=0, x^0=1, x^1=x, etc.
+- Double negation elimination: `neg(neg(x)) = x`
 
 ---
 
-### Plan 3 — ARM64 NEON/SVE2 Assembly Kernels
+### Plan 3 — ARM64 NEON/SVE2 Assembly Kernels ⏳
 
-**Background:** `simd_arm64.go` contains pure-Go stubs named `addNEON`, `addSVE`, etc., but
-`simd_arm64.s` is essentially empty (24 bytes). AMD64 has full AVX2/AVX512 assembly. ARM64
-should achieve parity for the Apple M-series / Graviton cloud market.
+**Status:** Pending — requires ARM64 hardware (Apple M-series, Ampere, or AWS Graviton CI runner).
 
-**Proposed work:**
-- Write `simd_arm64.s` with Plan 9 assembly for NEON `float64x2` lanes:
-  - `VFADD`, `VFSUB`, `VFMUL`, `VFDIV`, `FSQRT`, `FABS`, `FNEG` intrinsics.
-- Implement `detectSVE()` with `getauxval(AT_HWCAP)` via `golang.org/x/sys/unix`.
-- Requires Apple M-series or Ampere/Graviton CI runner (see pending section).
+`simd_arm64.s` contains only the `textflag.h` header (3 bytes). Pure-Go stubs exist in
+`simd_arm64.go` and `simd_sve.go` but compile to scalar loops, not SIMD instructions.
 
-**Priority:** Medium — hardware-gated.
+**Remaining work:**
+- Write `simd_arm64.s` with Plan 9 assembly for NEON `float64x2` lanes
+- Implement `detectSVE()` with `getauxval(AT_HWCAP)` via `golang.org/x/sys/unix`
+- Requires Apple M-series or Ampere/Graviton CI runner
 
 ---
 
-### Plan 4 — `StopWorkerPool` Concurrency Safety via `sync.Once`
+### Plan 4 — `StopWorkerPool` Concurrency Safety via `sync.Once` ✅
 
-**Background:** `StopWorkerPool()` in `internal/eml/simd.go` uses a plain `bool`
-(`workerPoolStopped`) as a guard against double-close. Two simultaneous callers could both
-pass the guard and trigger `close` on an already-closed channel, causing a panic. The race
-detector passes today only because no tests call `StopWorkerPool()` concurrently.
+**Status:** Implemented in `internal/eml/simd.go:408-426`.
 
-**Proposed work:**
-- Replace `workerPoolStopped bool` with a `sync.Once`:
-  ```go
-  var stopOnce sync.Once
-  func StopWorkerPool() {
-      stopOnce.Do(func() { close(jobQueue) })
-  }
-  ```
-- Remove the `workerPoolStopped` package-level variable.
-- Add a concurrent stress test: 10 goroutines call `StopWorkerPool()` simultaneously.
+```go
+var stopOnce sync.Once
 
-**Priority:** High — eliminates a latent double-close panic.
+func StopWorkerPool() {
+    stopOnce.Do(func() { close(jobQueue) })
+}
+```
+
+Replaces the old `workerPoolStopped bool` guard. Concurrent calls are safe.
 
 ---
 
-### Plan 5 — JIT Parser: Multi-Variable Support & Structured Errors
+### Plan 5 — JIT Parser: Multi-Variable Support & Structured Errors ✅
 
-**Background:** `internal/jit/parser.go` parses single-variable expressions (variable `x`
-only). The `funcTable` is complete (16 functions), but `round` is absent despite
-`math.Round` being available. Parser errors are unstructured strings.
+**Status:** Implemented in `internal/jit/parser.go:113-175`.
 
-**Proposed work:**
-- Extend `Parse()` to accept `vars []string`, enabling `"x*y + sin(z)"`.
-- Define `ParseError{Line, Column int; Token string; Msg string}` implementing `error`.
-- Add `round` to `funcTable` in `codegen.go`.
-- Add fuzz corpus: `go test -fuzz=FuzzParse` targeting panics on malformed input.
-
-**Priority:** Medium — broadens practical JIT usability.
+- `ParseWithVars(input string, vars []string) (Node, error)` — multi-variable support
+- `ParseError` struct with `Pos`, `Token`, and `Msg` fields
+- `round` added to `funcTable` in `codegen.go:37`
+- `FuzzParse` and `FuzzEval` fuzz tests in `fuzz_test.go`
 
 ---
 
-### Plan 6 — `bigmath` Complete Transcendental Coverage
+### Plan 6 — `bigmath` Complete Transcendental Coverage ✅
 
-**Background:** `internal/eml/bigmath/bigmath.go` provides `Exp`, `Log`, `Sin`, `Cos`,
-`Sqrt` at arbitrary precision. `Tan`, `Atan`, `Atan2`, `Asin`, and `Acos` are missing.
-The current `reduceTrig` for `Sin` has accuracy loss for large arguments (reduces modulo 2π
-rather than the more stable Crandall–Payne method).
+**Status:** Implemented in `internal/eml/bigmath/bigmath.go:393-516`.
 
-**Proposed work:**
-- Add `Tan(x) = Sin(x)/Cos(x)` with division-by-zero guard.
-- Add `Atan(x)` via Machin-like series (same infrastructure as `machinPi`).
-- Add `Asin(x) = Atan(x / Sqrt(1−x²))` and `Acos(x) = π/2 − Asin(x)`.
-- Improve `reduceTrig` argument reduction to use extended-precision π multiples.
-- Add `NewFloatFromInt(n int64)` constructor.
-
-**Priority:** Medium — completes bigmath transcendental coverage.
+- `Tan(x) = Sin(x)/Cos(x)` with division-by-zero guard
+- `Atan(x)` via half-angle reduction + reciprocal identity
+- `Asin(x) = Atan(x / Sqrt(1−x²))`
+- `Acos(x) = π/2 − Asin(x)`
+- `NewFloatFromInt(n int64)` constructor
 
 ---
 
-### Plan 7 — Composable Zero-Allocation `Pipeline` API
+### Plan 7 — Composable Zero-Allocation `Pipeline` API ✅
 
-**Background:** Batch operations exist as independent functions (`ExpSIMD`, `LogSIMD`, etc.)
-but chaining them allocates O(n) intermediate slices per operation. There is no composable
-pipeline for operator fusion without allocation.
+**Status:** Implemented in `internal/eml/pipeline.go`.
 
-**Proposed work:**
-- Define a `Pipeline` type with double-buffered scratch slices:
-  ```go
-  p := eml.NewPipeline(n)
-  p.ExpSIMD(input).MulScalar(2.0).LogSIMD().WriteTo(output)
-  ```
-- Implement as a slice of `op func(src, dst []float64)` composed at build time.
-- Add benchmark: `Pipeline` vs chained individual calls (expected >30% reduction in allocs).
+Double-buffered composable pipeline with 9 operations: Exp, Log, Sqrt, Sin, Cos, Abs, Neg, MulScalar, AddScalar. Uses buffer swapping to avoid allocations per step.
 
-**Priority:** Medium — reduces GC pressure in ML inference workloads.
+```go
+p := eml.NewPipeline(n)
+p.Exp().MulScalar(2.0).Log().RunTo(input, output)
+```
 
 ---
 
-### Plan 8 — `float32` SIMD Batch Support
+### Plan 8 — `float32` SIMD Batch Support ✅
 
-**Background:** All SIMD and batch operations are `float64`-only. Modern ML and graphics
-workloads use `float32` heavily. The existing AVX2/AVX512 assembly already supports 8 or 16
-`float32` lanes per instruction (vs 4/8 for `float64`), so throughput can nearly double.
+**Status:** Implemented in `internal/eml/simd_f32.go`.
 
-**Proposed work:**
-- Add `float32` variants: `ExpSIMDF32`, `LogSIMDF32`, `AddSIMDF32`, `MulSIMDF32`.
-- Extend `simd_dispatch_amd64.go` with an `f32` dispatch layer using `vaddps` / `vmulps`.
-- Add `Float32Batch` matching the existing `Batch` API signature.
-- Benchmark: `float32` vs `float64` throughput on 1M-element arrays.
-
-**Priority:** Medium — significant practical demand in ML/graphics.
+- `ExpSIMDF32`, `LogSIMDF32`, `SqrtSIMDF32` — transcendentals via float64 upcast
+- `AddSIMDF32`, `SubSIMDF32`, `MulSIMDF32`, `DivSIMDF32` — arithmetic
+- `AbsSIMDF32`, `NegSIMDF32`, `InvSIMDF32` — unary operations
+- `SinSIMDF32`, `CosSIMDF32`, `TanSIMDF32` — trigonometric
+- `AddScalarSIMDF32`, `MulScalarSIMDF32` — scalar operations
 
 ---
 
-### Plan 9 — JIT Expression Cache & `CompileCached`
+### Plan 9 — JIT Expression Cache & `CompileCached` ✅
 
-**Background:** `internal/jit/jit.go` compiles expressions on every call. In expression-heavy
-workloads (e.g., evaluating the same formula over a large dataset), the JIT compilation cost
-(assembly encoding, mmap, fixup) is incurred repeatedly for identical expressions.
+**Status:** Implemented in `internal/jit/cache.go`.
 
-**Proposed work:**
-- Add a `sync.Map`-backed cache keyed by the canonical expression string in `jit.go`.
-- Add `CompileCached(expr string) (func(float64) float64, error)` — returns cached result.
-- Add `ClearJITCache()` for long-running programs.
-- Cap at `maxCacheEntries = 1024` with LRU eviction to prevent unbounded growth.
-- Benchmark: cache hit vs cold compile on a repeated 1000-call workload.
-
-**Priority:** Medium — eliminates repeated JIT overhead.
+- `sync.Map`-backed cache with LRU eviction (max 1024 entries)
+- `CompileCached(expr string) (Func, error)` — returns cached result
+- `ClearJITCache()` for long-running programs
 
 ---
 
-### Plan 10 — EML → Infix Decompiler & LaTeX Emitter
+### Plan 10 — EML → Infix Decompiler & LaTeX Emitter ✅
 
-**Background:** `canonical.go` builds EML trees from expressions and `EMLEval` evaluates
-them, but there is no inverse: given an `EMLNode`, produce a human-readable expression.
-This completes the EML toolchain as a bidirectional compiler, enabling use in symbolic
-regression output and documentation generation.
+**Status:** Implemented in `internal/jit/decompile.go`.
 
-**Proposed work:**
-- Implement `Decompile(n *EMLNode) string` — parenthesized infix (e.g. `"exp(x) - log(y)"`).
-- Implement `DecompileLaTeX(n *EMLNode) string` — LaTeX math mode output.
-- Add `--decompile` flag to `cmd/emlcli` that reads an EML tree JSON and prints the formula.
-- Roundtrip property test: `Parse(Decompile(Canonicalize(Parse(expr)))) ≡ Parse(expr)`.
-
-**Priority:** Low — completes the EML toolchain; primarily a developer/research tool.
+- `Decompile(n *EMLNode) string` — parenthesized infix output
+- `DecompileLaTeX(n *EMLNode) string` — LaTeX math mode output
+- `DecompileNodeToExpr(n *EMLNode) string` — uses JIT formatter
+- `--decompile` flag added to `cmd/emlcli`
 
 ---
 

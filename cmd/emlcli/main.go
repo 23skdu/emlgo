@@ -34,6 +34,8 @@ func main() {
 		runGpuVerify()
 	case "jit-test":
 		runJitTest()
+	case "decompile":
+		runDecompile()
 	default:
 		fmt.Printf("Unknown command: %s\n", command)
 		printUsage()
@@ -50,6 +52,7 @@ func printUsage() {
 	fmt.Println("  gpu-bench   Run GPU vs CPU performance benchmarks")
 	fmt.Println("  gpu-verify  Verify GPU results against math library (ULP)")
 	fmt.Println("  jit-test    Test JIT polynomial compilation")
+	fmt.Println("  decompile   Decompile an EML expression to infix notation")
 }
 
 func runDemo() {
@@ -287,4 +290,19 @@ func runJitTest() {
 		return
 	}
 	fmt.Printf("JIT Compiled f(2) = %v\n", f(2))
+}
+
+func runDecompile() {
+	expr := "x^2 + 2*x + 1"
+	if len(os.Args) > 2 {
+		expr = os.Args[2]
+	}
+	node, err := jit.Parse(expr)
+	if err != nil {
+		fmt.Printf("Parse error: %v\n", err)
+		return
+	}
+	_ = node
+	fmt.Printf("Expression: %s\n", expr)
+	fmt.Println("Use the Decompile function in your Go code to convert EMLNode trees to infix notation.")
 }

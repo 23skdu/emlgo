@@ -384,3 +384,133 @@ func NewFloatFromString(s string) *big.Float {
 	f, _, _ := new(big.Float).Parse(s, 10)
 	return f.SetPrec(Prec)
 }
+
+// NewFloatFromInt creates a new big.Float from an int64 at default precision.
+func NewFloatFromInt(n int64) *big.Float {
+	return new(big.Float).SetPrec(Prec).SetInt64(n)
+}
+
+// Tan computes tan(x) = Sin(x)/Cos(x) at arbitrary precision.
+// Panics if cos(x) is zero (i.e., x is an odd multiple of π/2).
+func Tan(x *big.Float) *big.Float {
+	prec := x.Prec()
+	if prec == 0 {
+		prec = Prec
+	}
+	s := Sin(new(big.Float).SetPrec(prec).Copy(x))
+	c := Cos(new(big.Float).SetPrec(prec).Copy(x))
+	if c.Sign() == 0 {
+		// cos(x) = 0: return ±Inf analogous to math.Tan
+		inf := new(big.Float).SetPrec(prec).SetInf(s.Sign() >= 0)
+		return inf
+	}
+	return new(big.Float).SetPrec(prec).Quo(s, c)
+}
+
+// Atan computes arctan(x) at arbitrary precision.
+// Uses range reduction so that arctanSeries is only called on |x| < 0.5.
+func Atan(x *big.Float) *big.Float {
+	prec := x.Prec()
+	if prec == 0 {
+		prec = Prec
+	}
+	wprec := prec + 128
+
+	sign := x.Sign()
+	if sign == 0 {
+		return new(big.Float).SetPrec(prec).SetInt64(0)
+	}
+
+	// Work on |x|.
+	ax := new(big.Float).SetPrec(wprec).Abs(x)
+	one := new(big.Float).SetPrec(wprec).SetInt64(1)
+
+	// Reduce large arguments: atan(x) = π/2 - atan(1/x) for |x| > 1.
+	useRecip := false
+	if ax.Cmp(one) > 0 {
+		useRecip = true
+		ax.Quo(one, ax)
+	}
+
+	// Half-angle reduction: atan(x) = 2*atan(x / (1 + sqrt(1+x²)))
+	// Repeat until |x| < 0.5 for fast series convergence.
+	halvings := 0
+	half := new(big.Float).SetPrec(wprec).SetFloat64(0.5)
+	for ax.Cmp(half) >= 0 {
+		x2 := new(big.Float).SetPrec(wprec).Mul(ax, ax)
+		inner := new(big.Float).SetPrec(wprec).Add(one, x2)
+		sq := new(big.Float).SetPrec(wprec).Sqrt(inner)
+		denom := new(big.Float).SetPrec(wprec).Add(one, sq)
+		ax.Quo(ax, denom)
+		halvings++
+	}
+
+	result := arctanSeries(ax, wprec)
+
+	// Undo halvings.
+	twoW := new(big.Float).SetPrec(wprec).SetInt64(1)
+	for i := 0; i < halvings; i++ {
+		twoW.Mul(twoW, new(big.Float).SetPrec(wprec).SetInt64(2))
+	}
+	result.Mul(result, twoW)
+
+	// Undo reciprocal: atan(x) = π/2 - result.
+	if useRecip {
+		pi := piConst(wprec)
+		piOver2 := new(big.Float).SetPrec(wprec).Quo(pi, new(big.Float).SetPrec(wprec).SetInt64(2))
+		result.Sub(piOver2, result)
+	}
+
+	result.SetPrec(prec)
+	if sign < 0 {
+		result.Neg(result)
+	}
+	return result
+}
+
+// Asin computes arcsin(x) at arbitrary precision.
+// Domain: x ∈ [-1, 1]. Returns NaN-equivalent (0) for out-of-range inputs.
+func Asin(x *big.Float) *big.Float {
+	prec := x.Prec()
+	if prec == 0 {
+		prec = Prec
+	}
+	wprec := prec + 64
+
+	f64, _ := x.Float64()
+	if f64 < -1 || f64 > 1 {
+		return new(big.Float).SetPrec(prec) // 0 for out-of-range (analogous to NaN)
+	}
+	if f64 == 1 {
+		pi := piConst(prec)
+		return new(big.Float).SetPrec(prec).Quo(pi, new(big.Float).SetPrec(prec).SetInt64(2))
+	}
+	if f64 == -1 {
+		pi := piConst(prec)
+		r := new(big.Float).SetPrec(prec).Quo(pi, new(big.Float).SetPrec(prec).SetInt64(2))
+		return r.Neg(r)
+	}
+
+	// asin(x) = atan(x / sqrt(1 - x²))
+	xw := new(big.Float).SetPrec(wprec).Copy(x)
+	x2 := new(big.Float).SetPrec(wprec).Mul(xw, xw)
+	one := new(big.Float).SetPrec(wprec).SetInt64(1)
+	denom := new(big.Float).SetPrec(wprec).Sqrt(new(big.Float).SetPrec(wprec).Sub(one, x2))
+	arg := new(big.Float).SetPrec(wprec).Quo(xw, denom)
+	return Atan(arg.SetPrec(prec))
+}
+
+// Acos computes arccos(x) at arbitrary precision.
+// Domain: x ∈ [-1, 1].
+func Acos(x *big.Float) *big.Float {
+	prec := x.Prec()
+	if prec == 0 {
+		prec = Prec
+	}
+	wprec := prec + 64
+	// acos(x) = π/2 - asin(x)
+	pi := piConst(wprec)
+	piOver2 := new(big.Float).SetPrec(wprec).Quo(pi, new(big.Float).SetPrec(wprec).SetInt64(2))
+	asinX := Asin(new(big.Float).SetPrec(wprec).Copy(x))
+	return new(big.Float).SetPrec(prec).Sub(piOver2, asinX)
+}

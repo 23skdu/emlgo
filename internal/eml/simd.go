@@ -405,7 +405,7 @@ const (
 
 var jobQueue chan parallelJob
 
-var workerPoolStopped bool
+var stopOnce sync.Once
 
 func initWorkerPool() {
 	numWorkers := cpuNum
@@ -420,12 +420,9 @@ func initWorkerPool() {
 
 // StopWorkerPool gracefully shuts down the worker pool goroutines.
 // After calling Stop, no further parallel operations should be submitted.
+// Safe to call multiple times or concurrently — protected by sync.Once.
 func StopWorkerPool() {
-	if workerPoolStopped {
-		return
-	}
-	workerPoolStopped = true
-	close(jobQueue)
+	stopOnce.Do(func() { close(jobQueue) })
 }
 
 func workerPoolWorker() {

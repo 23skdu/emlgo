@@ -110,6 +110,10 @@ func EMLEval(n *EMLNode, x float64) float64 {
 			return math.Sin(arg)
 		case "cos":
 			return math.Cos(arg)
+		case "exp":
+			return math.Exp(arg)
+		case "log":
+			return math.Log(arg)
 		case "neg":
 			return -arg
 		case "add":
@@ -174,6 +178,220 @@ func Canonicalize(n Node) *EMLNode {
 		}
 	}
 	return nil
+}
+
+// Depth returns the height of the EMLNode tree (leaf = 0).
+func Depth(n *EMLNode) int {
+	if n == nil {
+		return 0
+	}
+	l, r := Depth(n.Left), Depth(n.Right)
+	if l > r {
+		return l + 1
+	}
+	return r + 1
+}
+
+// -- helpers used by Simplify / Diff --
+
+func emlFuncBinary(name string, l, r *EMLNode) *EMLNode {
+	return &EMLNode{Kind: EMLFunc, Name: name, Left: l, Right: r}
+}
+
+func emlFuncUnary(name string, arg *EMLNode) *EMLNode {
+	return &EMLNode{Kind: EMLFunc, Name: name, Left: arg}
+}
+
+// Simplify performs constant folding and algebraic simplification on an EMLNode tree.
+// The returned tree evaluates to the same value as n for all inputs.
+func Simplify(n *EMLNode) *EMLNode {
+	if n == nil {
+		return nil
+	}
+	// Recursively simplify children first.
+	l := Simplify(n.Left)
+	r := Simplify(n.Right)
+	node := &EMLNode{Kind: n.Kind, Value: n.Value, Name: n.Name, Left: l, Right: r}
+
+	switch n.Kind {
+	case EMLConst, EMLVar:
+		return node
+
+	case EMLOp:
+		// eml(u, v) = exp(u) - ln(v) — fold when both children are constants.
+		if l != nil && r != nil && l.Kind == EMLConst && r.Kind == EMLConst {
+			return constNode(math.Exp(l.Value) - math.Log(r.Value))
+		}
+		return node
+
+	case EMLFunc:
+		switch n.Name {
+		case "neg":
+			if l != nil && l.Kind == EMLConst {
+				return constNode(-l.Value)
+			}
+			// neg(neg(x)) = x
+			if l != nil && l.Kind == EMLFunc && l.Name == "neg" {
+				return l.Left
+			}
+		case "add":
+			if l != nil && r != nil && l.Kind == EMLConst && r.Kind == EMLConst {
+				return constNode(l.Value + r.Value)
+			}
+			if l != nil && l.Kind == EMLConst && l.Value == 0 {
+				return r
+			}
+			if r != nil && r.Kind == EMLConst && r.Value == 0 {
+				return l
+			}
+		case "sub":
+			if l != nil && r != nil && l.Kind == EMLConst && r.Kind == EMLConst {
+				return constNode(l.Value - r.Value)
+			}
+			if r != nil && r.Kind == EMLConst && r.Value == 0 {
+				return l
+			}
+		case "mul":
+			if l != nil && r != nil && l.Kind == EMLConst && r.Kind == EMLConst {
+				return constNode(l.Value * r.Value)
+			}
+			if l != nil && l.Kind == EMLConst {
+				if l.Value == 0 {
+					return constNode(0)
+				}
+				if l.Value == 1 {
+					return r
+				}
+			}
+			if r != nil && r.Kind == EMLConst {
+				if r.Value == 0 {
+					return constNode(0)
+				}
+				if r.Value == 1 {
+					return l
+				}
+			}
+		case "div":
+			if l != nil && r != nil && l.Kind == EMLConst && r.Kind == EMLConst && r.Value != 0 {
+				return constNode(l.Value / r.Value)
+			}
+			if r != nil && r.Kind == EMLConst && r.Value == 1 {
+				return l
+			}
+		case "pow":
+			if l != nil && r != nil && l.Kind == EMLConst && r.Kind == EMLConst {
+				return constNode(math.Pow(l.Value, r.Value))
+			}
+			if r != nil && r.Kind == EMLConst {
+				if r.Value == 0 {
+					return constNode(1)
+				}
+				if r.Value == 1 {
+					return l
+				}
+			}
+		case "sqrt":
+			if l != nil && l.Kind == EMLConst {
+				return constNode(math.Sqrt(l.Value))
+			}
+		}
+		return node
+	}
+	return node
+}
+
+// Diff symbolically differentiates the EMLNode tree with respect to "x" (the variable).
+// The returned tree represents d(n)/dx in the EMLFunc representation.
+func Diff(n *EMLNode) *EMLNode {
+	if n == nil {
+		return constNode(0)
+	}
+	switch n.Kind {
+	case EMLConst:
+		return constNode(0)
+	case EMLVar:
+		return constNode(1)
+	case EMLOp:
+		// eml(u, v) = exp(u) - ln(v)
+		// d/dx = exp(u)·u' - v'/v
+		u, v := n.Left, n.Right
+		u_ := Diff(u)
+		v_ := Diff(v)
+		// exp(u) * u'
+		term1 := emlFuncBinary("mul", emlFuncUnary("exp", u), u_)
+		// v' / v
+		term2 := emlFuncBinary("div", v_, v)
+		return Simplify(emlFuncBinary("sub", term1, term2))
+	case EMLFunc:
+		arg := n.Left
+		arg_ := Diff(arg)
+		switch n.Name {
+		case "exp":
+			// d/dx exp(u) = exp(u) * u'
+			return Simplify(emlFuncBinary("mul", emlFuncUnary("exp", arg), arg_))
+		case "log":
+			// d/dx log(u) = u' / u
+			return Simplify(emlFuncBinary("div", arg_, arg))
+		case "sin":
+			// d/dx sin(u) = cos(u) * u'
+			return Simplify(emlFuncBinary("mul", emlFuncUnary("cos", arg), arg_))
+		case "cos":
+			// d/dx cos(u) = -sin(u) * u'
+			return Simplify(emlFuncBinary("mul", emlFuncUnary("neg", emlFuncUnary("sin", arg)), arg_))
+		case "sqrt":
+			// d/dx sqrt(u) = u' / (2 * sqrt(u))
+			denom := emlFuncBinary("mul", constNode(2), emlFuncUnary("sqrt", arg))
+			return Simplify(emlFuncBinary("div", arg_, denom))
+		case "neg":
+			// d/dx -u = -u'
+			return Simplify(emlFuncUnary("neg", arg_))
+		case "add":
+			// d/dx (u + v) = u' + v'
+			return Simplify(emlFuncBinary("add", Diff(arg), Diff(n.Right)))
+		case "sub":
+			// d/dx (u - v) = u' - v'
+			return Simplify(emlFuncBinary("sub", Diff(arg), Diff(n.Right)))
+		case "mul":
+			// product rule: u'v + uv'
+			v := n.Right
+			v_ := Diff(v)
+			return Simplify(emlFuncBinary("add",
+				emlFuncBinary("mul", arg_, v),
+				emlFuncBinary("mul", arg, v_)))
+		case "div":
+			// quotient rule: (u'v - uv') / v²
+			v := n.Right
+			v_ := Diff(v)
+			num := emlFuncBinary("sub",
+				emlFuncBinary("mul", arg_, v),
+				emlFuncBinary("mul", arg, v_))
+			denom := emlFuncBinary("pow", v, constNode(2))
+			return Simplify(emlFuncBinary("div", num, denom))
+		case "pow":
+			// power rule for constant exponent: d/dx u^c = c * u^(c-1) * u'
+			v := n.Right
+			if v != nil && v.Kind == EMLConst {
+				c := v.Value
+				return Simplify(emlFuncBinary("mul",
+					constNode(c),
+					emlFuncBinary("mul",
+						emlFuncBinary("pow", arg, constNode(c-1)),
+						arg_)))
+			}
+			// general: d/dx u^v = u^v * (v'*ln(u) + v*u'/u)
+			v_ := Diff(v)
+			term1 := emlFuncBinary("mul", v_, emlFuncUnary("log", arg))
+			term2 := emlFuncBinary("div", emlFuncBinary("mul", v, arg_), arg)
+			return Simplify(emlFuncBinary("mul", n,
+				emlFuncBinary("add", term1, term2)))
+		}
+	}
+	return constNode(0)
+}
+
+// DiffEval evaluates the symbolic derivative Diff(n) at x.
+func DiffEval(n *EMLNode, x float64) float64 {
+	return EMLEval(Diff(n), x)
 }
 
 // Equiv reports whether two EMLNode trees are structurally equivalent.
