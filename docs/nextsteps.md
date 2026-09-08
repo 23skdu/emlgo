@@ -12,20 +12,24 @@ graph TD
     A --> C[Code Quality]
     A --> D[JIT Enhancement]
     A --> E[Build & CI]
+    A --> F[Performance]
+    A --> G[API & Distribution]
     
     B --> B1[1. ARM64 NEON Assembly Kernels]
     B --> B2[2. ARM64 SVE/SVE2 Assembly Kernels]
     B --> B3[3. ARM64 Transcendental Kernels]
     
-    C --> C1[4. Worker Pool for Fused Operations]
-    C --> C2[5. Eliminate Branchless Misnomers]
-    C --> C3[6. Refactor Parallelization Boilerplate]
+    C --> C1[4. Fix CI/CD Pipeline & Linter Config]
+    C --> C2[5. Go Documentation Coverage & Error Consistency]
     
-    D --> D1[7. JIT Function Call Codegen]
-    D --> D2[8. JIT Arbitrary Exponent Support]
+    D --> D1[6. JIT Non-Integer Power & Variable Support]
     
-    E --> E1[9. Fix CI/CD & Linter Config]
-    E --> E2[10. Go Documentation & Error Consistency]
+    E --> E1[7. GPU Kernel Library Expansion]
+    
+    F --> F1[8. WASM SIMD Optimization]
+    F --> F2[9. Benchmark Suite & Regression Detection]
+    
+    G --> G1[10. API Stability, SemVer & CHANGELOG]
 ```
 
 ### 1. ARM64 NEON Assembly Kernels for Arithmetic & Unary Ops
@@ -52,23 +56,8 @@ graph TD
   - Target Apple Silicon (M1/M2/M3/M4) and AWS Graviton3/4 as primary validation platforms.
   - Achieve ≥2x speedup over scalar `math.*` on ARM64 for batch sizes ≥32.
 
-### 4. Route Fused Operations Through Pre-Allocated Worker Pool ✓ DONE
-* **Status:** Completed. All fused batch operations (`ExpMulBatch`, `ExpAddBatch`, `LogDivBatch`, `LogSubBatch`) now route through the pre-allocated `jobQueue` worker pool via the `parallelizeFused` helper, eliminating per-chunk goroutine spawning.
-
-### 5. Eliminate Branchless Misnomers and Implement True Branchless Variants ✓ DONE
-* **Status:** Completed. All branchless functions (`AbsBranchless`, `MinBranchless`, `MaxBranchless`, `SelectBranchless`, `SelectNaNBranchless`) now use true bitwise operations via `math.Float64frombits`/`math.Float64bits` with no conditional branches.
-
-### 6. Refactor Parallelization Boilerplate into Shared Helper ✓ DONE
-* **Status:** Completed. Added `parallelMap` and `parallelMap2` helpers in `pkg/arithmetic/arith.go`. Refactored 13 duplicated parallelization patterns across arithmetic batch operations.
-
-### 7. JIT Function Call Codegen (sin, cos, exp, log, sqrt) ✓ DONE
-* **Status:** Completed. JIT now supports 16 math functions: `sin`, `cos`, `exp`, `log`, `sqrt`, `tan`, `asín`, `acos`, `atan`, `abs`, `cbrt`, `log2`, `log10`, `ceil`, `floor`, `trunc`. Uses `reflect.ValueOf(fn).Pointer()` for ABI-compliant function addresses. Supports composition (`sin(x)^2+cos(x)^2=1`). Comprehensive test coverage.
-
-### 8. JIT Arbitrary (Non-Integer) Exponent Support ✓ DONE
-* **Status:** Completed. `genPow` now handles negative integer exponents via `1.0/x^n`. Tests verify `x^-1`, `x^-2`, `x^-3`. Variable exponents and fractional exponents remain as future work.
-
-### 9. Fix CI/CD Pipeline and Consolidate Linter Configuration
-* **Current State:** 
+### 4. Fix CI/CD Pipeline and Consolidate Linter Configuration
+* **Current State:**
   - CI workflow (`ci.yml`) tests Go 1.21–1.23, but `go.mod` declares `go 1.26.1` (a future version). CI will fail on `go mod download`.
   - Duplicate golangci-lint configs exist: `.golangci.yml` (with deprecated linters `structcheck`, `varcheck`) and `.golangci.yaml` (different linter set). Only one is used.
 * **Proposed Plan:**
@@ -78,7 +67,7 @@ graph TD
   - Update `.golangci.yml`: remove deprecated `structcheck`/`varcheck`, add `errcheck` with `check-type-assertions: true`.
   - Add a CI step for `go vet` and `staticcheck` as separate lint stages.
 
-### 10. Go Documentation Coverage and Error Consistency
+### 5. Go Documentation Coverage and Error Consistency
 * **Current State:**
   - Most exported functions in `internal/eml/simd.go`, `fused.go` lack godoc comments.
   - Inconsistent error handling: `Batch()` returns `error`, but `*SIMD()` functions panic on length mismatch. `ExpMulTo` panics but `ExpMulBatch` returns a sentinel.
@@ -88,3 +77,51 @@ graph TD
   - Standardize error handling: introduce `ValidateSlices(args ...[]float64) error` helper and use it consistently. For API consistency, decide on panic (performance-critical path) vs error (user-facing API) and document the rationale.
   - Create `CHANGELOG.md` with semantic versioning entries starting from current state.
   - Ensure `go doc` renders useful descriptions for all public symbols.
+
+### 6. JIT Non-Integer Power and Variable Exponent Support
+* **Current State:** JIT `genPow` handles negative integer exponents via `1.0/x^n`, but fractional exponents (e.g., `x^0.5`, `x^2.3`) return an error. Variable exponents (e.g., `x^y`) are unsupported.
+* **Proposed Plan:**
+  - Implement `pow(x, y) = exp(y * log(x))` for non-integer exponents in JIT codegen.
+  - Add register spill support for the additional temp registers needed.
+  - Implement `pow(x, y)` for variable exponents using the same identity.
+  - Add batch compilation mode: compile multiple expressions sharing a constant pool.
+  - Add x86-64 `SQRTSD`/`SQRTSS` direct emission for `sqrt(x)` instead of indirect call.
+
+### 7. GPU Kernel Library Expansion
+* **Current State:** GPU backends (CUDA, Metal) provide batch arithmetic (add/sub/mul/div/sqrt) and EML operator. Transcendental functions (exp/log/sin/cos/tan) on GPU rely on the C runtime library.
+* **Proposed Plan:**
+  - Implement Metal compute shaders for Apple Silicon: Exp, Log, Sin, Cos, Tan kernels with 256-wide threadgroups.
+  - Implement CUDA kernels for transcendental batch operations.
+  - Add GPU memory pool statistics and OOM recovery.
+  - Implement `GPU available memory` query for auto-sizing batch operations.
+  - Add Vulkan compute backend for cross-platform GPU support (Linux/Windows).
+
+### 8. WASM SIMD Optimization
+* **Current State:** WASM SIMD uses 8-wide block unrolled loops for basic arithmetic. No transcendental operations have WASM SIMD paths. The `simd_wasm.go` implementation uses `wasm.SIMD128Load`/`Store` which works but is not optimized.
+* **Proposed Plan:**
+  - Implement WASM SIMD128 transcendental kernels (Exp, Log, Sin, Cos) using polynomial approximation.
+  - Add `f64x2.div` and `f64x2.sqrt` operations where supported.
+  - Implement SIMD-aligned memory allocator for WASM targets.
+  - Benchmark against scalar Go and native WASM implementations.
+  - Add WASM-specific build tags for feature detection (SIMD128, sign-extension, bulk-memory).
+
+### 9. Benchmark Suite and Regression Detection
+* **Current State:** `cmd/bench/` provides comprehensive benchmarks. No automated regression detection or CI integration exists.
+* **Proposed Plan:**
+  - Add `benchstat` integration for automated comparison between commits.
+  - Implement ULP accuracy tracking across releases.
+  - Add `go test -bench -json` output parsing for CI artifact collection.
+  - Create baseline benchmark data and regression thresholds.
+  - Add thermal throttling detection (ARM64) for consistent benchmark results.
+  - Implement `eml bench --compare=main` for local regression checks.
+
+### 10. API Stability, SemVer, and CHANGELOG
+* **Current State:** No versioning strategy, no CHANGELOG, exported API uses both panics and errors inconsistently. No `go doc` package-level documentation.
+* **Proposed Plan:**
+  - Freeze current API surface: document all public functions, types, and constants.
+  - Add `// Deprecated:` annotations to any functions that should be removed.
+  - Create `CHANGELOG.md` following [Keep a Changelog](https://keepachangelog.com/) format.
+  - Add `doc.go` files for each package with package-level documentation.
+  - Create `API.md` documenting all public APIs with examples.
+  - Tag release `v0.3.0` with semantic versioning policy documented.
+  - Add `go generate` for API documentation generation.
