@@ -113,8 +113,7 @@ func ComplexSin(z complex128) complex128 {
 }
 
 func ComplexCos(z complex128) complex128 {
-	conj := complex(-imag(z), real(z))
-	exp_z := eml.ComplexOne(z)
-	exp_conj := eml.ComplexOne(conj)
-	return (exp_z + exp_conj) / 2
+	iz := complex(-imag(z), real(z))
+	niz := complex(imag(z), -real(z))
+	return (eml.ComplexOne(iz) + eml.ComplexOne(niz)) / 2
 }

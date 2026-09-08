@@ -107,7 +107,7 @@ func LogSubTo(a, b, result []float64) {
 func AbsBranchless(x float64) float64 {
 	bits := math.Float64bits(x)
 	sign := bits >> 63
-	return math.Float64frombits(bits ^ (sign<<63 | sign))
+	return math.Float64frombits(bits ^ (sign << 63))
 }
 
 // MinBranchless returns the minimum of a and b using bitwise selection.

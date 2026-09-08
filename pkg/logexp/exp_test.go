@@ -182,3 +182,23 @@ func BenchmarkLog(b *testing.B) {
 		Log(1.5)
 	}
 }
+
+func TestExpStabilityNearZero(t *testing.T) {
+	tests := []struct {
+		x, want float64
+		tol     float64
+	}{
+		{1e-15, 1 + 1e-15, 1e-25},
+		{1e-10, 1 + 1e-10, 1e-20},
+		{1e-8, 1 + 1e-8, 1e-18},
+		{-1e-15, 1 - 1e-15, 1e-25},
+		{-1e-10, 1 - 1e-10, 1e-20},
+	}
+	for _, tc := range tests {
+		got := Exp(tc.x)
+		diff := math.Abs(got - tc.want)
+		if diff > tc.tol {
+			t.Errorf("Exp(%v) = %v, want %v (diff=%v, tol=%v)", tc.x, got, tc.want, diff, tc.tol)
+		}
+	}
+}

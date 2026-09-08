@@ -54,12 +54,12 @@ func TestEncoderLoadConstantREX(t *testing.T) {
 
 func TestEncoderMovsdStoreREX(t *testing.T) {
 	var e encoder
-	e.movsdStore(8) // reg >= 8 triggers REX 0x41
+	e.movsdStore(8) // reg >= 8 triggers REX.R 0x44
 	if len(e.code) < 6 {
 		t.Fatalf("movsdStore REX emitted %d bytes, want >= 6", len(e.code))
 	}
-	if e.code[0] != 0x41 {
-		t.Fatalf("expected REX.B prefix 0x41, got %02x", e.code[0])
+	if e.code[0] != 0x44 {
+		t.Fatalf("expected REX.R prefix 0x44, got %02x", e.code[0])
 	}
 }
 

@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	"github.com/emlgo/eml/internal/eml"
-	"github.com/emlgo/eml/pkg/logexp"
 )
 
 var (
@@ -15,6 +14,7 @@ var (
 	nan      = eml.NaN
 	inf      = eml.Inf
 	nativeLog   = eml.Log
+	nativeLog1p = eml.Log1p
 	nativeSqrt  = eml.Sqrt
 	nativeHypot = eml.Hypot
 
@@ -169,11 +169,21 @@ func Pow(x, y float64) float64 {
 	if x < 0 && isInteger(y) {
 		intY := int(y)
 		if intY%2 == 0 {
-			return logexp.Exp(y * logexp.Log(-x))
+			return powStable(-x, y)
 		}
-		return -logexp.Exp(y * logexp.Log(-x))
+		return -powStable(-x, y)
 	}
-	return logexp.Exp(y * logexp.Log(x))
+	return powStable(x, y)
+}
+
+// powStable computes x^y with improved stability near x=1.
+// For x near 1: x^y = exp(y * log(x)) ≈ exp(y * log1p(x-1))
+func powStable(x, y float64) float64 {
+	absX1 := x - 1
+	if absX1 > -0.5 && absX1 < 0.5 {
+		return nativeExp(y * nativeLog1p(absX1))
+	}
+	return nativeExp(y * nativeLog(x))
 }
 
 func PowInt(x float64, n int) float64 {
@@ -322,6 +332,10 @@ func Log(x float64) float64 {
 		return nan()
 	}
 	if x > 0 {
+		// For x near 1, use Log1p for better accuracy
+		if x > 0.5 && x < 1.5 {
+			return nativeLog1p(x - 1)
+		}
 		return nativeLog(x)
 	}
 	if x == 0 {
