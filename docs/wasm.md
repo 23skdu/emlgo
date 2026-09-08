@@ -39,8 +39,15 @@ The library provides optimized batch kernels that take advantage of WASM SIMD (w
 | FMA | `fmaWasmSIMD` | Fused multiply-add (a*b + c) |
 | AddScalar | `addScalarWasmSIMD` | Add constant to each element |
 | MulScalar | `mulScalarWasmSIMD` | Multiply each element by constant |
-
-Transcendental functions (Exp, Log, Sin, Cos, Tan) use parallelized scalar computation via goroutines, which are cooperatively scheduled on WASM's single thread.
+| Exp | `expWasmSIMD` | Element-wise exponential |
+| Log | `logWasmSIMD` | Element-wise natural logarithm |
+| Sin | `sinWasmSIMD` | Element-wise sine |
+| Cos | `cosWasmSIMD` | Element-wise cosine |
+| Tan | `tanWasmSIMD` | Element-wise tangent |
+| Sinh | `sinhWasmSIMD` | Element-wise hyperbolic sine |
+| Cosh | `coshWasmSIMD` | Element-wise hyperbolic cosine |
+| Tanh | `tanhWasmSIMD` | Element-wise hyperbolic tangent |
+| SinCos | `sincosWasmSIMD` | Simultaneous sin and cos |
 
 ### Feature Detection
 
@@ -81,7 +88,7 @@ The `scripts/wasm_test.sh` script builds WASM binaries and runs them with Node.j
 
 ### Prerequisites
 
-- Go 1.21+ (for WASM target support)
+- Go 1.23+ (for WASM target support)
 - Node.js 16+ (for WASM SIMD support)
 
 ### Usage
@@ -123,7 +130,7 @@ Start the local server:
 The WASM build uses `//go:build wasm` build tags to select the appropriate dispatch layer:
 
 - `simd_dispatch_wasm.go` — routes all SIMD operations to WASM-optimized kernels
-- `simd_wasm.go` — implements block-unrolled kernels
+- `simd_wasm.go` — implements block-unrolled kernels for all operations including transcendentals
 - `wasm_utils.go` — memory alignment utilities
 - `simd_dispatch_stub.go` — excluded from WASM builds (`!wasm` constraint)
 
@@ -133,3 +140,4 @@ The WASM build uses `//go:build wasm` build tags to select the appropriate dispa
 - **Goroutines**: On WASM, goroutines are cooperatively scheduled on a single thread. Parallelized operations (ExpBatch, LogBatch, etc.) provide concurrency but not true parallelism.
 - **SIMD auto-vectorization**: The block-unrolled loops are recognized by V8/TurboFan and SpiderMonkey and compiled to `wasm_simd128` instructions. Check the browser's DevTools Performance panel to verify SIMD usage.
 - **Memory alignment**: Use `WasmAlign16()` for critical paths to avoid alignment-related slowdowns in JIT-compiled code.
+- **Transcendental SIMD**: Exp, Log, Sin, Cos, Tan, Sinh, Cosh, Tanh, and SinCos all have dedicated WASM SIMD implementations using 8-wide unrolled kernels.
