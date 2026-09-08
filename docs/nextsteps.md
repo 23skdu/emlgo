@@ -1,119 +1,194 @@
-# Next Steps: 10-Part Improvement Plan
+# Next Steps: Improvement Plan & Known Issues
 
-This document outlines the remaining architectural and quality improvements for the `emlgo` math library based on a deep-dive analysis of the CPU, GPU, and JIT compilation subsystems.
+This document catalogs all known bugs, architectural flaws, and planned improvements for the `emlgo` math library.
 
 ---
 
-## 10-Part Improvement Plan
+## P0 Blockers — Critical Correctness
 
-```mermaid
-graph TD
-    A[Deep Code Analysis] --> B[Platform Parity]
-    A --> C[Code Quality]
-    A --> D[JIT Enhancement]
-    A --> E[Build & CI]
-    A --> F[Performance]
-    A --> G[API & Distribution]
-    
-    B --> B1[1. ARM64 NEON Assembly Kernels]
-    B --> B2[2. ARM64 SVE/SVE2 Assembly Kernels]
-    B --> B3[3. ARM64 Transcendental Kernels]
-    
-    C --> C1[4. Fix CI/CD Pipeline & Linter Config]
-    C --> C2[5. Go Documentation Coverage & Error Consistency]
-    
-    D --> D1[6. JIT Non-Integer Power & Variable Support]
-    
-    E --> E1[7. GPU Kernel Library Expansion]
-    
-    F --> F1[8. WASM SIMD Optimization]
-    F --> F2[9. Benchmark Suite & Regression Detection]
-    
-    G --> G1[10. ✅ API Stability, SemVer & CHANGELOG]
-```
+These must be fixed before any release.
 
-### 1. ARM64 NEON Assembly Kernels for Arithmetic & Unary Ops
-* **Current State:** `internal/eml/simd_arm64.s` is empty. All NEON-labeled functions (`addNEON`, `subNEON`, `mulNEON`, `divNEON`, `sqrtNEON`, etc.) in `simd_arm64.go` are plain Go loops, not actual NEON assembly.
-* **Proposed Plan:**
-  - Write hand-tuned ARM64 NEON assembly in `simd_arm64.s` utilizing 128-bit `V0.2D`-`V7.2D` vector registers for 2-wide `float64` operations (`FADD`, `FMUL`, `FDIV`, `FSQRT`).
-  - Implement bitwise NEON kernels for `Abs` (using `BIC` with sign-bit mask) and `Neg` (using `EOR` with sign-bit mask).
-  - Add scalar broadcast (`VMOV` + `FADD`/`FMUL`) for `AddScalarNEON` and `MulScalarNEON`.
-  - Wire assembly functions via `//go:noescape` declarations in `simd_arm64.go` and update the ARM64 dispatch layer.
+### P0-1. `AbsBranchless` corrupts negative numbers
+* **File:** `internal/eml/fused.go:110`
+* **Bug:** The mask `sign<<63 | sign` flips both the sign bit AND the LSB when `sign=1`. For `x = -5.0` (0xC014000000000000), this produces 0x4014000000000001 ≈ 5.0000000000000009 instead of exactly 5.0.
+* **Why:** `sign` is `bits >> 63`, which is 0 or 1. `1<<63 | 1` = `0x8000000000000001`. XOR with that flips sign bit and LSB.
+* **Fix:** Change to `bits ^ (sign << 63)` — only flip the sign bit.
+* **Test gap:** Tests use `1e-10` tolerance which masks the LSB corruption.
 
-### 2. ARM64 SVE/SVE2 Vector-Length Agnostic Assembly Kernels
-* **Current State:** `simd_arm64.go` implements SVE via Go-level VL-aware loops (e.g., `addSVE`, `mulSVE`). No actual SVE assembly instructions are used.
-* **Proposed Plan:**
-  - Write VLA (Vector-Length Agnostic) SVE assembly kernels using predicate registers (`P0-P7`) and scalable vector registers (`Z0-Z31`) for 2-wide double operations.
-  - Use `WHILELT` to generate progressive predicates and `FADD_ZZZ`/`FMUL_ZZZ`/`FDIV_ZZZ`/`FSQRT_ZZZ` for arithmetic.
-  - Support both SVE2 (Graviton 3/4, Apple M4) and baseline SVE via runtime detection from `/proc/self/auxv`.
-  - Add transcendental SVE kernels (Exp, Log, Sin, Cos, Tan) using SVE2 polynomial approximation instructions where available.
+### P0-2. `ComplexCos` uses wrong formula
+* **File:** `internal/constants/constants.go:115-119`
+* **Bug:** Computes `(Exp(z) + Exp(iz)) / 2`. Correct formula: `cos(z) = (Exp(iz) + Exp(-iz)) / 2`.
+* **Why:** Variable `conj` is actually `iz` (not conjugate). Code passes `z` instead of `-iz` to the first `ComplexOne`.
+* **Fix:** `iz = complex(-imag(z), real(z))`, `niz = complex(imag(z), -real(z))`, return `(Exp(iz) + Exp(niz)) / 2`.
 
-### 3. ARM64 Transcendental Batch Kernels (NEON)
-* **Current State:** ARM64 transcendental batch operations (`ExpSIMD`, `LogSIMD`, `SinSIMD`, `CosSIMD`, `TanSIMD`) fall through to `parallelizeGeneric` which calls scalar `math.*` in goroutines. The AVX2 hand-coded transcendental kernels have no ARM64 equivalent.
-* **Proposed Plan:**
-  - Implement NEON-vectorized Cody-Waite range reduction for Sin/Cos/Tan using `FMLS` (fused multiply-subtract) with precomputed constant tables.
-  - Port the minimax polynomial evaluation for Exp/Log/Sin/Cos/Tan to NEON using `FMLA` (fused multiply-add) with 2-wide `float64` vectors.
-  - Target Apple Silicon (M1/M2/M3/M4) and AWS Graviton3/4 as primary validation platforms.
-  - Achieve ≥2x speedup over scalar `math.*` on ARM64 for batch sizes ≥32.
+### P0-3. Missing length validation on binary SIMD ops
+* **File:** `internal/eml/simd.go:235-262`
+* **Bug:** `AddSIMD`, `SubSIMD`, `MulSIMD`, `DivSIMD` never check `len(a) == len(b)`. If mismatched, SIMD dispatch reads `b[i]` out of bounds → runtime panic.
+* **Why:** Every other public SIMD function (`SIMD`, `ExpSIMDTo`, `AbsSIMDTo`, etc.) validates. These four were added later without the check.
+* **Fix:** Add `if len(a) != len(b) { panic("slice length mismatch") }` at the top of each.
 
-### 4. Fix CI/CD Pipeline and Consolidate Linter Configuration
-* **Current State:**
-  - CI workflow (`ci.yml`) tests Go 1.21–1.23, but `go.mod` declares `go 1.26.1` (a future version). CI will fail on `go mod download`.
-  - Duplicate golangci-lint configs exist: `.golangci.yml` (with deprecated linters `structcheck`, `varcheck`) and `.golangci.yaml` (different linter set). Only one is used.
-* **Proposed Plan:**
-  - Update `go.mod` to a valid Go version (e.g., `go 1.23` matching the latest stable).
-  - Update CI matrix to test Go 1.22 and 1.23 (drop 1.21).
-  - Delete `.golangci.yaml` and keep `.golangci.yml` as the single source of truth.
-  - Update `.golangci.yml`: remove deprecated `structcheck`/`varcheck`, add `errcheck` with `check-type-assertions: true`.
-  - Add a CI step for `go vet` and `staticcheck` as separate lint stages.
+### P0-4. `movsdStore` wrong REX prefix for high XMM registers
+* **File:** `internal/jit/codegen.go:170`
+* **Bug:** Uses REX.B (0x41) instead of REX.R (0x44) for high XMM registers. `MOVSD [mem], xmm_reg` puts `xmm_reg` in the ModR/M reg field — needs REX.R to extend the reg field. REX.B extends rm/SIB base (RSP), which doesn't need extension.
+* **Why:** Copy-paste error from `movsdLoad` which uses REX.B correctly for the XMM load.
+* **Fix:** Change `e.emit(0x41)` to `e.emit(0x44)`. Update `coverage_test.go:57` to expect 0x44.
 
-### 5. Go Documentation Coverage and Error Consistency
-* **Current State:**
-  - Most exported functions in `internal/eml/simd.go`, `fused.go` lack godoc comments.
-  - Inconsistent error handling: `Batch()` returns `error`, but `*SIMD()` functions panic on length mismatch. `ExpMulTo` panics but `ExpMulBatch` returns a sentinel.
-  - No CHANGELOG or release notes exist.
-* **Proposed Plan:**
-  - Add godoc comments to all exported functions in `internal/eml/` (SIMD functions, fused operations, worker pool utilities).
-  - Standardize error handling: introduce `ValidateSlices(args ...[]float64) error` helper and use it consistently. For API consistency, decide on panic (performance-critical path) vs error (user-facing API) and document the rationale.
-  - Create `CHANGELOG.md` with semantic versioning entries starting from current state.
-  - Ensure `go doc` renders useful descriptions for all public symbols.
+### P0-5. Complex number first-class support and real-domain fast path
+* **Current State:** All math operations treat arguments as `float64`. Complex numbers are only supported in `internal/eml/complex.go` and `internal/constants/constants.go`. The JIT, SIMD batch ops, and public API have no complex path. Generating trigonometric identities, negative roots, and constants like `i` or `π` requires manual complex assembly.
+* **Plan:**
+  - Design a dual-path API: fast `float64` path for real numbers, `complex128` path via `math/cmplx` for complex expressions.
+  - Extend JIT to emit `complex128` operations (or at minimum, support `cmplx.Exp`, `cmplx.Log`, `cmplx.Sin`, `cmplx.Cos` as JIT-callable functions).
+  - Add batch complex operations: `AddComplexSIMD`, `MulComplexSIMD`, `ExpComplexSIMD`, etc.
+  - Ensure all trigonometric identities (`sin²z + cos²z = 1`, `e^{iπ} = -1`) hold in tests for complex inputs.
 
-### 6. JIT Non-Integer Power and Variable Exponent Support
-* **Current State:** JIT `genPow` handles negative integer exponents via `1.0/x^n`, but fractional exponents (e.g., `x^0.5`, `x^2.3`) return an error. Variable exponents (e.g., `x^y`) are unsupported.
-* **Proposed Plan:**
-  - Implement `pow(x, y) = exp(y * log(x))` for non-integer exponents in JIT codegen.
-  - Add register spill support for the additional temp registers needed.
-  - Implement `pow(x, y)` for variable exponents using the same identity.
-  - Add batch compilation mode: compile multiple expressions sharing a constant pool.
-  - Add x86-64 `SQRTSD`/`SQRTSS` direct emission for `sqrt(x)` instead of indirect call.
+### P0-6. Log1p/Expm1 asymmetric sensitivity and compound form stability
+* **Current State:** `Log1p` and `Expm1` exist but are not used in compound evaluations. `Exp(y * Log(x))` for `x` near 1 or `y` near 0 suffers catastrophic cancellation. `Log(1 + x)` for small `x` loses all significant digits.
+* **Plan:**
+  - Audit all places where `Log(1+x)` or `Exp(x)-1` appears and replace with `Log1p(x)` / `Expm1(x)`.
+  - Add optimized stable evaluation paths for compound derived forms (e.g., `Pow(x,y)` near `x=1`, `LogRatio(a,b)` for `a≈b`).
+  - Use `math.Expm1` and `math.Log1p` internally wherever subtraction/addition with 1.0 occurs.
+  - Add numerical stability tests: verify ULP accuracy for inputs near identity points (`x=1` for Log, `x=0` for Exp, etc.).
+
+### P0-7. Optional multiprecision backend for symbolic verification and deep tree reduction
+* **Current State:** All computation is `float64`. No way to verify symbolic identities to arbitrary precision. No deep tree reduction / algebraic simplification.
+* **Plan:**
+  - Add an optional `big` backend using `math/big.Float` for arbitrary-precision evaluation.
+  - Evaluate MPFR bindings (`github.com/cznic/mathutil` or `github.com/mattetti/mp`) for high-performance multiprecision.
+  - Implement tree reduction: simplify EML expression trees algebraically (constant folding, identity elimination, strength reduction).
+  - Provide a `VerifyIdentity(expr1, expr2 string, precision uint) bool` function that evaluates both expressions at random high-precision points and compares ULP distance.
+
+### P0-8. Core AST as explicit interface with zero-allocation design
+* **Current State:** JIT uses `Node` interface with 5 concrete types. Each `BinaryOp`, `UnaryOp`, `FunctionCall` heap-allocates. The tree-walking `Eval` function allocates nothing but the JIT path doesn't benefit. No arena/pool for AST nodes.
+* **Plan:**
+  - Design AST nodes as fixed-size structs with a `nodeKind` discriminator byte instead of interface dispatch.
+  - Implement arena allocator: `type Arena struct { buf []byte; off int }` — bump-allocate all nodes in a contiguous buffer.
+  - Add `ParseToArena(expr string, arena *Arena) *Node` for zero-GC-parse paths.
+  - Benchmark allocation count via `testing.AllocsPerRun` for parse and eval paths.
+  - Target: 0 allocations for `Parse` + `Eval` of any expression.
+
+### P0-9. Canonical constructors for minimal EML tree equivalents
+* **Current State:** No way to map a standard expression back to its canonical EML tree form. No simplification rules. `x + y` stays as `BinaryOp(+, x, y)` instead of potentially being reduced via EML identities.
+* **Plan:**
+  - Implement canonical form rules:
+    - `exp(x) = eml(x, 1)`
+    - `log(x) = eml(1, eml(eml(1, x), 1))`
+    - `x + y = eml(log(x), exp(y))` (for the full EML derivation)
+    - `sin(x)` as a composition of EML nodes
+  - Add a `Canonicalize(n Node) Node` function that rewrites any AST to minimal EML tree form.
+  - Add equivalence checker: two expressions are equal if their canonical forms are structurally identical.
+  - Provide `EMLSize(n Node) int` to measure the complexity of the EML decomposition.
+
+---
+
+## P1 Bugs — High Severity
+
+### P1-1. `MinBranchless`/`MaxBranchless` broken for NaN in second argument
+* **File:** `internal/eml/fused.go:114,123`
+* **Bug:** When `b` is NaN, `diff = a - NaN = NaN`, sign bit of NaN is 0, so `mask = 0`, result = `b = NaN`. IEEE 754 `minNum` returns the non-NaN operand.
+* **Fix:** Add NaN-aware logic: `if isNaN(a) { return b }; if isNaN(b) { return a }` before the bitwise operation.
+
+### P1-2. `IntAbs(MinInt)` overflows
+* **File:** `pkg/arithmetic/arith.go:415`
+* **Bug:** `-MinInt64` overflows back to `MinInt64`. The adjacent `GCD` function handles this but `IntAbs` doesn't.
+* **Fix:** Add overflow guard: `if a == math.MinInt { return math.MaxInt }` or use unsigned arithmetic.
+
+### P1-3. `GCD(MinInt64, x)` silently corrupts result
+* **File:** `pkg/arithmetic/arith.go:356-361`
+* **Bug:** Clamping `MinInt64` to `MaxInt64` changes the mathematical result. `GCD(MinInt64, 2) = 2` but returns `GCD(MaxInt64, 2) = 1`.
+* **Fix:** Use unsigned arithmetic for the absolute value, or document the limitation clearly.
+
+### P1-4. `hasNeonDot` unconditionally true on all ARM64
+* **File:** `internal/eml/simd_arm64.go:214`
+* **Bug:** Dot product requires ARMv8.2-A. Cortex-A53/A55 (ARMv8.0-A) will SIGILL when executing dot product instructions.
+* **Fix:** Runtime detection via `getauxval(AT_HWCAP)` checking `HWCAP_ATOMICS` or `HWCAP2_I8MM`.
+
+### P1-5. `Pow` integer conversion overflow for large exponents
+* **File:** `pkg/arithmetic/arith.go:170`
+* **Bug:** `int(y)` silently truncates for `y > 1e19`. The subsequent `intY%2 == 0` check is meaningless.
+* **Fix:** Range-check before casting: `if y > float64(math.MaxInt) || y < float64(math.MinInt) { ... }`.
+
+### P1-6. `push`/`popTo` emit malformed x86 instructions
+* **File:** `internal/jit/codegen.go:184-192`
+* **Bug:** `movsdStore` with mod=00 and SIB base=RSP requires a disp32 per x86-64 ISA. No displacement is emitted, so the CPU reads the next code bytes as the displacement field.
+* **Fix:** Use `modrm(1, ...)` with a disp8 of 0, or add the missing disp32. (Currently dead code, but the encoding is invalid.)
+
+---
+
+## P2 Issues — Medium Severity
+
+### P2-1. Inconsistent NaN semantics across packages
+* `arithmetic.Min`/`Max` return the non-NaN operand.
+* Go 1.21+ `math.Min`/`math.Max` return NaN if either operand is NaN.
+* `trig.Cot` returns NaN when sin(x)==0, even at multiples of π (should be ±Inf).
+* **Decision needed:** Document which convention the library follows and enforce it consistently.
+
+### P2-2. Mixed panic vs error on length mismatch
+* Public SIMD functions (`AddSIMD`, etc.): `panic` on length mismatch.
+* `Batch()`: returns `error` on length mismatch.
+* `AddBatch()`, `NegBatch()`, etc. in `arithmetic`: no length check at all.
+* **Fix:** Standardize: panic for internal/performance-critical paths, error for user-facing API. Document the rationale.
+
+### P2-3. `Acsch(0)` ignores sign
+* **File:** `pkg/trig/trig.go:236`
+* **Bug:** Returns `+Inf` for both `x→0+` and `x→0-`. Should be `inf(sign(x))`.
+* **Fix:** `if x == 0 { return inf(math.Copysign(1, x)) }` or handle via `1/x` approach.
+
+### P2-4. `Sec`/`Csc` missing NaN/Inf guards
+* **File:** `pkg/trig/trig.go:64-69`
+* **Bug:** Every other trig function checks NaN/Inf, but these two don't. Inconsistent API contract.
+* **Fix:** Add `if isNaN(x) || isInf(x, 0) { return nan() }` before the computation.
+
+### P2-5. `dispatchSinCosSIMDTo` doubles range-reduction work
+* **File:** `internal/eml/simd_dispatch_amd64.go:339-351`
+* **Bug:** Calls `sinAVX2` and `cosAVX2` as independent passes, doubling the Cody-Waite range reduction work.
+* **Fix:** Implement a fused `sincosAVX2` kernel that shares the range reduction and evaluates sin/cos polynomials together.
+
+### P2-6. Worker pool goroutines never shut down
+* **File:** `internal/eml/simd.go:396-405`
+* **Bug:** No `Stop()` or context cancellation. Goroutines leak for the process lifetime.
+* **Fix:** Add `Stop()` function that closes the `jobQueue` channel. Workers exit when channel is closed.
+
+---
+
+## Improvement Plan
+
+### 1. ARM64 NEON Assembly Kernels
+* **Status:** Pending
+* **Current State:** `simd_arm64.s` is empty. NEON-labeled functions are plain Go loops.
+* **Plan:** Write hand-tuned ARM64 NEON assembly for 2-wide `float64` ops, bitwise abs/neg, scalar broadcast.
+
+### 2. ARM64 SVE/SVE2 Assembly Kernels
+* **Status:** Pending
+* **Current State:** SVE implemented via Go-level VL-aware loops. No actual SVE instructions.
+* **Plan:** Write VLA SVE assembly with predicate registers and scalable vector registers.
+
+### 3. ARM64 Transcendental Batch Kernels
+* **Status:** Pending
+* **Current State:** ARM64 transcendental batch ops fall through to `parallelizeGeneric`.
+* **Plan:** NEON-vectorized Cody-Waite range reduction and minimax polynomial evaluation.
+
+### 4. Fix CI/CD Pipeline
+* **Status:** Pending
+* **Current State:** `go.mod` declares `go 1.26.1` (future version). CI tests Go 1.21-1.23. Duplicate linter configs.
+* **Plan:** Update `go.mod`, CI matrix, consolidate linter config.
+
+### 5. Go Documentation Coverage
+* **Status:** Partially done
+* **Done:** CHANGELOG.md created. doc.go files added for all packages.
+* **Remaining:** Add godoc to individual exported functions in `internal/eml/`.
+
+### 6. JIT Non-Integer Power
+* **Status:** ✅ Done
 
 ### 7. GPU Kernel Library Expansion
-* **Current State:** GPU backends (CUDA, Metal) provide batch arithmetic (add/sub/mul/div/sqrt) and EML operator. Transcendental functions (exp/log/sin/cos/tan) on GPU rely on the C runtime library.
-* **Proposed Plan:**
-  - Implement Metal compute shaders for Apple Silicon: Exp, Log, Sin, Cos, Tan kernels with 256-wide threadgroups.
-  - Implement CUDA kernels for transcendental batch operations.
-  - Add GPU memory pool statistics and OOM recovery.
-  - Implement `GPU available memory` query for auto-sizing batch operations.
-  - Add Vulkan compute backend for cross-platform GPU support (Linux/Windows).
+* **Status:** ✅ Done
 
 ### 8. WASM SIMD Optimization
-* **Current State:** WASM SIMD uses 8-wide block unrolled loops for basic arithmetic. No transcendental operations have WASM SIMD paths. The `simd_wasm.go` implementation uses `wasm.SIMD128Load`/`Store` which works but is not optimized.
-* **Proposed Plan:**
-  - Implement WASM SIMD128 transcendental kernels (Exp, Log, Sin, Cos) using polynomial approximation.
-  - Add `f64x2.div` and `f64x2.sqrt` operations where supported.
-  - Implement SIMD-aligned memory allocator for WASM targets.
-  - Benchmark against scalar Go and native WASM implementations.
-  - Add WASM-specific build tags for feature detection (SIMD128, sign-extension, bulk-memory).
+* **Status:** ✅ Done
 
-### 9. Benchmark Suite and Regression Detection
-* **Current State:** `cmd/bench/` provides comprehensive benchmarks. No automated regression detection or CI integration exists.
-* **Proposed Plan:**
-  - Add `benchstat` integration for automated comparison between commits.
-  - Implement ULP accuracy tracking across releases.
-  - Add `go test -bench -json` output parsing for CI artifact collection.
-  - Create baseline benchmark data and regression thresholds.
-  - Add thermal throttling detection (ARM64) for consistent benchmark results.
-  - Implement `eml bench --compare=main` for local regression checks.
+### 9. Benchmark Suite & Regression Detection
+* **Status:** Pending
+* **Plan:** `benchstat` integration, ULP tracking, CI artifact collection.
 
-### 10. ✅ API Stability, SemVer, and CHANGELOG
-* **Done:** CHANGELOG.md created following Keep a Changelog format with v0.3.0 and Unreleased sections. doc.go files added for all public and internal packages. Semantic versioning policy documented.
+### 10. API Stability, SemVer & CHANGELOG
+* **Status:** ✅ Done
