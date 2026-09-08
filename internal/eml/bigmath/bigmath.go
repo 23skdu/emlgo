@@ -13,7 +13,6 @@ const Prec = 256
 
 var (
 	one  = new(big.Float).SetPrec(Prec).SetInt64(1)
-	two  = new(big.Float).SetPrec(Prec).SetInt64(2)
 	half = new(big.Float).SetPrec(Prec).SetFloat64(0.5)
 )
 
