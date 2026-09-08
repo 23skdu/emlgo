@@ -337,16 +337,6 @@ func dispatchTanSIMDTo(x, result []float64) {
 }
 
 func dispatchSinCosSIMDTo(x, sin, cos []float64) {
-	n := len(x)
-	if hasAVX2 {
-		simdLen := (n / 4) * 4
-		sinAVX2(x[:simdLen], sin[:simdLen])
-		cosAVX2(x[:simdLen], cos[:simdLen])
-		for i := simdLen; i < n; i++ {
-			sin[i], cos[i] = Sincos(x[i])
-		}
-		return
-	}
 	parallelizeSinCos(x, sin, cos)
 }
 func dispatchSqrtSIMDTo(x, result []float64) { amd64SqrtSIMD(x, result) }

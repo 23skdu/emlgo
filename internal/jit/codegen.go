@@ -182,13 +182,13 @@ func (e *encoder) movsdLoad(reg byte) {
 }
 
 func (e *encoder) push() {
-	e.emit(0x48, 0x83, 0xEC, 0x08)
+	e.emit(0x48, 0x83, 0xEC, 0x08) // sub rsp, 8
 	e.movsdStore(0)
 }
 
 func (e *encoder) popTo(reg byte) {
 	e.movsdLoad(reg)
-	e.emit(0x48, 0x83, 0xC4, 0x08)
+	e.emit(0x48, 0x83, 0xC4, 0x08) // add rsp, 8
 }
 
 func (e *encoder) addsd(dst, src byte)  { e.sse2(0xF2, 0x58, dst, src) }

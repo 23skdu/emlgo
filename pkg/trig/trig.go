@@ -62,10 +62,16 @@ func Cot(x float64) float64 {
 }
 
 func Sec(x float64) float64 {
+	if isNaN(x) || isInf(x, 0) {
+		return nan()
+	}
 	return 1 / math.Cos(x)
 }
 
 func Csc(x float64) float64 {
+	if isNaN(x) || isInf(x, 0) {
+		return nan()
+	}
 	return 1 / math.Sin(x)
 }
 
@@ -233,7 +239,11 @@ func Acsch(x float64) float64 {
 		return nan()
 	}
 	if x == 0 {
+		// acsch(x) → sign(x) * Inf as x → 0
 		return inf(1)
+	}
+	if isInf(x, 0) {
+		return 0
 	}
 	return Asinh(1 / x)
 }

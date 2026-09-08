@@ -405,6 +405,8 @@ const (
 
 var jobQueue chan parallelJob
 
+var workerPoolStopped bool
+
 func initWorkerPool() {
 	numWorkers := cpuNum
 	if numWorkers < 1 {
@@ -414,6 +416,16 @@ func initWorkerPool() {
 	for i := 0; i < numWorkers; i++ {
 		go workerPoolWorker()
 	}
+}
+
+// StopWorkerPool gracefully shuts down the worker pool goroutines.
+// After calling Stop, no further parallel operations should be submitted.
+func StopWorkerPool() {
+	if workerPoolStopped {
+		return
+	}
+	workerPoolStopped = true
+	close(jobQueue)
 }
 
 func workerPoolWorker() {

@@ -27,6 +27,7 @@ type Arena struct {
 	off int
 }
 
+// NewArena creates a new Arena with the given initial capacity.
 func NewArena(capacity int) *Arena {
 	if capacity <= 0 {
 		capacity = 64
@@ -36,6 +37,7 @@ func NewArena(capacity int) *Arena {
 	}
 }
 
+// Alloc returns a pointer to the next available ArenaNode, growing the buffer if needed.
 func (a *Arena) Alloc() *ArenaNode {
 	if a.off >= len(a.buf) {
 		a.grow()
@@ -52,14 +54,17 @@ func (a *Arena) grow() {
 	a.buf = newBuf
 }
 
+// NumNodes returns the number of nodes allocated in the arena.
 func (a *Arena) NumNodes() int {
 	return a.off
 }
 
+// Reset resets the arena so that all previously allocated nodes become available for reuse.
 func (a *Arena) Reset() {
 	a.off = 0
 }
 
+// ToInterface converts an ArenaNode to the corresponding Node interface value.
 func (a *Arena) ToInterface(n *ArenaNode) Node {
 	if n == nil {
 		return nil
@@ -83,6 +88,7 @@ func (a *Arena) ToInterface(n *ArenaNode) Node {
 	return nil
 }
 
+// FromInterface converts a Node interface value into a new ArenaNode allocated from the arena.
 func (a *Arena) FromInterface(n Node) *ArenaNode {
 	if n == nil {
 		return nil
@@ -122,6 +128,7 @@ func (a *Arena) FromInterface(n Node) *ArenaNode {
 	return nil
 }
 
+// EvalArena evaluates the expression tree rooted at n with variable x set to the given value.
 func EvalArena(n *ArenaNode, x float64) float64 {
 	if n == nil {
 		return 0
