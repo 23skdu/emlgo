@@ -35,7 +35,7 @@ func (v *IdentityVerifier) VerifyIdentity(expr1, expr2 func(*big.Float) *big.Flo
 		v.Tolerance = 2.0
 	}
 
-	rng := rand.New(rand.NewSource(42))
+	rng := rand.New(rand.NewSource(42)) //#nosec G404 -- deterministic seed intentional: mathematical verifier, not a security-sensitive RNG
 	for i := 0; i < v.Samples; i++ {
 		// Generate random test point in (0.1, 10)
 		x := 0.1 + rng.Float64()*9.9
