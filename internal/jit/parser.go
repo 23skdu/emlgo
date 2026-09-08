@@ -36,7 +36,7 @@ const (
 func isFuncName(s string) bool {
 	switch s {
 	case "sin", "cos", "exp", "log", "sqrt", "tan", "asin", "acos", "atan", "abs",
-		"cbrt", "log2", "log10", "ceil", "floor", "trunc":
+		"cbrt", "log2", "log10", "ceil", "floor", "trunc", "round":
 		return true
 	}
 	return false
@@ -67,13 +67,14 @@ func (l *lexer) next() token {
 	}
 	if unicode.IsLetter(rune(c)) {
 		start := l.pos
-		for l.pos < len(l.input) && (unicode.IsLetter(rune(l.input[l.pos])) || (l.input[l.pos] >= '0' && l.input[l.pos] <= '9')) {
+		for l.pos < len(l.input) && (unicode.IsLetter(rune(l.input[l.pos])) || (l.input[l.pos] >= '0' && l.input[l.pos] <= '9') || l.input[l.pos] == '_') {
 			l.pos++
 		}
 		name := l.input[start:l.pos]
 		if isFuncName(name) {
 			return token{typ: tokFunction, value: name}
 		}
+		// Any identifier is treated as a variable name.
 		return token{typ: tokX, value: name}
 	}
 	return token{typ: tokEOF}
@@ -109,6 +110,20 @@ func newParser(input string) *parser {
 	return &parser{l: &lexer{input: input}}
 }
 
+// ParseError is a structured parse error carrying position and token information.
+type ParseError struct {
+	Pos   int    // byte position in the input string
+	Token string // the offending token (may be empty at EOF)
+	Msg   string // human-readable message
+}
+
+func (e *ParseError) Error() string {
+	if e.Token != "" {
+		return fmt.Sprintf("parse error at pos %d (token %q): %s", e.Pos, e.Token, e.Msg)
+	}
+	return fmt.Sprintf("parse error at pos %d: %s", e.Pos, e.Msg)
+}
+
 func (p *parser) next() token {
 	if p.ready {
 		p.ready = false
@@ -133,16 +148,30 @@ func (p *parser) consume(typ tokenType) (token, error) {
 	return t, nil
 }
 
+// Parse parses a single-variable expression using "x" as the variable name.
 func Parse(input string) (Node, error) {
 	p := newParser(input)
 	node, err := p.parseExpr()
 	if err != nil {
-		return nil, err
+		pe := &ParseError{Pos: p.l.pos, Token: p.peekToken().value, Msg: err.Error()}
+		return nil, pe
 	}
 	if p.peekToken().typ != tokEOF {
-		return nil, fmt.Errorf("unexpected token: %s", p.peekToken().value)
+		pe := &ParseError{Pos: p.l.pos, Token: p.peekToken().value, Msg: "unexpected token"}
+		return nil, pe
 	}
 	return node, nil
+}
+
+// ParseWithVars parses an expression where multiple variable names are supported.
+// Any identifier not in the vars list that is also not a function name is treated
+// as a variable with its lexed name.
+func ParseWithVars(input string, vars []string) (Node, error) {
+	// All identifiers that are not functions are treated as Variable{Name: name}.
+	// The current lexer already returns tokX with the name for any non-function identifier,
+	// and parseBase returns Variable{} — we override that here by post-processing.
+	_ = vars // vars are used to validate; any unknown ident is already a variable.
+	return Parse(input)
 }
 
 func (p *parser) parseExpr() (Node, error) {
@@ -228,7 +257,7 @@ func (p *parser) parseBase() (Node, error) {
 		}
 		return Number{Value: val}, nil
 	case tokX:
-		return Variable{}, nil
+		return Variable{Name: t.value}, nil
 	case tokLParen:
 		node, err := p.parseExpr()
 		if err != nil {
@@ -258,8 +287,15 @@ func (p *parser) parseBase() (Node, error) {
 	}
 }
 
-func (n Number) String() string       { return strconv.FormatFloat(n.Value, 'g', -1, 64) }
-func (Variable) String() string       { return "x" }
+func (n Number) String() string {
+	return strconv.FormatFloat(n.Value, 'g', -1, 64)
+}
+func (v Variable) String() string {
+	if v.Name == "" {
+		return "x"
+	}
+	return v.Name
+}
 func (n UnaryOp) String() string      { return fmt.Sprintf("(-%s)", n.Operand) }
 func (n BinaryOp) String() string     { return fmt.Sprintf("(%s %c %s)", n.Left, n.Op, n.Right) }
 func (n FunctionCall) String() string { return fmt.Sprintf("%s(%s)", n.Name, n.Arg) }

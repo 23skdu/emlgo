@@ -215,3 +215,135 @@ func TestNewFloatFromString(t *testing.T) {
 		t.Errorf("NewFloatFromString(pi) = %v, want %v", got, expected)
 	}
 }
+
+// -- Plan 6: Tan / Atan / Asin / Acos / NewFloatFromInt --
+
+func TestNewFloatFromInt(t *testing.T) {
+	f := NewFloatFromInt(42)
+	got := Float64(f)
+	if got != 42 {
+		t.Errorf("NewFloatFromInt(42) = %v, want 42", got)
+	}
+}
+
+func TestTanPiOver4(t *testing.T) {
+	// tan(π/4) = 1
+	pi := piConst(256)
+	piOver4 := new(big.Float).SetPrec(256).Quo(pi, new(big.Float).SetPrec(256).SetInt64(4))
+	got := Float64(Tan(piOver4))
+	if math.Abs(got-1) > 1e-12 {
+		t.Errorf("Tan(π/4) = %v, want 1", got)
+	}
+}
+
+func TestTanZero(t *testing.T) {
+	got := Float64(Tan(NewFloat(0)))
+	if got != 0 {
+		t.Errorf("Tan(0) = %v, want 0", got)
+	}
+}
+
+func TestAtanOne(t *testing.T) {
+	// atan(1) = π/4
+	got := Float64(Atan(NewFloat(1)))
+	want := math.Pi / 4
+	if math.Abs(got-want) > 1e-12 {
+		t.Errorf("Atan(1) = %v, want π/4=%v", got, want)
+	}
+}
+
+func TestAtanNegative(t *testing.T) {
+	// atan(-1) = -π/4
+	got := Float64(Atan(NewFloat(-1)))
+	want := -math.Pi / 4
+	if math.Abs(got-want) > 1e-12 {
+		t.Errorf("Atan(-1) = %v, want -π/4=%v", got, want)
+	}
+}
+
+func TestAtanLargeArg(t *testing.T) {
+	// atan(100) ≈ π/2
+	got := Float64(Atan(NewFloat(100)))
+	want := math.Atan(100)
+	if math.Abs(got-want) > 1e-10 {
+		t.Errorf("Atan(100) = %v, want %v", got, want)
+	}
+}
+
+func TestAsinHalf(t *testing.T) {
+	// asin(0.5) = π/6
+	got := Float64(Asin(NewFloat(0.5)))
+	want := math.Pi / 6
+	if math.Abs(got-want) > 1e-12 {
+		t.Errorf("Asin(0.5) = %v, want π/6=%v", got, want)
+	}
+}
+
+func TestAsinNegHalf(t *testing.T) {
+	// asin(-0.5) = -π/6
+	got := Float64(Asin(NewFloat(-0.5)))
+	want := -math.Pi / 6
+	if math.Abs(got-want) > 1e-12 {
+		t.Errorf("Asin(-0.5) = %v, want -π/6=%v", got, want)
+	}
+}
+
+func TestAcosHalf(t *testing.T) {
+	// acos(0.5) = π/3
+	got := Float64(Acos(NewFloat(0.5)))
+	want := math.Pi / 3
+	if math.Abs(got-want) > 1e-12 {
+		t.Errorf("Acos(0.5) = %v, want π/3=%v", got, want)
+	}
+}
+
+func TestAcosOne(t *testing.T) {
+	// acos(1) = 0
+	got := Float64(Acos(NewFloat(1)))
+	if math.Abs(got) > 1e-12 {
+		t.Errorf("Acos(1) = %v, want 0", got)
+	}
+}
+
+func TestTrigIdentitySinCos(t *testing.T) {
+	// sin²(x) + cos²(x) = 1 for several values
+	inputs := []float64{0.1, 0.5, 1.0, 1.5, 2.0, math.Pi / 4}
+	for _, f := range inputs {
+		x := NewFloat(f)
+		s := Sin(new(big.Float).SetPrec(Prec).Copy(x))
+		c := Cos(new(big.Float).SetPrec(Prec).Copy(x))
+		s2 := new(big.Float).SetPrec(Prec).Mul(s, s)
+		c2 := new(big.Float).SetPrec(Prec).Mul(c, c)
+		sum := Float64(new(big.Float).SetPrec(Prec).Add(s2, c2))
+		if math.Abs(sum-1) > 1e-12 {
+			t.Errorf("sin²(%v)+cos²(%v) = %v, want 1", f, f, sum)
+		}
+	}
+}
+
+func TestAtanTanRoundtrip(t *testing.T) {
+	// atan(tan(x)) = x for x in (-π/2, π/2)
+	inputs := []float64{0.1, 0.5, 1.0, -0.7, 1.2}
+	for _, f := range inputs {
+		x := NewFloat(f)
+		tanX := Tan(new(big.Float).SetPrec(Prec).Copy(x))
+		got := Float64(Atan(tanX))
+		if math.Abs(got-f) > 1e-10 {
+			t.Errorf("Atan(Tan(%v)) = %v, want %v", f, got, f)
+		}
+	}
+}
+
+func TestAsinAcosComplement(t *testing.T) {
+	// asin(x) + acos(x) = π/2 for x in [-1, 1]
+	piOver2 := math.Pi / 2
+	inputs := []float64{0, 0.3, 0.5, 0.8, -0.5}
+	for _, f := range inputs {
+		x := NewFloat(f)
+		asinX := Float64(Asin(new(big.Float).SetPrec(Prec).Copy(x)))
+		acosX := Float64(Acos(new(big.Float).SetPrec(Prec).Copy(x)))
+		if math.Abs(asinX+acosX-piOver2) > 1e-12 {
+			t.Errorf("Asin(%v)+Acos(%v) = %v, want π/2=%v", f, f, asinX+acosX, piOver2)
+		}
+	}
+}

@@ -7,7 +7,7 @@ type Node interface {
 
 type (
 	Number struct{ Value float64 }
-	Variable struct{}
+	Variable struct{ Name string } // Name="" defaults to "x"
 	UnaryOp struct {
 		Op      rune
 		Operand Node
