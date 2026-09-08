@@ -23,6 +23,7 @@ const (
 	EMLFunc
 )
 
+// String returns a human-readable representation of the EMLNode.
 func (n *EMLNode) String() string {
 	if n == nil {
 		return "<nil>"
@@ -40,6 +41,7 @@ func (n *EMLNode) String() string {
 	return "?"
 }
 
+// EMLSize returns the total number of nodes in the expression tree rooted at n.
 func EMLSize(n *EMLNode) int {
 	if n == nil {
 		return 0
@@ -59,22 +61,27 @@ func varNode() *EMLNode {
 	return &EMLNode{Kind: EMLVar}
 }
 
+// CanonicalExp returns an EMLNode representing exp(x) = eml(x, 1).
 func CanonicalExp(x *EMLNode) *EMLNode {
 	return emlNode(x, constNode(1))
 }
 
+// CanonicalLog returns an EMLNode representing log(x) using the eml canonical form.
 func CanonicalLog(x *EMLNode) *EMLNode {
 	return emlNode(constNode(1), emlNode(emlNode(constNode(1), x), constNode(1)))
 }
 
+// CanonicalSin returns an EMLNode representing sin(x).
 func CanonicalSin(x *EMLNode) *EMLNode {
 	return &EMLNode{Kind: EMLFunc, Name: "sin", Left: x}
 }
 
+// CanonicalCos returns an EMLNode representing cos(x).
 func CanonicalCos(x *EMLNode) *EMLNode {
 	return &EMLNode{Kind: EMLFunc, Name: "cos", Left: x}
 }
 
+// CanonicalSqrt returns an EMLNode representing sqrt(x) via exp(0.5 * log(x)).
 func CanonicalSqrt(x *EMLNode) *EMLNode {
 	return CanonicalExp(&EMLNode{
 		Kind:  EMLFunc,
@@ -84,6 +91,7 @@ func CanonicalSqrt(x *EMLNode) *EMLNode {
 	})
 }
 
+// EMLEval evaluates the canonical EML expression tree n with variable x set to the given value.
 func EMLEval(n *EMLNode, x float64) float64 {
 	if n == nil {
 		return 0
@@ -121,6 +129,7 @@ func EMLEval(n *EMLNode, x float64) float64 {
 	return 0
 }
 
+// Canonicalize converts a Node interface value into the canonical EMLNode representation.
 func Canonicalize(n Node) *EMLNode {
 	if n == nil {
 		return nil
@@ -167,6 +176,7 @@ func Canonicalize(n Node) *EMLNode {
 	return nil
 }
 
+// Equiv reports whether two EMLNode trees are structurally equivalent.
 func Equiv(a, b *EMLNode) bool {
 	if a == nil && b == nil {
 		return true

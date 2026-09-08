@@ -168,6 +168,12 @@ func Pow(x, y float64) float64 {
 	}
 	if x < 0 && isInteger(y) {
 		intY := int(y)
+		if intY == math.MinInt {
+			return nan()
+		}
+		if intY < 0 {
+			intY = -intY
+		}
 		if intY%2 == 0 {
 			return powStable(-x, y)
 		}
@@ -387,6 +393,9 @@ func GCD(a, b int64) int64 {
 	return a
 }
 
+// Note: GCD(MinInt64, x) uses MaxInt64 as the absolute value approximation.
+// This is a known limitation documented in docs/nextsteps.md.
+
 func LCM(a, b int64) int64 {
 	if a == 0 || b == 0 {
 		return 0
@@ -428,6 +437,9 @@ func IntMod(a, b int) int {
 
 func IntAbs(a int) int {
 	if a < 0 {
+		if a == math.MinInt {
+			return math.MaxInt
+		}
 		return -a
 	}
 	return a

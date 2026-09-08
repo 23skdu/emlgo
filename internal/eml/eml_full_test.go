@@ -37,7 +37,7 @@ func TestEmlAll(t *testing.T) {
 				if !math.IsInf(got, 0) {
 					t.Errorf("Eml(%v, %v) = %v, want %v", tt.x, tt.y, got, tt.expected)
 				}
-			} else if !close(got, tt.expected, 1e-10) {
+			} else if !closeTo(got, tt.expected, 1e-10) {
 				t.Errorf("Eml(%v, %v) = %v, want %v", tt.x, tt.y, got, tt.expected)
 			}
 		})
@@ -74,7 +74,7 @@ func TestOneAll(t *testing.T) {
 				if !math.IsInf(got, 0) {
 					t.Errorf("One(%v) = %v, want %v", tt.x, got, tt.expected)
 				}
-			} else if !close(got, tt.expected, 1e-10) {
+			} else if !closeTo(got, tt.expected, 1e-10) {
 				t.Errorf("One(%v) = %v, want %v", tt.x, got, tt.expected)
 			}
 		})
@@ -107,7 +107,7 @@ func TestOneEmlAll(t *testing.T) {
 				if !math.IsInf(got, 0) {
 					t.Errorf("OneEml(%v) = %v, want %v", tt.x, got, tt.expected)
 				}
-			} else if !close(got, tt.expected, 1e-10) {
+			} else if !closeTo(got, tt.expected, 1e-10) {
 				t.Errorf("OneEml(%v) = %v, want %v", tt.x, got, tt.expected)
 			}
 		})
@@ -120,7 +120,7 @@ func TestOneConst(t *testing.T) {
 	}
 }
 
-func close(a, b, tol float64) bool {
+func closeTo(a, b, tol float64) bool {
 	if math.IsNaN(a) && math.IsNaN(b) {
 		return true
 	}

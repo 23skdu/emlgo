@@ -111,7 +111,19 @@ func AbsBranchless(x float64) float64 {
 }
 
 // MinBranchless returns the minimum of a and b using bitwise selection.
+// NaN-aware: returns the non-NaN operand when one is NaN.
 func MinBranchless(a, b float64) float64 {
+	na := math.IsNaN(a)
+	nb := math.IsNaN(b)
+	if na && nb {
+		return a // both NaN, return first
+	}
+	if na {
+		return b
+	}
+	if nb {
+		return a
+	}
 	diff := a - b
 	mask := -int64(math.Float64bits(diff) >> 63)
 	return math.Float64frombits(
@@ -120,7 +132,19 @@ func MinBranchless(a, b float64) float64 {
 }
 
 // MaxBranchless returns the maximum of a and b using bitwise selection.
+// NaN-aware: returns the non-NaN operand when one is NaN.
 func MaxBranchless(a, b float64) float64 {
+	na := math.IsNaN(a)
+	nb := math.IsNaN(b)
+	if na && nb {
+		return a // both NaN, return first
+	}
+	if na {
+		return b
+	}
+	if nb {
+		return a
+	}
 	diff := a - b
 	mask := -int64(math.Float64bits(diff) >> 63)
 	return math.Float64frombits(

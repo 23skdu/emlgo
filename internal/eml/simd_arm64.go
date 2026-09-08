@@ -211,7 +211,9 @@ func detectARM64SIMD() {
 	hasAVX2 = false
 	hasAVX512 = false
 	hasNeon = true
-	hasNeonDot = true
+	// hasNeonDot requires ARMv8.2-A (dot product extension).
+	// Default to false; runtime detection via getauxval when available.
+	hasNeonDot = false
 	detectSVE()
 }
 
