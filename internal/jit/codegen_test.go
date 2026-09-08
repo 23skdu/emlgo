@@ -138,11 +138,58 @@ func TestJITNegativeExponent(t *testing.T) {
 	}
 }
 
-func TestJITNonIntegerExponentError(t *testing.T) {
-	c := NewCompiler()
-	_, err := c.Compile("x^0.5")
-	if err == nil {
-		t.Fatal("expected error for non-integer exponent")
+func TestJITNonIntegerExponent(t *testing.T) {
+	tests := []struct {
+		expr string
+		x    float64
+		want float64
+	}{
+		{"x^0.5", 4, 2},
+		{"x^0.5", 9, 3},
+		{"x^0.25", 16, 2},
+		{"x^1.5", 4, 8},
+		{"x^-0.5", 4, 0.5},
+		{"x^0.5", 0.25, 0.5},
+		{"x^0.1", 1, 1},
+		{"x^3.7", 2, math.Pow(2, 3.7)},
+	}
+	for _, tc := range tests {
+		c := NewCompiler()
+		f, err := c.Compile(tc.expr)
+		if err != nil {
+			t.Fatalf("compile %q: %v", tc.expr, err)
+		}
+		got := f(tc.x)
+		if math.Abs(got-tc.want) > 1e-10 {
+			t.Errorf("%s at x=%v: f = %v, want %v (diff=%v)", tc.expr, tc.x, got, tc.want, math.Abs(got-tc.want))
+		}
+	}
+}
+
+func TestJITVariableExponent(t *testing.T) {
+	tests := []struct {
+		expr string
+		x    float64
+		want float64
+	}{
+		{"x^x", 2, 4},
+		{"x^x", 3, 27},
+		{"x^(x-1)", 3, 9},
+		{"x^(2*x)", 2, 16},
+		{"x^(0+1)", 5, 5},
+	}
+	for _, tc := range tests {
+		c := NewCompiler()
+		f, err := c.Compile(tc.expr)
+		if err != nil {
+			t.Fatalf("compile %q: %v", tc.expr, err)
+		}
+		got := f(tc.x)
+		ast, _ := Parse(tc.expr)
+		want := Eval(ast, tc.x)
+		if math.Abs(got-want) > 1e-10 {
+			t.Errorf("%s at x=%v: f = %v, want %v (diff=%v)", tc.expr, tc.x, got, want, math.Abs(got-want))
+		}
 	}
 }
 

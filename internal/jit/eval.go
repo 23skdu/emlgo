@@ -46,9 +46,21 @@ func Eval(n Node, x float64) float64 {
 			return math.Acos(arg)
 		case "atan":
 			return math.Atan(arg)
-		case "abs":
-			return math.Abs(arg)
-		}
+	case "abs":
+		return math.Abs(arg)
+	case "cbrt":
+		return math.Cbrt(arg)
+	case "log2":
+		return math.Log2(arg)
+	case "log10":
+		return math.Log10(arg)
+	case "ceil":
+		return math.Ceil(arg)
+	case "floor":
+		return math.Floor(arg)
+	case "trunc":
+		return math.Trunc(arg)
+	}
 	}
 	return 0
 }

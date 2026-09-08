@@ -2,6 +2,27 @@
 
 package eml
 
+// WASM SIMD128 optimization strategy:
+//
+// WebAssembly SIMD128 provides 128-bit vector lanes that operate on
+// 2×float64 or 4×float32 simultaneously. The Go WASM JIT compiler
+// (wazero / the Go compiler's WASM backend) can auto-vectorize loops
+// when it detects a predictable, straight-line access pattern over
+// contiguous memory.
+//
+// The 8-wide unrolling in each function serves two purposes:
+//  1. It exposes enough independent operations for the JIT to fill
+//     two 128-bit float64 lanes (2 elements per SIMD register × 4
+//     registers = 8 elements) in a single pipeline depth.
+//  2. It amortizes loop overhead and branch prediction cost, which is
+//     critical on WASM runtimes where indirect-call overhead is high.
+//
+// For transcendental operations (exp, log, sin, cos, …) the unrolled
+// calls to native math wrappers still execute as scalar calls, but
+// the surrounding loop structure is preserved so that a future WASM
+// SIMD math library (e.g. wasm-SIMD-accelerated libm) can be dropped
+// in by replacing the inner call without restructuring the batch loop.
+
 // addWasmSIMD implements batch addition with 8-wide block unrolling
 // to enable WASM JIT auto-vectorization to wasm_simd128.
 func addWasmSIMD(a, b, result []float64) {
@@ -210,6 +231,177 @@ func fmaWasmSIMD(a, b, c, result []float64) {
 	}
 	for ; i < n; i++ {
 		result[i] = a[i]*b[i] + c[i]
+	}
+}
+
+func expWasmSIMD(a, result []float64) {
+	n := len(a)
+	i := 0
+	for i <= n-8 {
+		result[i] = nativeExp(a[i])
+		result[i+1] = nativeExp(a[i+1])
+		result[i+2] = nativeExp(a[i+2])
+		result[i+3] = nativeExp(a[i+3])
+		result[i+4] = nativeExp(a[i+4])
+		result[i+5] = nativeExp(a[i+5])
+		result[i+6] = nativeExp(a[i+6])
+		result[i+7] = nativeExp(a[i+7])
+		i += 8
+	}
+	for ; i < n; i++ {
+		result[i] = nativeExp(a[i])
+	}
+}
+
+func logWasmSIMD(a, result []float64) {
+	n := len(a)
+	i := 0
+	for i <= n-8 {
+		result[i] = nativeLog(a[i])
+		result[i+1] = nativeLog(a[i+1])
+		result[i+2] = nativeLog(a[i+2])
+		result[i+3] = nativeLog(a[i+3])
+		result[i+4] = nativeLog(a[i+4])
+		result[i+5] = nativeLog(a[i+5])
+		result[i+6] = nativeLog(a[i+6])
+		result[i+7] = nativeLog(a[i+7])
+		i += 8
+	}
+	for ; i < n; i++ {
+		result[i] = nativeLog(a[i])
+	}
+}
+
+func sinWasmSIMD(a, result []float64) {
+	n := len(a)
+	i := 0
+	for i <= n-8 {
+		result[i] = nativeSin(a[i])
+		result[i+1] = nativeSin(a[i+1])
+		result[i+2] = nativeSin(a[i+2])
+		result[i+3] = nativeSin(a[i+3])
+		result[i+4] = nativeSin(a[i+4])
+		result[i+5] = nativeSin(a[i+5])
+		result[i+6] = nativeSin(a[i+6])
+		result[i+7] = nativeSin(a[i+7])
+		i += 8
+	}
+	for ; i < n; i++ {
+		result[i] = nativeSin(a[i])
+	}
+}
+
+func cosWasmSIMD(a, result []float64) {
+	n := len(a)
+	i := 0
+	for i <= n-8 {
+		result[i] = nativeCos(a[i])
+		result[i+1] = nativeCos(a[i+1])
+		result[i+2] = nativeCos(a[i+2])
+		result[i+3] = nativeCos(a[i+3])
+		result[i+4] = nativeCos(a[i+4])
+		result[i+5] = nativeCos(a[i+5])
+		result[i+6] = nativeCos(a[i+6])
+		result[i+7] = nativeCos(a[i+7])
+		i += 8
+	}
+	for ; i < n; i++ {
+		result[i] = nativeCos(a[i])
+	}
+}
+
+func tanWasmSIMD(a, result []float64) {
+	n := len(a)
+	i := 0
+	for i <= n-8 {
+		result[i] = nativeTan(a[i])
+		result[i+1] = nativeTan(a[i+1])
+		result[i+2] = nativeTan(a[i+2])
+		result[i+3] = nativeTan(a[i+3])
+		result[i+4] = nativeTan(a[i+4])
+		result[i+5] = nativeTan(a[i+5])
+		result[i+6] = nativeTan(a[i+6])
+		result[i+7] = nativeTan(a[i+7])
+		i += 8
+	}
+	for ; i < n; i++ {
+		result[i] = nativeTan(a[i])
+	}
+}
+
+func sinhWasmSIMD(a, result []float64) {
+	n := len(a)
+	i := 0
+	for i <= n-8 {
+		result[i] = Sinh(a[i])
+		result[i+1] = Sinh(a[i+1])
+		result[i+2] = Sinh(a[i+2])
+		result[i+3] = Sinh(a[i+3])
+		result[i+4] = Sinh(a[i+4])
+		result[i+5] = Sinh(a[i+5])
+		result[i+6] = Sinh(a[i+6])
+		result[i+7] = Sinh(a[i+7])
+		i += 8
+	}
+	for ; i < n; i++ {
+		result[i] = Sinh(a[i])
+	}
+}
+
+func coshWasmSIMD(a, result []float64) {
+	n := len(a)
+	i := 0
+	for i <= n-8 {
+		result[i] = Cosh(a[i])
+		result[i+1] = Cosh(a[i+1])
+		result[i+2] = Cosh(a[i+2])
+		result[i+3] = Cosh(a[i+3])
+		result[i+4] = Cosh(a[i+4])
+		result[i+5] = Cosh(a[i+5])
+		result[i+6] = Cosh(a[i+6])
+		result[i+7] = Cosh(a[i+7])
+		i += 8
+	}
+	for ; i < n; i++ {
+		result[i] = Cosh(a[i])
+	}
+}
+
+func tanhWasmSIMD(a, result []float64) {
+	n := len(a)
+	i := 0
+	for i <= n-8 {
+		result[i] = Tanh(a[i])
+		result[i+1] = Tanh(a[i+1])
+		result[i+2] = Tanh(a[i+2])
+		result[i+3] = Tanh(a[i+3])
+		result[i+4] = Tanh(a[i+4])
+		result[i+5] = Tanh(a[i+5])
+		result[i+6] = Tanh(a[i+6])
+		result[i+7] = Tanh(a[i+7])
+		i += 8
+	}
+	for ; i < n; i++ {
+		result[i] = Tanh(a[i])
+	}
+}
+
+func sincosWasmSIMD(x, sin, cos []float64) {
+	n := len(x)
+	i := 0
+	for i <= n-8 {
+		sin[i], cos[i] = nativeSincos(x[i])
+		sin[i+1], cos[i+1] = nativeSincos(x[i+1])
+		sin[i+2], cos[i+2] = nativeSincos(x[i+2])
+		sin[i+3], cos[i+3] = nativeSincos(x[i+3])
+		sin[i+4], cos[i+4] = nativeSincos(x[i+4])
+		sin[i+5], cos[i+5] = nativeSincos(x[i+5])
+		sin[i+6], cos[i+6] = nativeSincos(x[i+6])
+		sin[i+7], cos[i+7] = nativeSincos(x[i+7])
+		i += 8
+	}
+	for ; i < n; i++ {
+		sin[i], cos[i] = nativeSincos(x[i])
 	}
 }
 

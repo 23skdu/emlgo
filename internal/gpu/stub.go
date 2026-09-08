@@ -101,6 +101,31 @@ func (d *Device) EmlBatch(x, y []float64) ([]float64, error) {
 	return nil, fmt.Errorf("GPU execution not available (build with -tags cuda)")
 }
 
+func (d *Device) AbsBatch(x []float64) ([]float64, error) {
+	_ = d
+	return nil, fmt.Errorf("GPU execution not available (build with -tags cuda)")
+}
+
+func (d *Device) NegBatch(x []float64) ([]float64, error) {
+	_ = d
+	return nil, fmt.Errorf("GPU execution not available (build with -tags cuda)")
+}
+
+func (d *Device) PowBatch(x []float64, exponent float64) ([]float64, error) {
+	_ = d
+	return nil, fmt.Errorf("GPU execution not available (build with -tags cuda)")
+}
+
+func (d *Device) InvBatch(x []float64) ([]float64, error) {
+	_ = d
+	return nil, fmt.Errorf("GPU execution not available (build with -tags cuda)")
+}
+
+func (d *Device) FmaBatch(a, b, c []float64) ([]float64, error) {
+	_ = d
+	return nil, fmt.Errorf("GPU execution not available (build with -tags cuda)")
+}
+
 // NewStream creates an async stream. Stub: returns nil.
 func NewStream() (*Stream, error) {
 	return nil, fmt.Errorf("streams not available without cuda tag")

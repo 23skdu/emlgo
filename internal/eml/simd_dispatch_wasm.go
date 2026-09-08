@@ -21,12 +21,12 @@ func fmaSIMD(a, b, c, result []float64) {
 	fmaWasmSIMD(a, b, c, result)
 }
 
-func dispatchExpSIMDTo(x, result []float64) { parallelizeGeneric(x, result, nativeExp) }
-func dispatchLogSIMDTo(x, result []float64) { parallelizeGeneric(x, result, nativeLog) }
-func dispatchSinSIMDTo(x, result []float64) { parallelizeGeneric(x, result, nativeSin) }
-func dispatchCosSIMDTo(x, result []float64) { parallelizeGeneric(x, result, nativeCos) }
-func dispatchTanSIMDTo(x, result []float64) { parallelizeGeneric(x, result, nativeTan) }
-func dispatchSinCosSIMDTo(x, sin, cos []float64) { parallelizeSinCos(x, sin, cos) }
+func dispatchExpSIMDTo(x, result []float64)  { expWasmSIMD(x, result) }
+func dispatchLogSIMDTo(x, result []float64)  { logWasmSIMD(x, result) }
+func dispatchSinSIMDTo(x, result []float64)  { sinWasmSIMD(x, result) }
+func dispatchCosSIMDTo(x, result []float64)  { cosWasmSIMD(x, result) }
+func dispatchTanSIMDTo(x, result []float64)  { tanWasmSIMD(x, result) }
+func dispatchSinCosSIMDTo(x, sin, cos []float64) { sincosWasmSIMD(x, sin, cos) }
 func dispatchSqrtSIMDTo(x, result []float64) { sqrtWasmSIMD(x, result) }
 func dispatchAddSIMD(a, b, result []float64) { addWasmSIMD(a, b, result) }
 func dispatchSubSIMD(a, b, result []float64) { subWasmSIMD(a, b, result) }

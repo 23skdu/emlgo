@@ -214,3 +214,102 @@ func BenchmarkMatMulLaunchConfig(b *testing.B) {
 		MatMulLaunchConfig(4096, 4096, 16)
 	}
 }
+
+func TestDeviceBatchMethodErrors(t *testing.T) {
+	d := &Device{}
+
+	tests := []struct {
+		name string
+		fn   func() error
+	}{
+		{"AbsBatch", func() error { _, err := d.AbsBatch([]float64{1, 2, 3}); return err }},
+		{"NegBatch", func() error { _, err := d.NegBatch([]float64{1, 2, 3}); return err }},
+		{"PowBatch", func() error { _, err := d.PowBatch([]float64{1, 2, 3}, 2); return err }},
+		{"InvBatch", func() error { _, err := d.InvBatch([]float64{1, 2, 3}); return err }},
+		{"FmaBatch", func() error { _, err := d.FmaBatch([]float64{1}, []float64{2}, []float64{3}); return err }},
+	}
+	for _, tt := range tests {
+		if err := tt.fn(); err == nil {
+			t.Errorf("%s: expected error, got nil", tt.name)
+		}
+	}
+}
+
+func TestCpuRefsUnivariate(t *testing.T) {
+	tests := []struct {
+		name string
+		x    float64
+		want float64
+	}{
+		{"Abs", -3.0, 3.0},
+		{"Abs", 3.0, 3.0},
+		{"Neg", 5.0, -5.0},
+		{"Neg", -5.0, 5.0},
+		{"Inv", 4.0, 0.25},
+		{"Fma", 7.0, 7.0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fn, ok := cpuRefs[tt.name]
+			if !ok {
+				t.Fatalf("cpuRefs missing key %q", tt.name)
+			}
+			got := fn(tt.x)
+			if got != tt.want {
+				t.Errorf("cpuRefs[%q](%v) = %v, want %v", tt.name, tt.x, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestBinaryOpRefs(t *testing.T) {
+	fn, ok := BinaryOpRefs["Eml"]
+	if !ok {
+		t.Fatal("BinaryOpRefs missing key \"Eml\"")
+	}
+	got := fn(0.0, 1.0)
+	// exp(0) - log(1) = 1 - 0 = 1
+	if got != 1.0 {
+		t.Errorf("BinaryOpRefs[\"Eml\"](0, 1) = %v, want 1.0", got)
+	}
+}
+
+func TestVerifyBinaryOp(t *testing.T) {
+	v := DefaultVerifier()
+	a := []float64{1.0, 2.0, 3.0}
+	b := []float64{4.0, 5.0, 6.0}
+	ref := func(x, y float64) float64 { return x + y }
+
+	gpuResult := []float64{5.0, 7.0, 9.0} // exact match
+	maxULP, failed, err := v.VerifyBinaryOp("add", a, b, gpuResult, ref)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if failed != 0 {
+		t.Errorf("failed = %d, want 0", failed)
+	}
+	if maxULP != 0 {
+		t.Errorf("maxULP = %d, want 0", maxULP)
+	}
+
+	gpuResultOff := []float64{5.0, 7.0, 10.0} // last element off
+	_, failed, err = v.VerifyBinaryOp("add", a, b, gpuResultOff, ref)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if failed != 1 {
+		t.Errorf("failed = %d, want 1", failed)
+	}
+}
+
+func TestVerifyBinaryOpLengthMismatch(t *testing.T) {
+	v := DefaultVerifier()
+	a := []float64{1.0, 2.0}
+	b := []float64{3.0}
+	gpuResult := []float64{4.0}
+	ref := func(x, y float64) float64 { return x + y }
+	_, _, err := v.VerifyBinaryOp("add", a, b, gpuResult, ref)
+	if err == nil {
+		t.Error("expected error for length mismatch, got nil")
+	}
+}

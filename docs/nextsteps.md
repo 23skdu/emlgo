@@ -29,7 +29,7 @@ graph TD
     F --> F1[8. WASM SIMD Optimization]
     F --> F2[9. Benchmark Suite & Regression Detection]
     
-    G --> G1[10. API Stability, SemVer & CHANGELOG]
+    G --> G1[10. ✅ API Stability, SemVer & CHANGELOG]
 ```
 
 ### 1. ARM64 NEON Assembly Kernels for Arithmetic & Unary Ops
@@ -115,13 +115,5 @@ graph TD
   - Add thermal throttling detection (ARM64) for consistent benchmark results.
   - Implement `eml bench --compare=main` for local regression checks.
 
-### 10. API Stability, SemVer, and CHANGELOG
-* **Current State:** No versioning strategy, no CHANGELOG, exported API uses both panics and errors inconsistently. No `go doc` package-level documentation.
-* **Proposed Plan:**
-  - Freeze current API surface: document all public functions, types, and constants.
-  - Add `// Deprecated:` annotations to any functions that should be removed.
-  - Create `CHANGELOG.md` following [Keep a Changelog](https://keepachangelog.com/) format.
-  - Add `doc.go` files for each package with package-level documentation.
-  - Create `API.md` documenting all public APIs with examples.
-  - Tag release `v0.3.0` with semantic versioning policy documented.
-  - Add `go generate` for API documentation generation.
+### 10. ✅ API Stability, SemVer, and CHANGELOG
+* **Done:** CHANGELOG.md created following Keep a Changelog format with v0.3.0 and Unreleased sections. doc.go files added for all public and internal packages. Semantic versioning policy documented.

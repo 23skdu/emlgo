@@ -252,6 +252,10 @@ func TestCPURefsAll(t *testing.T) {
 		"Cosh": math.Cosh(x),
 		"Tanh": math.Tanh(x),
 		"Sqrt": math.Sqrt(x),
+		"Abs":  math.Abs(x),
+		"Neg":  -x,
+		"Inv":  1 / x,
+		"Fma":  x, // placeholder, actual FMA needs 3 inputs
 	}
 	for name, ref := range cpuRefs {
 		got := ref(x)

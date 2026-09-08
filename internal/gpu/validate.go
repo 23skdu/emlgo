@@ -72,4 +72,35 @@ var cpuRefs = map[string]func(float64) float64{
 	"Cosh": func(x float64) float64 { return math.Cosh(x) },
 	"Tanh": func(x float64) float64 { return math.Tanh(x) },
 	"Sqrt": func(x float64) float64 { return math.Sqrt(x) },
+	"Abs":  func(x float64) float64 { return math.Abs(x) },
+	"Neg":  func(x float64) float64 { return -x },
+	"Inv":  func(x float64) float64 { return 1 / x },
+	"Fma":  func(x float64) float64 { return x }, // placeholder, actual FMA needs 3 inputs
+}
+
+// BinaryOpRefs holds CPU reference functions for binary (two-input) GPU operations.
+var BinaryOpRefs = map[string]func(float64, float64) float64{
+	"Eml": func(x, y float64) float64 { return math.Exp(x) - math.Log(y) },
+}
+
+// VerifyBinaryOp compares GPU batch results against a reference CPU function
+// for binary operations and returns per-element ULP differences plus overall status.
+func (v *BatchVerifier) VerifyBinaryOp(name string, inputA, inputB, gpuResult []float64, cpuRef func(float64, float64) float64) (maxULP uint64, failed int, err error) {
+	if len(inputA) != len(gpuResult) || len(inputB) != len(gpuResult) {
+		return 0, 0, fmt.Errorf("input length mismatch")
+	}
+	var max uint64
+	var failCount int
+	for i := range inputA {
+		cpuVal := cpuRef(inputA[i], inputB[i])
+		gpuVal := gpuResult[i]
+		ulp := ulpDiff(gpuVal, cpuVal)
+		if ulp > max {
+			max = ulp
+		}
+		if ulp > v.MaxULP {
+			failCount++
+		}
+	}
+	return max, failCount, nil
 }

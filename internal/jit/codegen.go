@@ -347,7 +347,7 @@ func (g *generator) genFuncCall(name string, arg Node, dst byte) error {
 }
 
 func (g *generator) genPow(base, exp Node, dst byte) error {
-	// Handle unary minus: x^(-n) = 1/x^n
+	// Handle unary minus: x^(-n) where n is a constant
 	if u, ok := exp.(UnaryOp); ok && u.Op == '-' {
 		if n, ok := u.Operand.(Number); ok {
 			return g.genPowWithSign(base, n.Value, true, dst)
@@ -356,14 +356,20 @@ func (g *generator) genPow(base, exp Node, dst byte) error {
 
 	num, ok := exp.(Number)
 	if !ok {
-		return fmt.Errorf("only constant exponents are supported in JIT codegen")
+		// Variable or complex exponent: x^y = exp(y * log(x))
+		return g.genPowExpLog(base, exp, 0, false, dst)
 	}
 	return g.genPowWithSign(base, num.Value, false, dst)
 }
 
 func (g *generator) genPowWithSign(base Node, value float64, negate bool, dst byte) error {
+	// Non-integer exponent: x^y = exp(y * log(x))
 	if value != float64(int(value)) {
-		return fmt.Errorf("only integer exponents are supported in JIT codegen")
+		expVal := value
+		if negate {
+			expVal = -expVal
+		}
+		return g.genPowExpLog(base, nil, expVal, false, dst)
 	}
 	n := int(value)
 	if negate {
@@ -386,6 +392,61 @@ func (g *generator) genPowWithSign(base Node, value float64, negate bool, dst by
 		return nil
 	}
 	return g.genPowUint(base, n, dst)
+}
+
+// genPowExpLog implements x^y via exp(y * log(x)).
+// If expNode is non-nil, it is a variable/complex expression exponent evaluated into a register.
+// If expNode is nil, constVal is used as a compile-time constant exponent.
+func (g *generator) genPowExpLog(base Node, expNode Node, constVal float64, negate bool, dst byte) error {
+	// 1. Generate base into dst
+	if err := g.gen(base, dst); err != nil {
+		return err
+	}
+
+	if expNode != nil {
+		// Variable/complex exponent path: x^y = exp(y * log(x))
+		tmp, err := g.alloc()
+		if err != nil {
+			return err
+		}
+		defer g.free(tmp)
+		if err := g.gen(expNode, tmp); err != nil {
+			return err
+		}
+		// dst = log(base) — callFunc saves/restores xmm1-xmm7 so tmp is safe
+		g.enc.callFunc(math.Log, dst)
+		if dst != 0 {
+			g.enc.movsdXmmXmm(dst, 0)
+		}
+		// dst = y * log(base)
+		g.enc.mulsd(dst, tmp)
+	} else {
+		// Constant exponent path: x^c = exp(c * log(x))
+		if negate {
+			constVal = -constVal
+		}
+		// dst = log(base)
+		g.enc.callFunc(math.Log, dst)
+		if dst != 0 {
+			g.enc.movsdXmmXmm(dst, 0)
+		}
+		// Load constant into a temp and multiply
+		tmp, err := g.alloc()
+		if err != nil {
+			return err
+		}
+		defer g.free(tmp)
+		idx := g.enc.addPool(constVal)
+		g.enc.loadConstant(tmp, idx)
+		g.enc.mulsd(dst, tmp)
+	}
+
+	// dst = exp(y * log(x))
+	g.enc.callFunc(math.Exp, dst)
+	if dst != 0 {
+		g.enc.movsdXmmXmm(dst, 0)
+	}
+	return nil
 }
 
 func (g *generator) genPowUint(base Node, n int, dst byte) error {
