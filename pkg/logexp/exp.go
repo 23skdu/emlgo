@@ -18,6 +18,10 @@ const expOverflow = 709.782712893384
 const expUnderflow = -745.133224101734
 
 func Exp(x float64) float64 {
+	// For x near 0, use Expm1 + 1 for better accuracy
+	if x > -0.5 && x < 0.5 {
+		return eml.Expm1(x) + 1
+	}
 	return nativeExp(x)
 }
 

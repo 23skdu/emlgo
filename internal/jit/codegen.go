@@ -167,7 +167,7 @@ func (e *encoder) movsdStore(reg byte) {
 	xmmReg := reg & 7
 	hasREX := reg >= 8
 	if hasREX {
-		e.emit(0x41)
+		e.emit(0x44)
 	}
 	e.emit(0xF2, 0x0F, 0x11, e.modrm(0, xmmReg, rsp), e.sib(0, 4, rsp))
 }

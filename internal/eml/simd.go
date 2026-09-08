@@ -233,6 +233,9 @@ func sincosSIMDTo(x, sin, cos []float64) {
 
 // AddSIMD returns a new slice containing the sum of elements in a and b.
 func AddSIMD(a, b []float64) []float64 {
+	if len(a) != len(b) {
+		panic("slice length mismatch")
+	}
 	result := make([]float64, len(a))
 	dispatchAddSIMD(a, b, result)
 	return result
@@ -241,6 +244,9 @@ func AddSIMD(a, b []float64) []float64 {
 
 // SubSIMD returns a new slice containing the difference of elements in a and b.
 func SubSIMD(a, b []float64) []float64 {
+	if len(a) != len(b) {
+		panic("slice length mismatch")
+	}
 	result := make([]float64, len(a))
 	dispatchSubSIMD(a, b, result)
 	return result
@@ -249,6 +255,9 @@ func SubSIMD(a, b []float64) []float64 {
 
 // MulSIMD returns a new slice containing the product of elements in a and b.
 func MulSIMD(a, b []float64) []float64 {
+	if len(a) != len(b) {
+		panic("slice length mismatch")
+	}
 	result := make([]float64, len(a))
 	dispatchMulSIMD(a, b, result)
 	return result
@@ -257,6 +266,9 @@ func MulSIMD(a, b []float64) []float64 {
 
 // DivSIMD returns a new slice containing the quotient of elements in a and b.
 func DivSIMD(a, b []float64) []float64 {
+	if len(a) != len(b) {
+		panic("slice length mismatch")
+	}
 	result := make([]float64, len(a))
 	dispatchDivSIMD(a, b, result)
 	return result
