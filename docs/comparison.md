@@ -158,11 +158,21 @@ Chunk size automatically adjusts based on array size and CPU count for optimal c
 - `[x]` **Adaptive Parallelization**: Cache-aware chunk sizing with pre-allocated worker pool.
 - `[x]` **JIT Function Calls**: 16 math functions (sin, cos, exp, log, sqrt, tan, asin, acos, atan, abs, cbrt, log2, log10, ceil, floor, trunc).
 - `[x]` **JIT Negative Exponents**: `x^-n` decomposed as `1.0/x^n`.
+- `[x]` **JIT Non-Integer Exponents**: `x^0.5`, `x^1.5` via `exp(y*log(x))`.
+- `[x]` **JIT Variable Exponents**: `x^x`, `x^(x-1)` via `exp(y*log(x))`.
+- `[x]` **Complex Number Support**: `complex128` batch operations via `math/cmplx`.
+- `[x]` **Arbitrary Precision Backend**: `math/big.Float` Taylor series, IdentityVerifier.
+- `[x]` **Zero-Allocation Arena**: Bump allocator for JIT parse/eval paths.
+- `[x]` **Canonical EML Trees**: Normalize any expression to minimal EML form.
+- `[x]` **Numerical Stability**: Log1p/Expm1 for Pow near x=1, Exp near x=0.
+- `[x]` **Worker Pool Shutdown**: `StopWorkerPool()` for graceful termination.
+- `[x]` **CI/CD Pipeline**: GitHub Actions with Go 1.22/1.23 matrix.
 
 ### Remaining Work
 
-1. **ARM64 NEON Assembly**: Write native NEON assembly kernels (currently Go loops only).
-2. **ARM64 Transcendentals**: Vectorize Exp/Log/Sin/Cos/Tan for ARM64.
+1. **ARM64 NEON Assembly Kernels**: Write native NEON assembly kernels (currently Go-level loops).
+2. **ARM64 SVE/SVE2 Assembly Kernels**: Write native SVE/SVE2 assembly kernels.
+3. **ARM64 Transcendental Batch Kernels**: Vectorize Exp/Log/Sin/Cos/Tan for ARM64.
 
 ---
 

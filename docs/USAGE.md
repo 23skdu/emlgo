@@ -94,11 +94,9 @@ import (
     "fmt"
     "math"
     "github.com/emlgo/eml/pkg/hyper"
-    "github.com/emlgo/eml/pkg/trig"
 )
 
 func main() {
-    // Using hyper package
     fmt.Printf("sinh(1) = %.6f (expected %.6f)\n", hyper.Sinh(1), math.Sinh(1))
     fmt.Printf("cosh(1) = %.6f (expected %.6f)\n", hyper.Cosh(1), math.Cosh(1))
     fmt.Printf("tanh(1) = %.6f (expected %.6f)\n", hyper.Tanh(1), math.Tanh(1))
@@ -107,9 +105,246 @@ func main() {
     fmt.Printf("asinh(1) = %.6f (expected %.6f)\n", hyper.Asinh(1), math.Asinh(1))
     fmt.Printf("acosh(2) = %.6f (expected %.6f)\n", hyper.Acosh(2), math.Acosh(2))
     fmt.Printf("atanh(0.5) = %.6f (expected %.6f)\n", hyper.Atanh(0.5), math.Atanh(0.5))
+}
+```
 
-    // Also available in trig package
-    fmt.Printf("tanh (via trig) = %.6f\n", trig.Tanh(1))
+## Complex Number Operations
+
+```go
+package main
+
+import (
+    "fmt"
+    "github.com/emlgo/eml/internal/eml"
+)
+
+func main() {
+    // Single complex operations
+    z := complex(1.0, 2.0)
+    result := eml.Complex(z, 1) // cmplx.Exp(z) - cmplx.Log(1) = cmplx.Exp(z)
+    fmt.Printf("eml(1+2i, 1) = %v\n", result)
+
+    // Batch complex operations
+    inputs := []complex128{
+        complex(1, 0),
+        complex(0, 1),   // i
+        complex(-1, 0),  // -1
+        complex(0, -1),  // -i
+    }
+
+    expResults := eml.ComplexExpBatch(inputs)
+    fmt.Println("Exp batch results:")
+    for i, z := range inputs {
+        fmt.Printf("  exp(%v) = %v\n", z, expResults[i])
+    }
+
+    // Trigonometric identity: sin²(z) + cos²(z) = 1
+    sinResults := eml.ComplexSinBatch(inputs)
+    cosResults := eml.ComplexCosBatch(inputs)
+    fmt.Println("\nTrig identity sin²(z) + cos²(z) = 1:")
+    for i, z := range inputs {
+        s := sinResults[i]
+        c := cosResults[i]
+        identity := s*s + c*c
+        fmt.Printf("  sin²(%v) + cos²(%v) = %v\n", z, z, identity)
+    }
+
+    // Euler's identity: e^(iπ) + 1 = 0
+    euler := eml.ComplexExpBatch([]complex128{complex(0, math.Pi)})
+    fmt.Printf("\ne^(iπ) = %v (should be ≈ -1)\n", euler[0])
+    fmt.Printf("e^(iπ) + 1 = %v (should be ≈ 0)\n", euler[0]+1)
+}
+```
+
+## JIT Compilation with Non-Integer and Variable Exponents
+
+```go
+package main
+
+import (
+    "fmt"
+    "github.com/emlgo/eml/internal/jit"
+)
+
+func main() {
+    c := jit.NewCompiler()
+
+    // Integer exponent (binary exponentiation)
+    f, _ := c.Compile("x^3")
+    fmt.Printf("x^3 at x=2: %.6f\n", f(2)) // 8.0
+
+    // Negative integer exponent
+    g, _ := c.Compile("x^-2")
+    fmt.Printf("x^-2 at x=4: %.6f\n", g(4)) // 0.0625
+
+    // Non-integer constant exponent (exp(y * log(x)))
+    h, _ := c.Compile("x^0.5")
+    fmt.Printf("x^0.5 at x=4: %.6f\n", h(4)) // 2.0
+
+    // Non-integer constant exponent
+    k, _ := c.Compile("x^1.5")
+    fmt.Printf("x^1.5 at x=4: %.6f\n", k(4)) // 8.0
+
+    // Variable exponent (exp(y * log(x)))
+    l, _ := c.Compile("x^x")
+    fmt.Printf("x^x at x=2: %.6f\n", l(2)) // 4.0
+    fmt.Printf("x^x at x=3: %.6f\n", l(3)) // 27.0
+
+    // Variable exponent expression
+    m, _ := c.Compile("x^(x-1)")
+    fmt.Printf("x^(x-1) at x=3: %.6f\n", m(3)) // 9.0
+
+    // Complex expressions with 16 supported functions
+    n, _ := c.Compile("sin(x)^2 + cos(x)^2")
+    fmt.Printf("sin²(x) + cos²(x) = %.6f\n", n(1.23)) // 1.0
+
+    // All 16 functions work
+    o, _ := c.Compile("sqrt(abs(x)) + cbrt(x)")
+    fmt.Printf("sqrt(|-8|) + cbrt(-8) = %.6f\n", o(-8)) // 2.0 + (-2.0) = 0.0
+}
+```
+
+## Arena Zero-Allocation Parsing
+
+```go
+package main
+
+import (
+    "fmt"
+    "github.com/emlgo/eml/internal/jit"
+)
+
+func main() {
+    // Create arena with initial capacity
+    arena := jit.NewArena(64)
+
+    // Parse an expression and convert to arena nodes
+    c := jit.NewCompiler()
+    ast, _ := c.Parse("sin(x)^2 + cos(x)^2")
+
+    // Convert AST to arena-allocated nodes (zero heap allocation)
+    arenaNode := arena.FromInterface(ast)
+    fmt.Printf("Arena nodes allocated: %d\n", arena.NumNodes())
+
+    // Evaluate without touching the heap
+    result := jit.EvalArena(arenaNode, 3.14)
+    fmt.Printf("Result: %.6f\n", result) // 1.0
+
+    // Reset and reuse
+    arena.Reset()
+    fmt.Printf("After reset: %d nodes\n", arena.NumNodes()) // 0
+}
+```
+
+## Canonical EML Tree Construction
+
+```go
+package main
+
+import (
+    "fmt"
+    "github.com/emlgo/eml/internal/jit"
+)
+
+func main() {
+    c := jit.NewCompiler()
+
+    // Parse and canonicalize
+    ast, _ := c.Parse("exp(x)")
+    canonical := jit.Canonicalize(ast)
+    fmt.Printf("exp(x) canonical: %v\n", canonical)
+    // eml(x, 1)
+
+    // All exp/log/sqrt map to canonical EML form
+    ast2, _ := c.Parse("log(x)")
+    canonical2 := jit.Canonicalize(ast2)
+    fmt.Printf("log(x) canonical: %v\n", canonical2)
+    // eml(1, eml(eml(1, x), 1))
+
+    // Structural equivalence
+    ast3, _ := c.Parse("exp(x)")
+    canonical3 := jit.Canonicalize(ast3)
+    fmt.Printf("exp(x) ≡ exp(x): %v\n", jit.Equiv(canonical, canonical3)) // true
+
+    // Tree size
+    fmt.Printf("Canonical exp(x) size: %d nodes\n", jit.EMLSize(canonical)) // 2
+    fmt.Printf("Canonical log(x) size: %d nodes\n", jit.EMLSize(canonical2)) // 5
+
+    // Canonical sqrt(x) = exp(0.5 * log(x))
+    ast4, _ := c.Parse("sqrt(x)")
+    canonical4 := jit.Canonicalize(ast4)
+    fmt.Printf("sqrt(x) canonical: %v\n", canonical4)
+    fmt.Printf("sqrt(x) size: %d nodes\n", jit.EMLSize(canonical4))
+}
+```
+
+## Arbitrary Precision Verification
+
+```go
+package main
+
+import (
+    "fmt"
+    "math/big"
+    "github.com/emlgo/eml/internal/eml/bigmath"
+)
+
+func main() {
+    // Basic arbitrary-precision EML
+    x := bigmath.NewFloat(1.0)
+    y := bigmath.NewFloat(1.0)
+    result := bigmath.Eml(x, y) // exp(1) - log(1) = e
+    fmt.Printf("eml(1, 1) = %.6f\n", bigmath.Float64(result)) // 2.718282
+
+    // Verify sin²(x) + cos²(x) = 1
+    v := bigmath.DefaultVerifier()
+    sin2pluscos2 := func(x *big.Float) *big.Float {
+        s := bigmath.Sin(x)
+        c := bigmath.Cos(x)
+        ss := new(big.Float).Mul(s, s)
+        cc := new(big.Float).Mul(c, c)
+        return new(big.Float).Add(ss, cc)
+    }
+    one := func(x *big.Float) *big.Float { return bigmath.NewFloat(1.0) }
+
+    identityHolds := v.VerifyIdentity(sin2pluscos2, one)
+    fmt.Printf("sin²(x) + cos²(x) = 1 verified: %v\n", identityHolds)
+
+    // Evaluate at specific point
+    f := func(x *big.Float) *big.Float { return bigmath.Exp(x) }
+    val := bigmath.EvalAt(f, 1.0)
+    fmt.Printf("exp(1) at high precision: %.10f\n", val) // 2.7182818285
+}
+```
+
+## Numerically Stable Pow Near x=1
+
+```go
+package main
+
+import (
+    "fmt"
+    "math"
+    "github.com/emlgo/eml/pkg/arithmetic"
+)
+
+func main() {
+    // Near x=1, standard Log suffers from catastrophic cancellation
+    x := 1.0 + 1e-15
+    y := 1e6
+
+    // emlgo uses Log1p for stability
+    emlResult := arithmetic.Pow(x, y)
+    mathResult := math.Pow(x, y)
+
+    fmt.Printf("emlgo Pow(1+1e-15, 1e6): %.12f\n", emlResult)
+    fmt.Printf("math   Pow(1+1e-15, 1e6): %.12f\n", mathResult)
+    fmt.Printf("Difference: %.2e\n", math.Abs(emlResult-mathResult))
+
+    // Exp near x=0 uses Expm1
+    smallX := 1e-15
+    fmt.Printf("\nemlgo Exp(1e-15): %.25f\n", arithmetic.Exp(smallX))
+    fmt.Printf("math   Exp(1e-15): %.25f\n", math.Exp(smallX))
 }
 ```
 
@@ -129,7 +364,7 @@ func main() {
     // Create input slice
     inputs := []float64{0, 0.5, 1.0, 1.5, 2.0}
 
-    // Batch operations
+    // Batch operations (SIMD-accelerated)
     sinResults := trig.SinBatch(inputs)
     cosResults := trig.CosBatch(inputs)
 
@@ -166,7 +401,6 @@ import (
 func main() {
     // NaN handling
     fmt.Printf("sin(NaN) = %v\n", trig.Sin(math.NaN()))
-    fmt.Printf("logexp.Log(-1) = %v\n", math.NaN()) // Returns NaN for invalid input
 
     // Infinity handling
     fmt.Printf("sin(+Inf) = %v\n", trig.Sin(math.Inf(1)))
@@ -175,11 +409,9 @@ func main() {
     // Domain errors
     fmt.Printf("asin(2) = %v (outside domain)\n", trig.Asin(2))
     fmt.Printf("acosh(0.5) = %v (outside domain)\n", trig.Acosh(0.5))
-    fmt.Printf("logexp.Log(-1) = %v (invalid input)\n", math.NaN())
 
     // Division by zero
     fmt.Printf("Div(1, 0) = %v\n", arithmetic.Div(1, 0))
-    fmt.Printf("Sin(π/2) = %v (for sec at boundary)\n", trig.Sec(math.Pi/2))
 }
 ```
 
@@ -202,9 +434,28 @@ func main() {
 }
 ```
 
+## Worker Pool Shutdown
+
+```go
+package main
+
+import (
+    "github.com/emlgo/eml/internal/eml"
+)
+
+func main() {
+    // Use batch operations (workers are auto-started)...
+
+    // When done, gracefully shut down the worker pool
+    eml.StopWorkerPool()
+}
+```
+
 ## Performance Considerations
 
 - Single function calls have similar overhead to math library
 - Batch operations (SinBatch, CosBatch, etc.) are optimized for large slices
 - SIMD chunk size: 4 for AVX2/NEON, 8 for AVX-512
 - For small slices (<8 elements), scalar implementation may be faster
+- Arena allocator eliminates GC pressure in JIT hot paths
+- Canonical EML trees enable expression-level optimization and comparison

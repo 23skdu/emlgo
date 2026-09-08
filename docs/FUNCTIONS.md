@@ -12,6 +12,10 @@ Exponential and logarithmic functions using EML operator.
 |----------|-----------|-------------|
 | Exp | `func Exp(x float64) float64` | Exponential function e^x |
 | Log | `func Log(x float64) float64` | Natural logarithm ln(x) |
+| ExpBatch | `func ExpBatch(x []float64) []float64` | Batch exponential (SIMD) |
+| LogBatch | `func LogBatch(x []float64) []float64` | Batch logarithm (SIMD) |
+| ExpFast | `func ExpFast(x float64) float64` | Fast approximate exp |
+| LogFast | `func LogFast(x float64) float64` | Fast approximate log |
 
 ---
 
@@ -118,7 +122,7 @@ Basic arithmetic operations, roots, and powers.
 
 | Function | Signature | Description |
 |----------|-----------|-------------|
-| Pow | `func Pow(x, y float64) float64` | Power x^y |
+| Pow | `func Pow(x, y float64) float64` | Power x^y (uses Log1p near x=1) |
 | PowInt | `func PowInt(x float64, n int) float64` | Integer power x^n |
 | Sqrt | `func Sqrt(x float64) float64` | Square root |
 | Cbrt | `func Cbrt(x float64) float64` | Cube root |
@@ -145,8 +149,8 @@ Basic arithmetic operations, roots, and powers.
 
 | Function | Signature | Description |
 |----------|-----------|-------------|
-| Max | `func Max(x, y float64) float64` | Maximum of x and y |
-| Min | `func Min(x, y float64) float64` | Minimum of x and y |
+| Max | `func Max(x, y float64) float64` | Maximum of x and y (NaN-aware) |
+| Min | `func Min(x, y float64) float64` | Minimum of x and y (NaN-aware) |
 
 ### Rounding
 
@@ -184,30 +188,52 @@ Core EML operator and SIMD utilities (internal).
 | Function | Signature | Description |
 |----------|-----------|-------------|
 | Eml | `func Eml(x, y float64) float64` | Core EML operator: exp(x) - ln(y) |
-| EmlOne | `func EmlOne(x float64) float64` | Eml(x, 1) = exp(x) - 0 = exp(x) |
+| EmlOne | `func EmlOne(x float64) float64` | Eml(x, 1) = exp(x) |
 | OneEml | `func OneEml(y float64) float64` | Eml(1, y) = e - ln(y) |
+| Complex | `func Complex(x, y complex128) complex128` | Complex EML: cmplx.Exp(x) - cmplx.Log(y) |
+| ComplexOne | `func ComplexOne(x complex128) complex128` | Complex EML(x, 1) = cmplx.Exp(x) |
+| ComplexBatch | `func ComplexBatch(x, y, result []complex128)` | Batch complex EML operation |
+| ComplexExpBatch | `func ComplexExpBatch(x []complex128) []complex128` | Batch complex exponential |
+| ComplexLogBatch | `func ComplexLogBatch(x []complex128) []complex128` | Batch complex logarithm |
+| ComplexSinBatch | `func ComplexSinBatch(x []complex128) []complex128` | Batch complex sine |
+| ComplexCosBatch | `func ComplexCosBatch(x []complex128) []complex128` | Batch complex cosine |
+| ComplexTanBatch | `func ComplexTanBatch(x []complex128) []complex128` | Batch complex tangent |
+| StopWorkerPool | `func StopWorkerPool()` | Gracefully shut down worker pool |
 | HasAVX2 | `func HasAVX2() bool` | AVX2 detection |
 | HasAVX512 | `func HasAVX512() bool` | AVX-512 detection |
 | HasNeon | `func HasNeon() bool` | ARM NEON detection |
 
 ---
 
-## Package: internal/constants
+## Package: internal/eml/bigmath
 
-Mathematical constants.
+Arbitrary-precision EML operations using `math/big.Float`.
 
-| Constant | Value | Description |
-|----------|-------|-------------|
-| One | 1.0 | Unit constant |
-| E | 2.718281828459045... | Euler's number |
-| Pi | 3.141592653589793... | π |
-| I | 0+1i | Imaginary unit |
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| Eml | `func Eml(x, y *big.Float) *big.Float` | exp(x) - log(y) at arbitrary precision |
+| Exp | `func Exp(x *big.Float) *big.Float` | Arbitrary-precision exponential (Taylor series) |
+| Log | `func Log(x *big.Float) *big.Float` | Arbitrary-precision natural log |
+| Sin | `func Sin(x *big.Float) *big.Float` | Arbitrary-precision sine |
+| Cos | `func Cos(x *big.Float) *big.Float` | Arbitrary-precision cosine |
+| Sqrt | `func Sqrt(x *big.Float) *big.Float` | Arbitrary-precision square root |
+| NewFloat | `func NewFloat(x float64) *big.Float` | Create big.Float from float64 (256-bit) |
+| Float64 | `func Float64(x *big.Float) float64` | Convert big.Float to float64 |
+| DefaultVerifier | `func DefaultVerifier() *IdentityVerifier` | Identity verifier with default settings |
+| VerifyIdentity | `func (v *IdentityVerifier) VerifyIdentity(expr1, expr2 func(*big.Float) *big.Float) bool` | Test symbolic identity at high precision |
 
 ---
 
 ## Package: internal/jit
 
 JIT compiler for math expressions (amd64 only).
+
+### Compiler Functions
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| NewCompiler | `func NewCompiler() *Compiler` | Create a new JIT compiler |
+| Compile | `func (c *Compiler) Compile(expr string) (jitFunc, error)` | Compile expression string to native function |
 
 ### Supported Operators
 
@@ -217,8 +243,7 @@ JIT compiler for math expressions (amd64 only).
 | `-` | `x - y` | Subtraction |
 | `*` | `x * y` | Multiplication |
 | `/` | `x / y` | Division |
-| `^` | `x ^ 3` | Integer power (binary exponentiation) |
-| `^` | `x ^ -2` | Negative integer power (1/x^n) |
+| `^` | `x ^ 3` | Power (integer: binary exponentiation, non-integer/variable: exp(y*log(x))) |
 | unary `-` | `-x` | Negation |
 
 ### Supported Functions (JIT)
@@ -242,13 +267,66 @@ JIT compiler for math expressions (amd64 only).
 | floor | `floor(x)` | Floor |
 | trunc | `trunc(x)` | Truncate |
 
-### Composition Example
+### Exponent Support
 
-```go
-c, err := jit.Compile("sin(x)^2 + cos(x)^2")
-f := c.Func()
-result := f(0.0) // 1.0
-```
+| Expression | Strategy | Description |
+|------------|----------|-------------|
+| `x^3` | Binary exponentiation | O(log n) integer power |
+| `x^-2` | Reciprocal | `1.0 / x^2` |
+| `x^0.5` | `exp(0.5 * log(x))` | Non-integer constant exponent |
+| `x^1.5` | `exp(1.5 * log(x))` | Non-integer constant exponent |
+| `x^x` | `exp(x * log(x))` | Variable exponent |
+| `x^(x-1)` | `exp((x-1) * log(x))` | Variable exponent expression |
+
+### Arena Allocator
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| NewArena | `func NewArena(capacity int) *Arena` | Create arena with initial capacity |
+| Alloc | `func (a *Arena) Alloc() *ArenaNode` | Allocate a node (bump pointer, grows if needed) |
+| Reset | `func (a *Arena) Reset()` | Reset arena for reuse |
+| NumNodes | `func (a *Arena) NumNodes() int` | Number of allocated nodes |
+| FromInterface | `func (a *Arena) FromInterface(n Node) *ArenaNode` | Convert Node to arena node |
+| ToInterface | `func (a *Arena) ToInterface(n *ArenaNode) Node` | Convert arena node to Node |
+| EvalArena | `func EvalArena(n *ArenaNode, x float64) float64` | Evaluate arena tree |
+
+### Canonical EML Trees
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| CanonicalExp | `func CanonicalExp(x *EMLNode) *EMLNode` | exp(x) = eml(x, 1) |
+| CanonicalLog | `func CanonicalLog(x *EMLNode) *EMLNode` | log(x) = eml(1, eml(eml(1, x), 1)) |
+| CanonicalSin | `func CanonicalSin(x *EMLNode) *EMLNode` | sin(x) |
+| CanonicalCos | `func CanonicalCos(x *EMLNode) *EMLNode` | cos(x) |
+| CanonicalSqrt | `func CanonicalSqrt(x *EMLNode) *EMLNode` | sqrt(x) = exp(0.5 * log(x)) |
+| Canonicalize | `func Canonicalize(n Node) *EMLNode` | Convert any Node to canonical EML form |
+| Equiv | `func Equiv(a, b *EMLNode) bool` | Structural equivalence check |
+| EMLSize | `func EMLSize(n *EMLNode) int` | Count nodes in tree |
+
+---
+
+## Package: internal/constants
+
+Mathematical constants.
+
+| Constant | Value | Description |
+|----------|-------|-------------|
+| One | 1.0 | Unit constant |
+| E | 2.718281828459045... | Euler's number |
+| Pi | 3.141592653589793... | π |
+| Sqrt2 | 1.4142135623730951... | √2 |
+| Sqrt3 | 1.7320508075688772... | √3 |
+| Ln2 | 0.6931471805599453... | ln(2) |
+| Ln10 | 2.302585092994046... | ln(10) |
+| SqrtPi | 1.7724538509055159... | √π |
+| Phi | 1.618033988749895... | Golden ratio φ |
+| I | 0+1i | Imaginary unit |
+| NegOne | -1.0 | Negative unit |
+| Two | 2.0 | Two |
+| Half | 0.5 | One half |
+| ComplexOne | 1+0i | Complex unit |
+| ComplexI | 0+1i | Complex imaginary unit |
+| ComplexNegI | 0-1i | Complex negative imaginary unit |
 
 ---
 
@@ -259,7 +337,11 @@ The core EML operator `eml(x,y) = exp(x) - ln(y)` serves as the theoretical foun
 - **Scalar operations**: Direct implementations using `math.*` functions or hand-coded assembly (AVX2/AVX512 on AMD64).
 - **Batch operations**: SIMD-vectorized kernels that process 4-8 elements per cycle using architecture-specific assembly.
 - **FastMath**: FMA-optimized polynomial approximations with relaxed IEEE 754 compliance.
-- **JIT compiler**: x86-64 SSE2 codegen for math expressions parsed from strings, supporting 16 built-in functions, integer powers, and negative exponents.
+- **JIT compiler**: x86-64 SSE2 codegen for math expressions parsed from strings, supporting 16 built-in functions, non-integer exponents (via `exp(y*log(x))`), and variable exponents.
+- **Complex numbers**: `math/cmplx`-based operations on `complex128` slices, parallelized via the worker pool.
+- **Arbitrary precision**: `math/big.Float` Taylor series for symbolic verification at 256-bit precision.
+- **Arena allocator**: Zero-allocation JIT parse/eval paths using bump-pointer allocation.
+- **Canonical EML trees**: Normalize any expression to minimal EML form for comparison and optimization.
 - **GPU backends**: CUDA and Metal kernels for massive parallel workloads.
 
 The EML operator is used in the `Eml()` scalar function and the GPU `EmlBatch` kernel. The mathematical framework from the original EML paper (arXiv:2603.21852v2) demonstrates that all elementary functions can be derived from this single operator, which is the theoretical basis for the library's unified design.

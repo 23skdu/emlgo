@@ -1,26 +1,29 @@
-# emlgo - Elementary Functions from the EML Operator
+# emlgo
 
-A pure Go implementation of all elementary mathematical functions using only the EML (ExpMinusLog) operator, based on the research presented in [arXiv:2603.21852v2](https://arxiv.org/html/2603.21852v2).
+A high-performance mathematical library for Go, implementing all elementary functions using the EML (Exp-Minus-Log) operator with SIMD acceleration, JIT compilation, GPU backends, and arbitrary-precision verification.
 
-## Overview
+Based on the research of **Andrzej Odrzywołek**: [All elementary functions from a single operator](https://arxiv.org/abs/2603.21852v2) (2026).
 
-The emlgo library provides a complete set of elementary mathematical functions (trigonometric, hyperbolic, exponential, logarithmic, and arithmetic operations) implemented using a single primitive operator:
+## Features
 
-```math
-eml(x, y) = exp(x) - ln(y)
-```
-
-This approach enables:
-
-- **Minimal dependencies** - Pure Go with only `golang.org/x/sys` for platform-specific primitives
-- **Unified implementation** - All functions derived from a single primitive
-- **SIMD optimizations** - Batch processing with AVX2/AVX512/NEON support
+- **EML Operator**: `eml(x, y) = exp(x) - ln(y)` — single primitive from which all elementary functions derive
+- **SIMD Batch Operations**: AVX2, AVX-512 (AMD64), NEON, SVE (ARM64), WASM SIMD128
+- **JIT Compiler**: x86-64 machine code generation for math expressions (16 functions, non-integer/variable exponents)
+- **GPU Backends**: CUDA (Linux/Windows) and Metal (macOS/ARM64)
+- **Complex Numbers**: First-class `complex128` support via `math/cmplx`
+- **Arbitrary Precision**: `math/big.Float` backend for symbolic verification
+- **Zero-Allocation AST**: Arena allocator for JIT parse/eval paths
+- **Canonical EML Trees**: Map any expression to minimal EML form
+- **Numerically Stable**: Log1p/Expm1 optimization for compound expressions
+- **FastMath**: FMA-optimized polynomial approximations (~10% faster than `math.Sin`)
 
 ## Installation
 
 ```bash
 go get github.com/emlgo/eml
 ```
+
+Requires **Go 1.23+**.
 
 ## Quick Start
 
@@ -29,24 +32,32 @@ package main
 
 import (
     "fmt"
+    "math"
     "github.com/emlgo/eml/pkg/trig"
     "github.com/emlgo/eml/pkg/logexp"
     "github.com/emlgo/eml/pkg/arithmetic"
+    "github.com/emlgo/eml/pkg/hyper"
 )
 
 func main() {
-    // Trigonometric functions
-    fmt.Printf("sin(π/4) = %v\n", trig.Sin(math.Pi/4))  // ≈ 0.707
-    fmt.Printf("cos(π/4) = %v\n", trig.Cos(math.Pi/4))  // ≈ 0.707
-    fmt.Printf("tan(π/4) = %v\n", trig.Tan(math.Pi/4))  // ≈ 1.0
+    // Trigonometric
+    fmt.Printf("sin(π/4) = %.6f\n", trig.Sin(math.Pi/4))
 
-    // Exponential and Logarithmic
-    fmt.Printf("exp(1) = %v\n", logexp.Exp(1))          // ≈ 2.718
-    fmt.Printf("ln(e) = %v\n", logexp.Log(math.E))      // ≈ 1.0
+    // Exponential & Logarithmic
+    fmt.Printf("exp(1) = %.6f\n", logexp.Exp(1))
 
-    // Arithmetic
-    fmt.Printf("sqrt(2) = %v\n", arithmetic.Sqrt(2))     // ≈ 1.414
-    fmt.Printf("pow(2, 3) = %v\n", arithmetic.Pow(2, 3)) // ≈ 8.0
+    // Arithmetic with numerical stability
+    fmt.Printf("pow(1.000001, 1e6) = %.6f\n", arithmetic.Pow(1.000001, 1e6))
+
+    // Hyperbolic
+    fmt.Printf("sinh(1) = %.6f\n", hyper.Sinh(1))
+
+    // Batch operations (SIMD-accelerated)
+    x := []float64{0, 0.5, 1.0, 1.5, 2.0}
+    sin := trig.SinBatch(x)
+    exp := logexp.ExpBatch(x)
+    fmt.Printf("SinBatch: %v\n", sin)
+    fmt.Printf("ExpBatch: %v\n", exp)
 }
 ```
 
@@ -54,40 +65,75 @@ func main() {
 
 | Package | Description |
 | :--- | :--- |
-| `pkg/logexp` | Exponential and logarithmic functions |
-| `pkg/trig` | Trigonometric and inverse trigonometric functions |
-| `pkg/hyper` | Hyperbolic and inverse hyperbolic functions |
-| `pkg/arithmetic` | Basic arithmetic operations, roots, powers |
-| `pkg/fastmath` | High-performance scalar alternatives |
-| `internal/eml` | Core EML operator + SIMD/Scalar kernels |
-| `internal/constants` | Mathematical constants |
+| `pkg/arithmetic` | Add, Sub, Mul, Div, Pow, Sqrt, Cbrt, FMA, GCD, LCM, batch ops |
+| `pkg/trig` | Sin, Cos, Tan, Cot, Sec, Csc, Asin, Acos, Atan, Atan2, batch ops |
+| `pkg/hyper` | Sinh, Cosh, Tanh, Asinh, Acosh, Atanh, batch ops |
+| `pkg/logexp` | Exp, Log, ExpBatch, LogBatch, ExpFast, LogFast |
+| `pkg/fastmath` | FMA-optimized polynomial approximations for Exp, Sin, Cos, Log |
+| `internal/eml` | Core EML operator, SIMD dispatch, worker pool, complex batch ops |
+| `internal/eml/bigmath` | Arbitrary-precision EML via `math/big.Float`, identity verifier |
+| `internal/jit` | JIT compiler (x86-64 codegen), arena allocator, canonical EML trees |
+| `internal/gpu` | CUDA & Metal GPU backends, ULP-based verification |
+| `internal/constants` | Mathematical constants (e, π, ln2, √2, φ, etc.) |
 
 ## Architecture
 
-For details on the internal design and SIMD dispatch logic, see [Architecture](architecture.md).
+```text
+emlgo/
+├── cmd/
+│   ├── bench/           # Benchmark tool
+│   ├── validate/        # Validation tool
+│   └── emlcli/          # CLI demo
+├── internal/
+│   ├── eml/             # Core EML operator + SIMD dispatch
+│   │   ├── bigmath/     # Arbitrary-precision backend
+│   │   └── simd_*.go    # Platform-specific dispatch (amd64/arm64/wasm)
+│   ├── jit/             # JIT compiler + arena allocator + canonical trees
+│   ├── gpu/             # CUDA & Metal GPU backends
+│   └── constants/       # Mathematical constants
+├── pkg/
+│   ├── arithmetic/      # Basic arithmetic + batch ops
+│   ├── trig/            # Trigonometric + batch ops
+│   ├── hyper/           # Hyperbolic functions + batch ops
+│   ├── logexp/          # Exponential & logarithmic
+│   └── fastmath/        # High-performance scalar ops
+├── docs/                # Documentation
+└── scripts/             # Benchmark & validation scripts
+```
 
-## Features
+## SIMD Support
 
-- **Full float64 domain support** - Handles NaN, Inf, edge cases correctly
-- **Comprehensive test coverage** - All functions verified against math library
-- **SIMD batch operations** - Efficient processing of slice inputs
-- **Race-condition safe** - Tested with `-race` flag
-- **Zero security issues** - Verified with gosec
+| Architecture | Instructions | Width |
+| :--- | :--- | :--- |
+| AMD64 | AVX-512 | 8-wide float64 |
+| AMD64 | AVX2 + FMA | 4-wide float64 |
+| ARM64 | NEON | 2-wide float64 |
+| ARM64 | SVE/SVE2 | Scalable |
+| WASM | SIMD128 | 2-wide float64 (8-wide unrolled) |
+
+Batch operations automatically dispatch to the fastest available SIMD path.
+
+## Building & Testing
+
+```bash
+go build ./...
+go test ./...
+go test -race ./...
+go vet ./...
+gosec -exclude-generated ./...
+./scripts/bench-compare.sh
+```
 
 ## Performance
 
-The library provides comparable accuracy to the standard math library while being implemented entirely through the EML operator. For batch operations, SIMD optimizations provide significant speedups on supported architectures.
-
-## Requirements
-
-- Go 1.26 or later
-- `golang.org/x/sys` for JIT mmap/mprotect and SIMD detection
+| Operation | Scalar | Batch (SIMD) |
+| :--- | :--- | :--- |
+| Add/Sub/Mul | ~parity with `math` | **1.2-15x faster** |
+| Exp/Log/Sin/Cos | ~parity with `math` | **1.1-5x faster** |
+| PowInt | **5-6x faster** than `math.Pow` | parallelized |
+| FastMath Sin | **10% faster** than `math.Sin` | N/A |
+| Fused (ExpMul) | N/A | **20-30% less memory** |
 
 ## License
 
-The Unlicense (public domain) - See LICENSE file for details
-
-## References
-
-- [EML Operator Paper (arXiv:2603.21852v2)](https://arxiv.org/html/2603.21852v2)
-- Related: Kolmogorov-Arnold Networks (KAN) for similar tree structures
+See LICENSE file.
