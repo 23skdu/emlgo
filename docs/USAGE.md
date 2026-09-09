@@ -194,13 +194,154 @@ func main() {
     m, _ := c.Compile("x^(x-1)")
     fmt.Printf("x^(x-1) at x=3: %.6f\n", m(3)) // 9.0
 
-    // Complex expressions with 16 supported functions
+    // Complex expressions with 17 supported functions
     n, _ := c.Compile("sin(x)^2 + cos(x)^2")
     fmt.Printf("sin²(x) + cos²(x) = %.6f\n", n(1.23)) // 1.0
 
-    // All 16 functions work
+    // All 17 functions work
     o, _ := c.Compile("sqrt(abs(x)) + cbrt(x)")
     fmt.Printf("sqrt(|-8|) + cbrt(-8) = %.6f\n", o(-8)) // 2.0 + (-2.0) = 0.0
+
+    // round function
+    r, _ := c.Compile("round(x)")
+    fmt.Printf("round(3.7) = %.6f\n", r(3.7)) // 4.0
+}
+```
+
+## JIT Expression Cache
+
+```go
+package main
+
+import (
+    "fmt"
+    "github.com/emlgo/eml/internal/jit"
+)
+
+func main() {
+    // First call compiles and caches
+    fn, err := jit.CompileCached("sin(x)^2 + cos(x)^2")
+    if err != nil {
+        panic(err)
+    }
+    fmt.Printf("f(1.23) = %.6f\n", fn(1.23)) // 1.0
+
+    // Subsequent calls return cached result (no recompilation)
+    fn2, _ := jit.CompileCached("sin(x)^2 + cos(x)^2")
+    fmt.Printf("Same function: %v\n", fn == fn2) // true
+
+    // Clear cache for long-running programs
+    jit.ClearJITCache()
+}
+```
+
+## Symbolic Differentiation
+
+```go
+package main
+
+import (
+    "fmt"
+    "github.com/emlgo/eml/internal/jit"
+)
+
+func main() {
+    // Parse and canonicalize
+    node := jit.Canonicalize(jit.Parse("x^2"))
+
+    // Differentiate: d/dx x² = 2x
+    dx := jit.Diff(node)
+    fmt.Printf("d/dx x² = %s\n", jit.Decompile(dx)) // mul(2.0, x)
+
+    // Evaluate derivative at a point
+    result := jit.DiffEval(node, 3.0) // 2*3 = 6.0
+    fmt.Printf("d/dx x² at x=3: %.6f\n", result)
+
+    // More complex: d/dx sin(x) = cos(x)
+    sinNode := jit.Canonicalize(jit.Parse("sin(x")))
+    dsin := jit.Diff(sinNode)
+    fmt.Printf("d/dx sin(x) = %s\n", jit.Decompile(dsin)) // cos(x)
+}
+```
+
+## Expression Simplification
+
+```go
+package main
+
+import (
+    "fmt"
+    "github.com/emlgo/eml/internal/jit"
+)
+
+func main() {
+    // Constant folding
+    node := jit.Simplify(jit.Canonicalize(jit.Parse("2 + 3")))
+    fmt.Printf("2 + 3 = %s\n", jit.Decompile(node)) // 5.0
+
+    // Identity reduction
+    node2 := jit.Simplify(jit.Canonicalize(jit.Parse("x + 0")))
+    fmt.Printf("x + 0 = %s\n", jit.Decompile(node2)) // x
+
+    // Double negation
+    node3 := jit.Simplify(jit.Canonicalize(jit.Parse("-(-x)")))
+    fmt.Printf("-(-x) = %s\n", jit.Decompile(node3)) // x
+
+    // Multiplication identities
+    node4 := jit.Simplify(jit.Canonicalize(jit.Parse("x * 1")))
+    fmt.Printf("x * 1 = %s\n", jit.Decompile(node4)) // x
+
+    node5 := jit.Simplify(jit.Canonicalize(jit.Parse("x * 0")))
+    fmt.Printf("x * 0 = %s\n", jit.Decompile(node5)) // 0.0
+}
+```
+
+## EML Decompiler & LaTeX
+
+```go
+package main
+
+import (
+    "fmt"
+    "github.com/emlgo/eml/internal/jit"
+)
+
+func main() {
+    // Parse and canonicalize
+    emlNode := jit.Canonicalize(jit.Parse("sin(x)^2 + cos(x)^2"))
+
+    // Infix notation
+    fmt.Println("Infix:", jit.Decompile(emlNode))
+
+    // LaTeX math mode
+    fmt.Println("LaTeX:", jit.DecompileLaTeX(emlNode))
+
+    // CLI usage:
+    // emlcli decompile "sin(x)^2 + cos(x)^2"
+}
+```
+
+## Composable Pipeline
+
+```go
+package main
+
+import (
+    "fmt"
+    "github.com/emlgo/eml/internal/eml"
+)
+
+func main() {
+    input := []float64{0.5, 1.0, 1.5, 2.0}
+    output := make([]float64, len(input))
+
+    // Zero-allocation composable pipeline with buffer swapping
+    p := eml.NewPipeline(len(input))
+    p.Exp().MulScalar(2.0).Log().RunTo(input, output)
+
+    fmt.Printf("input:  %v\n", input)
+    fmt.Printf("output: %v\n", output)
+    // output[i] = log(2 * exp(input[i]))
 }
 ```
 
@@ -384,6 +525,26 @@ func main() {
 }
 ```
 
+## float32 SIMD Batch Operations
+
+```go
+package main
+
+import (
+    "fmt"
+    "github.com/emlgo/eml/internal/eml"
+)
+
+func main() {
+    // float32 batch operations for memory-constrained workloads
+    x := []float32{0.5, 1.0, 1.5, 2.0}
+    sin := eml.SinSIMDF32(x)
+    exp := eml.ExpSIMDF32(x)
+    fmt.Printf("SinSIMDF32: %v\n", sin)
+    fmt.Printf("ExpSIMDF32: %v\n", exp)
+}
+```
+
 ## Error Handling
 
 All functions handle edge cases correctly:
@@ -431,6 +592,8 @@ func main() {
     fmt.Printf("Has AVX2: %v\n", eml.HasAVX2())
     fmt.Printf("Has AVX-512: %v\n", eml.HasAVX512())
     fmt.Printf("Has NEON: %v\n", eml.HasNeon())
+    fmt.Printf("Has FMA: %v\n", eml.HasFMA())
+    fmt.Printf("Has WASM SIMD: %v\n", eml.HasWasmSIMD())
 }
 ```
 
@@ -459,3 +622,5 @@ func main() {
 - For small slices (<8 elements), scalar implementation may be faster
 - Arena allocator eliminates GC pressure in JIT hot paths
 - Canonical EML trees enable expression-level optimization and comparison
+- Pipeline API provides zero-allocation chained operations
+- JIT expression cache avoids recompilation for repeated expressions

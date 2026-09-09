@@ -185,11 +185,122 @@ Basic arithmetic operations, roots, and powers.
 
 Core EML operator and SIMD utilities (internal).
 
+### Core EML
+
 | Function | Signature | Description |
 |----------|-----------|-------------|
 | Eml | `func Eml(x, y float64) float64` | Core EML operator: exp(x) - ln(y) |
 | EmlOne | `func EmlOne(x float64) float64` | Eml(x, 1) = exp(x) |
 | OneEml | `func OneEml(y float64) float64` | Eml(1, y) = e - ln(y) |
+
+### SIMD Detection
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| HasSSE4 | `func HasSSE4() bool` | SSE4 detection |
+| HasAVX2 | `func HasAVX2() bool` | AVX2 detection |
+| HasAVX512 | `func HasAVX512() bool` | AVX-512 detection |
+| HasNeon | `func HasNeon() bool` | ARM NEON detection |
+| HasNeonDot | `func HasNeonDot() bool` | ARM NEON dot product detection |
+| HasSVE | `func HasSVE() bool` | ARM SVE detection |
+| HasFMA | `func HasFMA() bool` | FMA detection |
+| HasAVXVNNI | `func HasAVXVNNI() bool` | AVX-VNNI detection |
+| HasWasmSIMD | `func HasWasmSIMD() bool` | WASM SIMD detection |
+
+### Scalar Operations
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| FmaScalar | `func FmaScalar(a, b, c float64) float64` | Fused multiply-add: a*b+c |
+| SqrtScalar | `func SqrtScalar(x float64) float64` | Square root |
+| AbsScalar | `func AbsScalar(x float64) float64` | Absolute value |
+| NegScalar | `func NegScalar(x float64) float64` | Negation |
+
+### float64 SIMD Batch Operations
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| SIMD | `func SIMD(x, y, result []float64)` | EML operator on slices |
+| ExpSIMD | `func ExpSIMD(x []float64) []float64` | Batch exponential |
+| ExpSIMDTo | `func ExpSIMDTo(x, result []float64)` | In-place batch exponential |
+| LogSIMD | `func LogSIMD(x []float64) []float64` | Batch logarithm |
+| LogSIMDTo | `func LogSIMDTo(x, result []float64)` | In-place batch logarithm |
+| SqrtSIMD | `func SqrtSIMD(x []float64) []float64` | Batch square root |
+| SqrtSIMDTo | `func SqrtSIMDTo(x, result []float64)` | In-place batch square root |
+| SinSIMD | `func SinSIMD(x []float64) []float64` | Batch sine |
+| SinSIMDTo | `func SinSIMDTo(x, result []float64)` | In-place batch sine |
+| CosSIMD | `func CosSIMD(x []float64) []float64` | Batch cosine |
+| CosSIMDTo | `func CosSIMDTo(x, result []float64)` | In-place batch cosine |
+| TanSIMD | `func TanSIMD(x []float64) []float64` | Batch tangent |
+| TanSIMDTo | `func TanSIMDTo(x, result []float64)` | In-place batch tangent |
+| SinCosSIMD | `func SinCosSIMD(x []float64) (sin, cos []float64)` | Batch sin+cos |
+| SinCosSIMDTo | `func SinCosSIMDTo(x, sin, cos []float64)` | In-place batch sin+cos |
+| AddSIMD | `func AddSIMD(a, b []float64) []float64` | Batch addition |
+| SubSIMD | `func SubSIMD(a, b []float64) []float64` | Batch subtraction |
+| MulSIMD | `func MulSIMD(a, b []float64) []float64` | Batch multiplication |
+| DivSIMD | `func DivSIMD(a, b []float64) []float64` | Batch division |
+| AbsSIMD | `func AbsSIMD(x []float64) []float64` | Batch absolute value |
+| AbsSIMDTo | `func AbsSIMDTo(x, result []float64)` | In-place batch absolute value |
+| NegSIMD | `func NegSIMD(x []float64) []float64` | Batch negation |
+| NegSIMDTo | `func NegSIMDTo(x, result []float64)` | In-place batch negation |
+| InvSIMD | `func InvSIMD(x []float64) []float64` | Batch inverse |
+| InvSIMDTo | `func InvSIMDTo(x, result []float64)` | In-place batch inverse |
+| AddScalarSIMD | `func AddScalarSIMD(a []float64, b float64) []float64` | Add scalar to batch |
+| AddScalarSIMDTo | `func AddScalarSIMDTo(a []float64, b float64, result []float64)` | In-place add scalar |
+| MulScalarSIMD | `func MulScalarSIMD(a []float64, b float64) []float64` | Multiply batch by scalar |
+| MulScalarSIMDTo | `func MulScalarSIMDTo(a []float64, b float64, result []float64)` | In-place multiply scalar |
+
+### float32 SIMD Batch Operations
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| ExpSIMDF32 | `func ExpSIMDF32(x []float32) []float32` | Batch exponential (float32) |
+| LogSIMDF32 | `func LogSIMDF32(x []float32) []float32` | Batch logarithm (float32) |
+| SqrtSIMDF32 | `func SqrtSIMDF32(x []float32) []float32` | Batch square root (float32) |
+| AddSIMDF32 | `func AddSIMDF32(a, b []float32) []float32` | Batch addition (float32) |
+| SubSIMDF32 | `func SubSIMDF32(a, b []float32) []float32` | Batch subtraction (float32) |
+| MulSIMDF32 | `func MulSIMDF32(a, b []float32) []float32` | Batch multiplication (float32) |
+| DivSIMDF32 | `func DivSIMDF32(a, b []float32) []float32` | Batch division (float32) |
+| AbsSIMDF32 | `func AbsSIMDF32(x []float32) []float32` | Batch absolute value (float32) |
+| NegSIMDF32 | `func NegSIMDF32(x []float32) []float32` | Batch negation (float32) |
+| InvSIMDF32 | `func InvSIMDF32(x []float32) []float32` | Batch inverse (float32) |
+| SinSIMDF32 | `func SinSIMDF32(x []float32) []float32` | Batch sine (float32) |
+| CosSIMDF32 | `func CosSIMDF32(x []float32) []float32` | Batch cosine (float32) |
+| TanSIMDF32 | `func TanSIMDF32(x []float32) []float32` | Batch tangent (float32) |
+| AddScalarSIMDF32 | `func AddScalarSIMDF32(a []float32, b float32) []float32` | Add scalar (float32) |
+| MulScalarSIMDF32 | `func MulScalarSIMDF32(a []float32, b float32) []float32` | Multiply scalar (float32) |
+
+### Hyperbolic Batch Operations
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| SinhBatch | `func SinhBatch(x []float64) []float64` | Batch hyperbolic sine |
+| CoshBatch | `func CoshBatch(x []float64) []float64` | Batch hyperbolic cosine |
+| TanhBatch | `func TanhBatch(x []float64) []float64` | Batch hyperbolic tangent |
+| AsinhBatch | `func AsinhBatch(x []float64) []float64` | Batch inverse hyperbolic sine |
+| AcoshBatch | `func AcoshBatch(x []float64) []float64` | Batch inverse hyperbolic cosine |
+| AtanhBatch | `func AtanhBatch(x []float64) []float64` | Batch inverse hyperbolic tangent |
+
+### Composable Pipeline
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| NewPipeline | `func NewPipeline(n int) *Pipeline` | Create pipeline with buffer size n |
+| Pipeline.Exp | `func (p *Pipeline) Exp() *Pipeline` | Append exp step |
+| Pipeline.Log | `func (p *Pipeline) Log() *Pipeline` | Append log step |
+| Pipeline.Sqrt | `func (p *Pipeline) Sqrt() *Pipeline` | Append sqrt step |
+| Pipeline.Sin | `func (p *Pipeline) Sin() *Pipeline` | Append sin step |
+| Pipeline.Cos | `func (p *Pipeline) Cos() *Pipeline` | Append cos step |
+| Pipeline.Abs | `func (p *Pipeline) Abs() *Pipeline` | Append abs step |
+| Pipeline.Neg | `func (p *Pipeline) Neg() *Pipeline` | Append neg step |
+| Pipeline.MulScalar | `func (p *Pipeline) MulScalar(c float64) *Pipeline` | Append mul-by-constant step |
+| Pipeline.AddScalar | `func (p *Pipeline) AddScalar(c float64) *Pipeline` | Append add-constant step |
+| Pipeline.RunTo | `func (p *Pipeline) RunTo(input, output []float64)` | Execute pipeline (zero-alloc) |
+
+### Complex Batch Operations
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
 | Complex | `func Complex(x, y complex128) complex128` | Complex EML: cmplx.Exp(x) - cmplx.Log(y) |
 | ComplexOne | `func ComplexOne(x complex128) complex128` | Complex EML(x, 1) = cmplx.Exp(x) |
 | ComplexBatch | `func ComplexBatch(x, y, result []complex128)` | Batch complex EML operation |
@@ -198,10 +309,12 @@ Core EML operator and SIMD utilities (internal).
 | ComplexSinBatch | `func ComplexSinBatch(x []complex128) []complex128` | Batch complex sine |
 | ComplexCosBatch | `func ComplexCosBatch(x []complex128) []complex128` | Batch complex cosine |
 | ComplexTanBatch | `func ComplexTanBatch(x []complex128) []complex128` | Batch complex tangent |
+
+### Worker Pool
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
 | StopWorkerPool | `func StopWorkerPool()` | Gracefully shut down worker pool |
-| HasAVX2 | `func HasAVX2() bool` | AVX2 detection |
-| HasAVX512 | `func HasAVX512() bool` | AVX-512 detection |
-| HasNeon | `func HasNeon() bool` | ARM NEON detection |
 
 ---
 
@@ -216,8 +329,13 @@ Arbitrary-precision EML operations using `math/big.Float`.
 | Log | `func Log(x *big.Float) *big.Float` | Arbitrary-precision natural log |
 | Sin | `func Sin(x *big.Float) *big.Float` | Arbitrary-precision sine |
 | Cos | `func Cos(x *big.Float) *big.Float` | Arbitrary-precision cosine |
+| Tan | `func Tan(x *big.Float) *big.Float` | Arbitrary-precision tangent |
+| Atan | `func Atan(x *big.Float) *big.Float` | Arbitrary-precision arctangent |
+| Asin | `func Asin(x *big.Float) *big.Float` | Arbitrary-precision arcsine |
+| Acos | `func Acos(x *big.Float) *big.Float` | Arbitrary-precision arccosine |
 | Sqrt | `func Sqrt(x *big.Float) *big.Float` | Arbitrary-precision square root |
 | NewFloat | `func NewFloat(x float64) *big.Float` | Create big.Float from float64 (256-bit) |
+| NewFloatFromInt | `func NewFloatFromInt(n int64) *big.Float` | Create big.Float from int64 |
 | Float64 | `func Float64(x *big.Float) float64` | Convert big.Float to float64 |
 | DefaultVerifier | `func DefaultVerifier() *IdentityVerifier` | Identity verifier with default settings |
 | VerifyIdentity | `func (v *IdentityVerifier) VerifyIdentity(expr1, expr2 func(*big.Float) *big.Float) bool` | Test symbolic identity at high precision |
@@ -234,6 +352,63 @@ JIT compiler for math expressions (amd64 only).
 |----------|-----------|-------------|
 | NewCompiler | `func NewCompiler() *Compiler` | Create a new JIT compiler |
 | Compile | `func (c *Compiler) Compile(expr string) (jitFunc, error)` | Compile expression string to native function |
+| Parse | `func Parse(input string) (Node, error)` | Parse expression to AST |
+| ParseWithVars | `func ParseWithVars(input string, vars []string) (Node, error)` | Parse with multi-variable support |
+
+### JIT Expression Cache
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| CompileCached | `func CompileCached(expr string) (Func, error)` | Compile and cache expression (LRU, max 1024) |
+| ClearJITCache | `func ClearJITCache()` | Clear the JIT expression cache |
+
+### Symbolic Differentiation
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| Diff | `func Diff(n *EMLNode) *EMLNode` | Symbolically differentiate EMLNode tree |
+| DiffEval | `func DiffEval(n *EMLNode, x float64) float64` | Evaluate derivative at x |
+
+### Expression Simplification
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| Simplify | `func Simplify(n *EMLNode) *EMLNode` | Constant fold and algebraically simplify |
+
+### EML Decompiler
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| Decompile | `func Decompile(n *EMLNode) string` | Convert EMLNode to parenthesized infix |
+| DecompileLaTeX | `func DecompileLaTeX(n *EMLNode) string` | Convert EMLNode to LaTeX math mode |
+| DecompileNodeToExpr | `func DecompileNodeToExpr(n *EMLNode) string` | Convert EMLNode using JIT formatter |
+
+### Canonical EML Trees
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| CanonicalExp | `func CanonicalExp(x *EMLNode) *EMLNode` | exp(x) = eml(x, 1) |
+| CanonicalLog | `func CanonicalLog(x *EMLNode) *EMLNode` | log(x) = eml(1, eml(eml(1, x), 1)) |
+| CanonicalSin | `func CanonicalSin(x *EMLNode) *EMLNode` | sin(x) |
+| CanonicalCos | `func CanonicalCos(x *EMLNode) *EMLNode` | cos(x) |
+| CanonicalSqrt | `func CanonicalSqrt(x *EMLNode) *EMLNode` | sqrt(x) = exp(0.5 * log(x)) |
+| Canonicalize | `func Canonicalize(n Node) *EMLNode` | Convert any Node to canonical EML form |
+| Equiv | `func Equiv(a, b *EMLNode) bool` | Structural equivalence check |
+| EMLSize | `func EMLSize(n *EMLNode) int` | Count nodes in tree |
+| EMLEval | `func EMLEval(n *EMLNode, x float64) float64` | Evaluate canonical EML tree |
+| Depth | `func Depth(n *EMLNode) int` | Height of EMLNode tree |
+
+### Arena Allocator
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| NewArena | `func NewArena(capacity int) *Arena` | Create arena with initial capacity |
+| Alloc | `func (a *Arena) Alloc() *ArenaNode` | Allocate a node (bump pointer, grows if needed) |
+| Reset | `func (a *Arena) Reset()` | Reset arena for reuse |
+| NumNodes | `func (a *Arena) NumNodes() int` | Number of allocated nodes |
+| FromInterface | `func (a *Arena) FromInterface(n Node) *ArenaNode` | Convert Node to arena node |
+| ToInterface | `func (a *Arena) ToInterface(n *ArenaNode) Node` | Convert arena node to Node |
+| EvalArena | `func EvalArena(n *ArenaNode, x float64) float64` | Evaluate arena tree |
 
 ### Supported Operators
 
@@ -266,42 +441,7 @@ JIT compiler for math expressions (amd64 only).
 | ceil | `ceil(x)` | Ceiling |
 | floor | `floor(x)` | Floor |
 | trunc | `trunc(x)` | Truncate |
-
-### Exponent Support
-
-| Expression | Strategy | Description |
-|------------|----------|-------------|
-| `x^3` | Binary exponentiation | O(log n) integer power |
-| `x^-2` | Reciprocal | `1.0 / x^2` |
-| `x^0.5` | `exp(0.5 * log(x))` | Non-integer constant exponent |
-| `x^1.5` | `exp(1.5 * log(x))` | Non-integer constant exponent |
-| `x^x` | `exp(x * log(x))` | Variable exponent |
-| `x^(x-1)` | `exp((x-1) * log(x))` | Variable exponent expression |
-
-### Arena Allocator
-
-| Function | Signature | Description |
-|----------|-----------|-------------|
-| NewArena | `func NewArena(capacity int) *Arena` | Create arena with initial capacity |
-| Alloc | `func (a *Arena) Alloc() *ArenaNode` | Allocate a node (bump pointer, grows if needed) |
-| Reset | `func (a *Arena) Reset()` | Reset arena for reuse |
-| NumNodes | `func (a *Arena) NumNodes() int` | Number of allocated nodes |
-| FromInterface | `func (a *Arena) FromInterface(n Node) *ArenaNode` | Convert Node to arena node |
-| ToInterface | `func (a *Arena) ToInterface(n *ArenaNode) Node` | Convert arena node to Node |
-| EvalArena | `func EvalArena(n *ArenaNode, x float64) float64` | Evaluate arena tree |
-
-### Canonical EML Trees
-
-| Function | Signature | Description |
-|----------|-----------|-------------|
-| CanonicalExp | `func CanonicalExp(x *EMLNode) *EMLNode` | exp(x) = eml(x, 1) |
-| CanonicalLog | `func CanonicalLog(x *EMLNode) *EMLNode` | log(x) = eml(1, eml(eml(1, x), 1)) |
-| CanonicalSin | `func CanonicalSin(x *EMLNode) *EMLNode` | sin(x) |
-| CanonicalCos | `func CanonicalCos(x *EMLNode) *EMLNode` | cos(x) |
-| CanonicalSqrt | `func CanonicalSqrt(x *EMLNode) *EMLNode` | sqrt(x) = exp(0.5 * log(x)) |
-| Canonicalize | `func Canonicalize(n Node) *EMLNode` | Convert any Node to canonical EML form |
-| Equiv | `func Equiv(a, b *EMLNode) bool` | Structural equivalence check |
-| EMLSize | `func EMLSize(n *EMLNode) int` | Count nodes in tree |
+| round | `round(x)` | Round to nearest integer |
 
 ---
 
@@ -337,11 +477,14 @@ The core EML operator `eml(x,y) = exp(x) - ln(y)` serves as the theoretical foun
 - **Scalar operations**: Direct implementations using `math.*` functions or hand-coded assembly (AVX2/AVX512 on AMD64).
 - **Batch operations**: SIMD-vectorized kernels that process 4-8 elements per cycle using architecture-specific assembly.
 - **FastMath**: FMA-optimized polynomial approximations with relaxed IEEE 754 compliance.
-- **JIT compiler**: x86-64 SSE2 codegen for math expressions parsed from strings, supporting 16 built-in functions, non-integer exponents (via `exp(y*log(x))`), and variable exponents.
+- **JIT compiler**: x86-64 SSE2 codegen for math expressions parsed from strings, supporting 17 built-in functions, non-integer exponents (via `exp(y*log(x))`), and variable exponents.
 - **Complex numbers**: `math/cmplx`-based operations on `complex128` slices, parallelized via the worker pool.
 - **Arbitrary precision**: `math/big.Float` Taylor series for symbolic verification at 256-bit precision.
 - **Arena allocator**: Zero-allocation JIT parse/eval paths using bump-pointer allocation.
 - **Canonical EML trees**: Normalize any expression to minimal EML form for comparison and optimization.
+- **Symbolic differentiation**: Chain-rule-based `Diff()` with automatic simplification.
+- **Expression simplification**: Constant folding, identity reduction, algebraic simplifications.
+- **EML decompiler**: Convert canonical trees back to infix or LaTeX notation.
 - **GPU backends**: CUDA and Metal kernels for massive parallel workloads.
 
 The EML operator is used in the `Eml()` scalar function and the GPU `EmlBatch` kernel. The mathematical framework from the original EML paper (arXiv:2603.21852v2) demonstrates that all elementary functions can be derived from this single operator, which is the theoretical basis for the library's unified design.
