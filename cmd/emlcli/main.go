@@ -302,7 +302,8 @@ func runDecompile() {
 		fmt.Printf("Parse error: %v\n", err)
 		return
 	}
-	_ = node
-	fmt.Printf("Expression: %s\n", expr)
-	fmt.Println("Use the Decompile function in your Go code to convert EMLNode trees to infix notation.")
+	emlNode := jit.Canonicalize(node)
+	fmt.Printf("Input:    %s\n", expr)
+	fmt.Printf("Infix:    %s\n", jit.Decompile(emlNode))
+	fmt.Printf("LaTeX:    %s\n", jit.DecompileLaTeX(emlNode))
 }
