@@ -33,8 +33,8 @@ func newJITCache(maxSize int) *jitCache {
 }
 
 func (c *jitCache) get(key string) (Func, bool) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	if elem, ok := c.items[key]; ok {
 		c.order.MoveToFront(elem)
 		return elem.Value.(*jitCacheEntry).fn, true

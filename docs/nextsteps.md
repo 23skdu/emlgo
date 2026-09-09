@@ -43,8 +43,8 @@ The `Simplify(n *EMLNode) *EMLNode` function performs:
 
 **Status:** Pending — requires ARM64 hardware (Apple M-series, Ampere, or AWS Graviton CI runner).
 
-`simd_arm64.s` contains only the `textflag.h` header (3 bytes). Pure-Go stubs exist in
-`simd_arm64.go` and `simd_sve.go` but compile to scalar loops, not SIMD instructions.
+`sVE2/simd_arm64.s` contains only the `textflag.h` header (3 bytes). Pure-Go stubs exist in
+`sVE2/simd_arm64.go` and `sVE2/simd_sve.go` but compile to scalar loops, not SIMD instructions.
 
 **Remaining work:**
 - Write `simd_arm64.s` with Plan 9 assembly for NEON `float64x2` lanes
@@ -121,7 +121,7 @@ p.Exp().MulScalar(2.0).Log().RunTo(input, output)
 
 **Status:** Implemented in `internal/jit/cache.go`.
 
-- `sync.Map`-backed cache with LRU eviction (max 1024 entries)
+- Mutex-protected LRU cache with `container/list` (max 1024 entries)
 - `CompileCached(expr string) (Func, error)` — returns cached result
 - `ClearJITCache()` for long-running programs
 
@@ -150,5 +150,3 @@ The following items require ARM64 hardware (Apple M-series, Ampere, or AWS Gravi
 
 ### ARM64-3. ARM64 Transcendental Batch Kernels
 * **Status:** Pending — No `expNEON`/`logNEON`/`sinNEON` assembly; falls back to `parallelizeGeneric`.
-
----
