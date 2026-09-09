@@ -1,6 +1,6 @@
 # JIT Compiler
 
-emlgo includes a JIT (Just-In-Time) compiler that generates x86-64 machine code from mathematical expression strings.
+emlgo includes a JIT (Just-In-Time) compiler that generates x86-64 machine code from mathematical expression strings, plus symbolic differentiation, expression simplification, and an EML decompiler.
 
 ## Overview
 
@@ -21,7 +21,7 @@ The JIT compiler (`internal/jit`) parses a mathematical expression string, build
 | `^` | `x ^ n` | Power (see Exponent Support below) |
 | unary `-` | `-x` | Negation |
 
-### Functions (16 total)
+### Functions (17 total)
 
 | Function | Example | Description |
 |----------|---------|-------------|
@@ -41,6 +41,7 @@ The JIT compiler (`internal/jit`) parses a mathematical expression string, build
 | `ceil` | `ceil(x)` | Ceiling |
 | `floor` | `floor(x)` | Floor |
 | `trunc` | `trunc(x)` | Truncate |
+| `round` | `round(x)` | Round to nearest integer |
 
 ## Exponent Support
 
@@ -148,8 +149,113 @@ nested, _ := c.Compile("sqrt(sin(x)^2 + cos(x)^2)")
 // Multiple operations
 expr, _ := c.Compile("(x + 1) / (x - 1)")
 
-// All 16 functions work
+// All 17 functions work
 allFuncs, _ := c.Compile("log2(abs(x)) + log10(abs(x))")
+```
+
+## JIT Expression Cache
+
+LRU cache for compiled expressions:
+
+```go
+// First call compiles and caches
+fn, err := jit.CompileCached("sin(x)^2 + cos(x)^2")
+
+// Subsequent calls return cached result (no recompilation)
+fn2, _ := jit.CompileCached("sin(x)^2 + cos(x)^2") // same fn
+
+// Clear cache for long-running programs
+jit.ClearJITCache()
+```
+
+- Mutex-protected with `container/list` for LRU eviction
+- Maximum 1024 entries
+- Thread-safe for concurrent access
+
+## Symbolic Differentiation
+
+The `Diff` function performs symbolic differentiation of EMLNode trees:
+
+```go
+// Parse and canonicalize
+node := jit.Canonicalize(jit.Parse("x^2"))
+
+// Differentiate: d/dx x² = 2x
+dx := jit.Diff(node)
+fmt.Println(jit.Decompile(dx)) // mul(2.0, x)
+
+// Evaluate derivative at a point
+result := jit.DiffEval(node, 3.0) // 2*3 = 6.0
+```
+
+### Supported operations
+
+- `eml(u, v)`: `exp(u)·u' − v'/v`
+- `exp(u)`: `exp(u) · u'`
+- `log(u)`: `u' / u`
+- `sin(u)`: `cos(u) · u'`
+- `cos(u)`: `-sin(u) · u'`
+- `sqrt(u)`: `u' / (2·sqrt(u))`
+- `neg(u)`: `-u'`
+- `add(u, v)`: `u' + v'`
+- `sub(u, v)`: `u' - v'`
+- `mul(u, v)`: `u'·v + u·v'` (product rule)
+- `div(u, v)`: `(u'·v - u·v') / v²` (quotient rule)
+- `pow(u, c)`: `c · u^(c-1) · u'` (power rule, constant exponent)
+
+## Expression Simplification
+
+The `Simplify` function performs constant folding and algebraic simplification:
+
+```go
+// Constant folding
+node := jit.Simplify(jit.Canonicalize(jit.Parse("2 + 3")))
+// Result: constNode(5.0)
+
+// Identity reduction
+node2 := jit.Simplify(jit.Parse("x + 0"))
+// Result: x
+
+// Double negation
+node3 := jit.Simplify(jit.Parse("-(-x)"))
+// Result: x
+```
+
+### Simplification rules
+
+- Constant folding: evaluates subtrees where all leaves are constants
+- `0 + x = x`, `x + 0 = x`
+- `1 * x = x`, `x * 1 = x`, `0 * x = 0`
+- `x - 0 = x`
+- `x / 1 = x`, `0 / x = 0`
+- `x^0 = 1`, `x^1 = x`
+- `sqrt(const)` folded directly
+- `neg(neg(x)) = x`
+
+## EML Decompiler & LaTeX Emitter
+
+Convert canonical EML trees back to human-readable forms:
+
+```go
+// Parse and canonicalize
+emlNode := jit.Canonicalize(jit.Parse("sin(x)^2 + cos(x)^2"))
+
+// Infix notation
+fmt.Println(jit.Decompile(emlNode))
+// Output: add(mul(sin(x), sin(x)), mul(cos(x), cos(x)))
+
+// LaTeX math mode
+fmt.Println(jit.DecompileLaTeX(emlNode))
+// Output: \sin^{2}\left(x\right) + \cos^{2}\left(x\right)
+
+// JIT formatter
+fmt.Println(jit.DecompileNodeToExpr(emlNode))
+```
+
+### CLI usage
+
+```bash
+emlcli decompile "sin(x)^2 + cos(x)^2"
 ```
 
 ## Arena Allocator
