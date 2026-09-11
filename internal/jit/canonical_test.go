@@ -166,3 +166,38 @@ func TestEMLNodeString(t *testing.T) {
 		}
 	}
 }
+
+func TestSimplifyEMLIdentities(t *testing.T) {
+	// eml(1, 1) -> e
+	eTree := emlNode(constNode(1), constNode(1))
+	s1 := Simplify(eTree)
+	if s1.Kind != EMLConst || math.Abs(s1.Value-math.E) > 1e-12 {
+		t.Errorf("Simplify(eml(1, 1)): got %v, want e", s1)
+	}
+
+	// eml(x, 1) -> exp(x)
+	expTree := emlNode(varNode(), constNode(1))
+	s2 := Simplify(expTree)
+	if s2.Kind != EMLFunc || s2.Name != "exp" {
+		t.Errorf("Simplify(eml(x, 1)): got %v, want exp(x)", s2)
+	}
+
+	// eml(1, eml(eml(1, x), 1)) -> log(x)
+	logTree := CanonicalLog(varNode())
+	s3 := Simplify(logTree)
+	if s3.Kind != EMLFunc || s3.Name != "log" {
+		t.Errorf("Simplify(CanonicalLog): got %v, want log(x)", s3)
+	}
+}
+
+func TestEMLEvalRegularized(t *testing.T) {
+	// Even with non-positive values, EMLEvalRegularized should produce finite numbers (no NaNs)
+	logTree := CanonicalLog(varNode())
+	for _, x := range []float64{-10.0, -1.0, 0.0, 0.5, 1.0, 5.0} {
+		val := EMLEvalRegularized(logTree, x, 1e-6)
+		if math.IsNaN(val) || math.IsInf(val, 0) {
+			t.Errorf("EMLEvalRegularized(log, %v) produced non-finite: %v", x, val)
+		}
+	}
+}
+

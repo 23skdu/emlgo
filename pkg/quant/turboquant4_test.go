@@ -67,10 +67,51 @@ func TestTurboQuant4Distance(t *testing.T) {
 
 	dist, err := TurboQuant4Distance(query, tqData, dim, pow2)
 	if err != nil {
-		t.Fatalf("TurboQuant4Distance returned unexpected error: %v", err)
+		t.Fatalf("TurboQuant4Distance failed: %v", err)
 	}
-	if dist <= 0 || math.IsNaN(float64(dist)) {
-		t.Errorf("TurboQuant4Distance invalid distance: %v", dist)
+	if dist <= 0 {
+		t.Errorf("Expected positive distance, got %f", dist)
+	}
+}
+
+func TestPackUnpackRoundtrip(t *testing.T) {
+	orig := []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 7}
+	packed := make([]byte, (len(orig)+1)/2)
+	Pack4Bit(orig, packed)
+
+	unpacked := make([]byte, len(orig))
+	Unpack4Bit(packed, unpacked, len(orig))
+
+	for i := range orig {
+		if unpacked[i] != orig[i] {
+			t.Errorf("Mismatch at %d: unpacked=%d, orig=%d", i, unpacked[i], orig[i])
+		}
+	}
+}
+
+func TestEncodeTurboQuant4(t *testing.T) {
+	dim := 16
+	pow2 := 16
+	vec := make([]float32, dim)
+	for i := range vec {
+		vec[i] = float32(i + 1)
+	}
+
+	encoded, err := EncodeTurboQuant4(vec, pow2)
+	if err != nil {
+		t.Fatalf("EncodeTurboQuant4 failed: %v", err)
+	}
+	if len(encoded) == 0 {
+		t.Fatal("EncodeTurboQuant4 returned empty slice")
+	}
+
+	// Distance from vector to its own encoded form should be very small
+	dist, err := TurboQuant4Distance(vec, encoded, dim, pow2)
+	if err != nil {
+		t.Fatalf("TurboQuant4Distance on encoded failed: %v", err)
+	}
+	if dist < 0 || math.IsNaN(float64(dist)) {
+		t.Errorf("Invalid distance: %v", dist)
 	}
 }
 

@@ -35,6 +35,14 @@ var funcTable = map[string]jitFunc{
 	"floor": math.Floor,
 	"trunc": math.Trunc,
 	"round": math.Round,
+	"sinh":  math.Sinh,
+	"cosh":  math.Cosh,
+	"tanh":  math.Tanh,
+	"asinh": math.Asinh,
+	"acosh": math.Acosh,
+	"atanh": math.Atanh,
+	"erf":   math.Erf,
+	"gamma": math.Gamma,
 }
 
 type encoder struct {

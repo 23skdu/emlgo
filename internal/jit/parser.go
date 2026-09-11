@@ -36,7 +36,8 @@ const (
 func isFuncName(s string) bool {
 	switch s {
 	case "sin", "cos", "exp", "log", "sqrt", "tan", "asin", "acos", "atan", "abs",
-		"cbrt", "log2", "log10", "ceil", "floor", "trunc", "round":
+		"cbrt", "log2", "log10", "ceil", "floor", "trunc", "round",
+		"sinh", "cosh", "tanh", "asinh", "acosh", "atanh", "erf", "gamma":
 		return true
 	}
 	return false

@@ -133,6 +133,67 @@ func EMLEval(n *EMLNode, x float64) float64 {
 	return 0
 }
 
+// EMLEvalRegularized evaluates the canonical EML expression tree n using smooth regularization:
+// ln_eps(y) = 0.5 * ln(y^2 + eps^2) and clamped exp.
+// This prevents NaN cascading during symbolic fitting and genetic programming.
+func EMLEvalRegularized(n *EMLNode, x float64, eps float64) float64 {
+	if n == nil {
+		return 0
+	}
+	if eps <= 0 {
+		eps = 1e-12
+	}
+	switch n.Kind {
+	case EMLConst:
+		return n.Value
+	case EMLVar:
+		return x
+	case EMLOp:
+		left := EMLEvalRegularized(n.Left, x, eps)
+		right := EMLEvalRegularized(n.Right, x, eps)
+		if left > 700.0 {
+			left = 700.0
+		} else if left < -700.0 {
+			return -0.5 * math.Log(right*right+eps*eps)
+		}
+		return math.Exp(left) - 0.5*math.Log(right*right+eps*eps)
+	case EMLFunc:
+		arg := EMLEvalRegularized(n.Left, x, eps)
+		switch n.Name {
+		case "sin":
+			return math.Sin(arg)
+		case "cos":
+			return math.Cos(arg)
+		case "exp":
+			if arg > 700.0 {
+				arg = 700.0
+			}
+			return math.Exp(arg)
+		case "log":
+			return 0.5 * math.Log(arg*arg+eps*eps)
+		case "neg":
+			return -arg
+		case "add":
+			return arg + EMLEvalRegularized(n.Right, x, eps)
+		case "sub":
+			return arg - EMLEvalRegularized(n.Right, x, eps)
+		case "mul":
+			return arg * EMLEvalRegularized(n.Right, x, eps)
+		case "div":
+			denom := EMLEvalRegularized(n.Right, x, eps)
+			return arg * denom / (denom*denom + eps*eps)
+		case "pow":
+			return math.Pow(arg, EMLEvalRegularized(n.Right, x, eps))
+		case "sqrt":
+			if arg < 0 {
+				arg = -arg
+			}
+			return math.Sqrt(arg)
+		}
+	}
+	return 0
+}
+
 // Canonicalize converts a Node interface value into the canonical EMLNode representation.
 func Canonicalize(n Node) *EMLNode {
 	if n == nil {
@@ -220,7 +281,54 @@ func Simplify(n *EMLNode) *EMLNode {
 	case EMLOp:
 		// eml(u, v) = exp(u) - ln(v) — fold when both children are constants.
 		if l != nil && r != nil && l.Kind == EMLConst && r.Kind == EMLConst {
+			if l.Value == 1.0 && r.Value == 1.0 {
+				return constNode(math.E)
+			}
+			if l.Value == 0.0 && r.Value == 1.0 {
+				return constNode(1.0)
+			}
 			return constNode(math.Exp(l.Value) - math.Log(r.Value))
+		}
+		// eml(x, 1) -> exp(x)
+		if r != nil && r.Kind == EMLConst && r.Value == 1.0 {
+			return &EMLNode{Kind: EMLFunc, Name: "exp", Left: l}
+		}
+		// eml(0, y) -> 1 - ln(y)
+		if l != nil && l.Kind == EMLConst && l.Value == 0.0 {
+			return emlFuncBinary("sub", constNode(1), &EMLNode{Kind: EMLFunc, Name: "log", Left: r})
+		}
+		// 1. eml(1, eml(eml(1, x), 1)) -> log(x)
+		// Or after bottom-up reduction: eml(1, exp(eml(1, x))) -> log(x)
+		if l != nil && l.Kind == EMLConst && l.Value == 1.0 && r != nil {
+			if r.Kind == EMLFunc && r.Name == "exp" && r.Left != nil && r.Left.Kind == EMLOp {
+				u := r.Left
+				if u.Left != nil && u.Left.Kind == EMLConst && u.Left.Value == 1.0 && u.Right != nil {
+					return &EMLNode{Kind: EMLFunc, Name: "log", Left: u.Right}
+				}
+			}
+			if r.Kind == EMLOp && r.Right != nil && r.Right.Kind == EMLConst && r.Right.Value == 1.0 && r.Left != nil && r.Left.Kind == EMLOp {
+				u := r.Left
+				if u.Left != nil && u.Left.Kind == EMLConst && u.Left.Value == 1.0 && u.Right != nil {
+					return &EMLNode{Kind: EMLFunc, Name: "log", Left: u.Right}
+				}
+			}
+		}
+		// 2. eml(eml(1, eml(x, 1)), eml(1, 1)) -> -x (neg(x))
+		if l != nil && l.Kind == EMLOp && r != nil && r.Kind == EMLOp {
+			if r.Left != nil && r.Left.Kind == EMLConst && r.Left.Value == 1.0 &&
+				r.Right != nil && r.Right.Kind == EMLConst && r.Right.Value == 1.0 {
+				if l.Left != nil && l.Left.Kind == EMLConst && l.Left.Value == 1.0 &&
+					l.Right != nil && l.Right.Kind == EMLOp &&
+					l.Right.Right != nil && l.Right.Right.Kind == EMLConst && l.Right.Right.Value == 1.0 {
+					return &EMLNode{Kind: EMLFunc, Name: "neg", Left: l.Right.Left}
+				}
+			}
+			// 3. eml(eml(1, x), eml(x, 1)) -> 1/x (div(1, x))
+			if l.Left != nil && l.Left.Kind == EMLConst && l.Left.Value == 1.0 &&
+				r.Right != nil && r.Right.Kind == EMLConst && r.Right.Value == 1.0 &&
+				Equiv(l.Right, r.Left) {
+				return emlFuncBinary("div", constNode(1), l.Right)
+			}
 		}
 		return node
 

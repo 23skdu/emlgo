@@ -1,10 +1,15 @@
-# Next Steps: Comprehensive Technical Roadmap & Gap Remediation Plan
+# Next Steps: Comprehensive Technical Roadmap & Architecture Specification
 
-This document provides an exhaustive catalog of all stubbed, incomplete, or unimplemented features across `emlgo`, accompanied by a structured, phased implementation roadmap to achieve complete cross-platform parity, hardware acceleration, and mathematical robustness.
+This document provides an exhaustive, phased implementation roadmap and technical specification for `emlgo`. It incorporates a deep architectural analysis of the current codebase and details the engineering steps required to align the library with four core mathematical and data-oriented computing design principles:
+
+- **Principle A**: Data-Oriented Memory Layout (Flat Linear Bytecode & Structure of Arrays)
+- **Principle B**: Fast Minimax Polynomial Approximations ($\exp$ and $\ln$ for Symbolic Exploration)
+- **Principle C**: AVX2 / AVX-512 SIMD Kernel Acceleration & Interpretation Amortization
+- **Principle D**: Algebraic Simplification, Identity Reductions & Domain Guardrails
 
 ---
 
-## Current Status & Milestones Achieved (v0.4)
+## Current Status & Milestones Achieved (v0.4 Baseline)
 
 - **Vector Quantization & Search**:
   - `pkg/quant/turboquant4.go`: 4-bit polar-quantized vector reconstruction, 8-wide nibble unpacking (`Unpack4Bit`), and scratch-pooled L2 distance calculation (`TurboQuant4Distance`, `TurboQuant4DistanceScratch`).
@@ -21,301 +26,460 @@ This document provides an exhaustive catalog of all stubbed, incomplete, or unim
 
 ---
 
-## Comprehensive Audit of Stubbed, Incomplete, and TODO Code
+## Architectural Analysis & Gap Assessment
 
-### 1. GPU Subsystem & Hardware Acceleration (`internal/gpu`, `cuda/`, `metal`)
+A deep audit of the existing codebase reveals structural and algorithmic bottlenecks that hinder high-throughput symbolic regression, large-scale dataset fitting, and compiler efficiency:
 
-| File & Location | Status / Issue | Technical Impact |
+| Subsystem | Existing Implementation | Architectural Gap vs Design Principles |
 | :--- | :--- | :--- |
-| `internal/gpu/bridge.go:1044-1075` | Stubbed with `fmt.Errorf("GPU execution not implemented for ...")` | `AbsBatch`, `NegBatch`, `PowBatch`, `InvBatch`, and `FmaBatch` cannot execute on CUDA GPUs. |
-| `cuda/eml_capi.cu` & `cuda/eml_cuda.cu` | Missing kernel definitions for unary & ternary ops | CUDA kernels for `abs`, `neg`, `pow`, `inv`, and `fma` do not exist in the C-API / CUDA bridge. |
-| `internal/gpu/bridge.go` & `cuda/` | Missing basic vector arithmetic (`Add`, `Sub`, `Mul`, `Div`) | Only `EmlBatch` and `DotBatch` exist. Standard vector addition, subtraction, multiplication, and division cannot run on the GPU. |
-| `internal/gpu/bridge.go` & `cuda/` | Missing GPU-accelerated Int8 & Quantization kernels | `CosineDistanceInt8`, `TurboQuant4Distance`, and `DotInt8` are currently CPU-only. Cannot leverage Tensor Cores or CUDA cores for fast ANN search. |
-| `internal/gpu/metal.go` | Incomplete Metal backend on `darwin/arm64` | Supports only `float64`; lacks `float32`, `complex64`, `complex128`. `NewStream` returns an error (no async streams). Missing binary ops (`Add`, `Sub`, etc.). `AllocatePinned` allocates normal heap memory. |
-| `internal/gpu/stub.go:52-100+` | All batch ops return "GPU execution not available" error | In stub mode (non-CUDA, non-Metal builds), there is no transparent fallback to CPU SIMD execution if requested by the user. |
+| **AST & Expression Storage** (`internal/jit/ast.go`, `arena.go`, `canonical.go`) | Linked heap trees (`Node` interface, 86-byte `ArenaNode`, 48-byte `EMLNode`) with recursive pointer chasing. | **Violates Principle A**: Traversals cause frequent CPU cache misses, branch mispredictions, GC scan overhead, and non-linear memory access. Missing flat linear bytecode / RPN representation in Structure of Arrays (SoA) layout. |
+| **Transcendental Math Evaluation** (`internal/eml/native_math.go`, `pkg/fastmath/`, `pkg/logexp/`) | Delegates to Go standard library `math.Exp` and `math.Log` (53-bit IEEE 754 precision, 10+ term polynomials, table lookups). | **Violates Principle B**: Latency is ~15–25 ns per call. In symbolic search exploration, exact IEEE precision is unnecessary; fast minimax approximations can run 4x–6x faster (~2–4 ns). |
+| **SIMD & Batch Dispatch** (`internal/eml/simd_dispatch_amd64.go`, `simd_amd64.s`, `simd_f32.go`) | `emlSIMD` falls back to `scalarEml`; `expAVX2` and `logAVX2` broadcast constants inside loop iterations; `simd_f32.go` converts to float64 for scalar loops. No AVX-512 `exp`/`log`. Expression evaluation evaluates one scalar at a time. | **Violates Principle C**: Interpretation overhead is not amortized across batches. No vectorized bytecode VM exists to evaluate chunks of 4/8 (`float64`) or 8/16 (`float32`) samples per vector register in a single instruction pass. |
+| **Algebraic Simplification** (`internal/jit/canonical.go:Simplify`) | Only folds constants if both children are `EMLConst`. Does not simplify identities like $\text{eml}(1, 1) \to e$, $\text{eml}(x, 1) \to \exp(x)$, or collapse multi-node EML clusters into native operations. | **Violates Principle D**: Unsimplified trees cause exponential tree bloat during symbolic search. Fails to collapse equivalent identities ($\text{eml}(1, \text{eml}(\text{eml}(1, x), 1)) \to \ln(x)$). |
+| **Domain Safety & NaN Cascading** (`internal/eml/eml.go`, `eval.go`, `canonical.go`) | Raw $\text{eml}(x, y) = e^x - \ln(y)$. If $y \le 0$, $\ln(y) = \text{NaN}$, which poisons all parent nodes and invalidates fitness evaluation. | **Violates Principle D**: Missing soft clamping / smooth regularization ($\ln_\epsilon(y) = \ln(\max(y, \epsilon))$ or $\frac{1}{2}\ln(y^2 + \epsilon^2)$) to ensure $C^\infty$ or $C^0$ continuity during numeric fitting. |
 
 ---
 
-### 2. Quantization & Approximate Nearest Neighbors (`pkg/quant`)
-
-| File & Location | Status / Issue | Technical Impact |
-| :--- | :--- | :--- |
-| `pkg/quant/turboquant4.go` | Forward quantization / encoding is missing | Only reconstruction and distance evaluation exist. There is no `EncodeTurboQuant4(vec []float32) ([]byte, error)` or `Pack4Bit(indices []byte, packed []byte)`. Users cannot compress raw vectors into TurboQuant4 format in Go. |
-| `pkg/quant/turboquant4.go` | Limited bitwidth support | Only 4-bit (16-bin) polar quantization is implemented. No 2-bit, 3-bit, or 8-bit TurboQuant variants exist. |
-| `pkg/quant/` | Absence of general vector quantization schemes | No Product Quantization (PQ), Scalar Quantization (SQ8/SQ4), or vector clustering / codebook training routines exist in the package. |
-
----
-
-### 3. JIT Machine Code Generation & AST Compiler (`internal/jit`)
-
-| File & Location | Status / Issue | Technical Impact |
-| :--- | :--- | :--- |
-| `internal/jit/codegen.go:321` | Unsupported operator: `'^'` | The AST parser (`parser.go`), canonicalizer (`canonical.go`), and evaluator (`eval.go`) all support exponentiation (`^`), but JIT codegen emits `unsupported operator: ^` and fails. |
-| `internal/jit/codegen.go:20-38` | Incomplete `funcTable` | Transcendental and elementary functions like `sinh`, `cosh`, `tanh`, `asinh`, `acosh`, `atanh`, `erf`, `gamma`, `hypot`, and `eml` are missing from the JIT compilation table. |
-| `internal/jit/ast.go:20-24` | Single-argument `FunctionCall` struct | `FunctionCall` only has `Arg Node`. Multi-argument functions such as `eml(x, y)`, `atan2(y, x)`, `pow(x, y)`, `hypot(x, y)`, `min(x, y)`, `max(x, y)` cannot be parsed or represented in the AST. |
-| `internal/jit/codegen.go` | Single-variable JIT emission | While `ParseWithVars` parses expressions with multiple variables, `codegen.go` hardcodes `x` to register `xmm0`. Multi-variable compiled functions (e.g. `f(x, y, z)`) obeying System V AMD64 ABI (`xmm0`, `xmm1`, `xmm2`) are not implemented. |
-| `internal/jit/codegen_stub.go:8` | `compileToCode` returns "JIT codegen requires amd64" | Non-AMD64 platforms (Apple Silicon `darwin/arm64`, AWS Graviton `linux/arm64`) cannot JIT compile; no AArch64 machine code generator exists. |
-| `internal/jit/jit_wasm.go:24` | `Compile` returns "JIT compilation is not supported on WebAssembly" | WebAssembly targets fail on JIT compilation without a fallback to AST tree evaluation or WebAssembly bytecode generation. |
-| `internal/jit/jit.go:10, 44-55` | Unconditional POSIX `unix.Mmap` / `unix.Mprotect` | Prevents Windows compilation. Windows executable memory allocation via `VirtualAlloc` and `VirtualProtect` is not implemented. |
-
----
-
-### 4. SIMD & Vector Kernel Architecture (`internal/eml`)
-
-| File & Location | Status / Issue | Technical Impact |
-| :--- | :--- | :--- |
-| `internal/eml/simd_arm64.s` | Empty assembly file (only header comment) | On ARM64 (macOS / Linux), arithmetic does not use hand-tuned NEON assembly, falling back to pure-Go loops. |
-| `internal/eml/simd_sve_stub.go:6` & `simd_arm64_stub.go:6` | Stubs for SVE / SVE2 vector execution | ARM Scalable Vector Extension (SVE) detection and dynamic vector-length execution kernels are stubbed out. |
-| `internal/eml/simd.go:342-381` | Hyperbolic functions fall back to `parallelizeGeneric` | `SinhBatch`, `CoshBatch`, `TanhBatch`, `AsinhBatch`, `AcoshBatch`, `AtanhBatch` execute scalar Go loops across goroutines rather than vectorized AVX2/AVX512 polynomial kernels. |
-| `internal/eml/simd_f32.go` | Float32 transcendentals upcast to Float64 | `ExpSIMDF32`, `LogSIMDF32`, `SinSIMDF32`, `CosSIMDF32` convert float32 to float64, run float64 AVX2/AVX512 kernels, and downcast back, losing up to 2× throughput compared to native 8-lane single-precision SIMD. |
-
----
-
-### 5. Public Package APIs & High-Performance In-Place Ergonomics
-
-| Package / File | Status / Issue | Technical Impact |
-| :--- | :--- | :--- |
-| `pkg/arithmetic` | Missing type variants for batch arithmetic | Only `float64` and `int8`/`uint8` exist. Missing `float32`, `complex64`, `complex128`, `int16`, `int32`, `int64` batch operations (`AddF32`, `MulF32`, `AddC128`, etc.). |
-| `pkg/logexp/exp.go` | Missing in-place & multi-precision APIs | Missing `ExpBatchTo`, `LogBatchTo`, `ExpBatchF32`, `LogBatchF32`, and base-2/base-10 functions (`Log2`, `Log10`, `Log1p`, `Expm1`). |
-| `pkg/trig/trig.go:279-282` | `TanBatch` creates redundant allocations | Computes `SinCosBatch` + `DivSIMD`, allocating 3 temporary slices rather than using `eml.TanSIMD`. Missing `TanBatchTo`, `SinBatchTo`, `CosBatchTo`, and `float32` variants. |
-| `pkg/fastmath/fastmath.go:74-81` | `SqrtBatchToF32` uses a scalar loop | Loops over each float32 calling `math.Sqrt(float64(v))` rather than delegating to SIMD. |
-
----
-
-## Action Plan to Fix Identified Code
+## Action Plan: Core Design Principles Implementation
 
 ```mermaid
 flowchart TD
-    subgraph Phase1["Phase 1: High-Impact Algorithmic & JIT Fixes"]
-        P1_1["1.1 JIT Codegen '^' Power Op & Extended Funcs"]
-        P1_2["1.2 Multi-Argument AST & Function Calls"]
-        P1_3["1.3 TurboQuant4 Forward Encoder & Pack4Bit"]
+    subgraph TrackA["Track A: Data-Oriented Memory Layout (Principle A)"]
+        A1["A.1 Linear Bytecode & SoA Program Representation"]
+        A2["A.2 Zero-Allocation Stack VM Evaluator"]
+        A3["A.3 Direct Shunting-Yard Bytecode Compiler"]
+        A4["A.4 Linear GP Genetic Operators (Crossover/Mutation)"]
     end
 
-    subgraph Phase2["Phase 2: GPU Completeness & Native Acceleration"]
-        P2_1["2.1 Missing CUDA Kernels (Abs, Neg, Pow, Inv, FMA)"]
-        P2_2["2.2 GPU Vector Arithmetic (Add, Sub, Mul, Div)"]
-        P2_3["2.3 CUDA Int8 & Quantized Vector Search Kernels"]
-        P2_4["2.4 Metal Backend Multi-Precision Parity"]
+    subgraph TrackB["Track B: Fast Minimax Polynomial Approximations (Principle B)"]
+        B1["B.1 Fast Exp: Schraudolph & Degree-4 Remez Minimax"]
+        B2["B.2 Fast Log: IEEE Bit-Cast & Chebyshev Mantissa"]
+        B3["B.3 Fused Fast EML Scalar Kernel"]
+        B4["B.4 pkg/fastmath High-Throughput API Exposure"]
     end
 
-    subgraph Phase3["Phase 3: Cross-Platform & JIT Portability"]
-        P3_1["3.1 Windows JIT Support (VirtualAlloc)"]
-        P3_2["3.2 ARM64 JIT Codegen Engine"]
-        P3_3["3.3 WebAssembly AST Interpreter Fallback"]
-        P3_4["3.4 Handcrafted ARM64 NEON & SVE2 Assembly"]
+    subgraph TrackC["Track C: AVX2 / AVX-512 Batch SIMD (Principle C)"]
+        C1["C.1 Vectorized Bytecode Batch VM Engine"]
+        C2["C.2 Plan9 AVX2/AVX-512 Fast Exp/Log Kernels"]
+        C3["C.3 Fused Fast EML Vector Kernels"]
+        C4["C.4 Native Single-Precision Float32 AVX2/AVX-512"]
+        C5["C.5 Optional Intel SVML / SLEEF Integration"]
     end
 
-    subgraph Phase4["Phase 4: High-Performance SIMD & API Parity"]
-        P4_1["4.1 Native Single-Precision Float32 SIMD Kernels"]
-        P4_2["4.2 Vectorized Hyperbolic AVX2 Polynomials"]
-        P4_3["4.3 Zero-Allocation BatchTo Across All Packages"]
-        P4_4["4.4 Multi-Type Vector Arithmetic Parity"]
+    subgraph TrackD["Track D: Simplification & Domain Guardrails (Principle D)"]
+        D1["D.1 EML Identity Reductions & Constant Folding"]
+        D2["D.2 Pattern Collapsing of Nested EML Clusters"]
+        D3["D.3 Soft Clamping & Smooth Regularization"]
+        D4["D.4 Configurable Guardrail Modes"]
     end
 
-    Phase1 --> Phase2
-    Phase2 --> Phase3
-    Phase3 --> Phase4
+    subgraph TrackE["Track E: Cross-Platform, GPU & System Parity"]
+        E1["E.1 CUDA Extended Kernels & Vector Arithmetic"]
+        E2["E.2 TurboQuant4 Forward Encoding (Pack4Bit)"]
+        E3["E.3 Windows JIT (VirtualAlloc) & ARM64 JIT Engine"]
+        E4["E.4 Handcrafted ARM64 NEON & SVE2 Assembly"]
+    end
+
+    TrackA --> TrackC
+    TrackB --> TrackC
+    TrackD --> TrackA
+    TrackA --> TrackE
+    TrackC --> TrackE
 ```
 
 ---
 
-### Phase 1: High-Impact Algorithmic & JIT Fixes
+## Detailed Specifications per Principle
 
-#### 1.1 JIT Codegen Exponentiation (`^`) & Extended Math Functions
-- **Target Files**: `internal/jit/codegen.go`, `internal/jit/codegen_test.go`
-- **Actions**:
-  1. Add support for `v.Op == '^'` in `codegen.go:switch v.Op`:
-     - If right operand is a small constant integer (e.g. 2, 3, 4, 0.5), emit inline multiplication (`mulsd dst, dst`) or square root (`sqrtsd dst, dst`).
-     - For general powers, emit a call to `math.Pow(x, y)` preserving register state across caller-saved registers.
-  2. Expand `funcTable` in `codegen.go` to include:
-     - Hyperbolic: `sinh`, `cosh`, `tanh`, `asinh`, `acosh`, `atanh`
-     - Special functions: `erf`, `gamma`, `hypot`
-     - The canonical EML unary reduction: `exp`, `log`
-- **Success Criteria**: Expressions like `"x^2 + 3*x + 1"`, `"sinh(x) + cosh(x)"`, and `"x^0.5"` compile to machine code and match `math` evaluation within 1 ULP.
+### Track A: Data-Oriented Memory Layout (Flat Linear Bytecode & SoA)
 
-#### 1.2 Multi-Argument AST & Multi-Variable Function Support
-- **Target Files**: `internal/jit/ast.go`, `internal/jit/parser.go`, `internal/jit/codegen.go`, `internal/jit/eval.go`
+#### A.1 Linear Bytecode & Structure of Arrays (SoA) Layout
+- **Target Files**: `pkg/bytecode/program.go`, `internal/jit/bytecode.go`
+- **Design & Data Structures**:
+  Replace linked pointer nodes with a dense, flat Structure of Arrays layout:
+  ```go
+  package bytecode
+
+  // OpCode represents a virtual machine operation in 1 byte.
+  type OpCode uint8
+
+  const (
+      OpConst OpCode = iota // Push Consts[constIdx++]
+      OpVar                 // Push vars[VarIndices[varIdx++]]
+      OpEML                 // Pop right, Pop left, Push eml(left, right)
+      
+      // Native elementary operations (used for collapsed EML identities)
+      OpAdd                 // Pop right, Pop left, Push left + right
+      OpSub                 // Pop right, Pop left, Push left - right
+      OpMul                 // Pop right, Pop left, Push left * right
+      OpDiv                 // Pop right, Pop left, Push left / right
+      OpPow                 // Pop right, Pop left, Push left ^ right
+      OpNeg                 // Pop arg, Push -arg
+      OpInv                 // Pop arg, Push 1.0 / arg
+      OpSqrt                // Pop arg, Push sqrt(arg)
+      OpExp                 // Pop arg, Push exp(arg)
+      OpLog                 // Pop arg, Push log(arg)
+  )
+
+  // Program represents a linear bytecode buffer in Structure of Arrays (SoA) layout.
+  type Program struct {
+      Ops           []OpCode  // Contiguous opcode stream (1 byte per op)
+      Consts        []float64 // Constant table referenced sequentially by OpConst
+      VarIndices    []uint16  // Variable slot indices referenced by OpVar
+      MaxStackDepth int       // Precomputed maximum evaluation stack depth
+  }
+  ```
+- **Memory Footprint Comparison**:
+  - *AST (`Node`)*: 10-node tree $\approx$ 10 heap allocations $\times$ 48–86 bytes + pointer graph $\approx$ 800+ bytes, high GC overhead.
+  - *Arena (`ArenaNode`)*: 10-node tree $\approx$ 640 bytes contiguous buffer, but still traverses `Left`/`Right` pointers recursively.
+  - *SoA `Program`*: 10-node tree $\approx$ 10 bytes `Ops` + 24 bytes `Consts` + 4 bytes `VarIndices` $\approx$ **38 bytes total**. Zero GC pointers.
+
+#### A.2 Zero-Allocation Stack VM Evaluator
+- **Target Files**: `pkg/bytecode/eval.go`, `pkg/bytecode/eval_test.go`
 - **Actions**:
-  1. Update `FunctionCall` in `ast.go`:
+  1. Implement scalar evaluation:
      ```go
-     type FunctionCall struct {
-         Name string
-         Args []Node
+     func (p *Program) Eval(vars []float64, scratch []float64) float64 {
+         // Use stack-allocated scratch buffer when nil
+         var localStack [32]float64
+         stack := localStack[:]
+         if scratch != nil && len(scratch) >= p.MaxStackDepth {
+             stack = scratch
+         }
+         
+         sp := 0
+         cIdx := 0
+         vIdx := 0
+         
+         for _, op := range p.Ops {
+             switch op {
+             case OpConst:
+                 stack[sp] = p.Consts[cIdx]
+                 sp++
+                 cIdx++
+             case OpVar:
+                 stack[sp] = vars[p.VarIndices[vIdx]]
+                 sp++
+                 vIdx++
+             case OpEML:
+                 sp--
+                 y := stack[sp]
+                 x := stack[sp-1]
+                 stack[sp-1] = fastEml(x, y)
+             case OpAdd:
+                 sp--
+                 stack[sp-1] += stack[sp]
+             case OpSub:
+                 sp--
+                 stack[sp-1] -= stack[sp]
+             case OpMul:
+                 sp--
+                 stack[sp-1] *= stack[sp]
+             case OpDiv:
+                 sp--
+                 stack[sp-1] /= stack[sp]
+             case OpExp:
+                 stack[sp-1] = fastExp(stack[sp-1])
+             case OpLog:
+                 stack[sp-1] = fastLog(stack[sp-1])
+             case OpNeg:
+                 stack[sp-1] = -stack[sp-1]
+             case OpInv:
+                 stack[sp-1] = 1.0 / stack[sp-1]
+             }
+         }
+         return stack[0]
      }
      ```
-  2. Enhance `parser.go` to parse comma-separated function argument lists: `eml(x, y)`, `atan2(y, x)`, `pow(x, y)`, `hypot(x, y)`.
-  3. Extend `eval.go` and `canonical.go` to evaluate and differentiate multi-argument functions.
-  4. Extend `codegen.go` to support multi-variable function compilation:
-     - Function signature: `type Func2 func(x, y float64) float64` and `type FuncN func(vars []float64) float64`.
-     - In AMD64 System V ABI, map `x` to `xmm0`, `y` to `xmm1`, `z` to `xmm2`.
-- **Success Criteria**: `Parse("eml(x, y)")` and `Compile2("eml(x, y)")` produce callable native function pointers.
+  2. Guarantee: **0 heap allocations**, $O(N)$ sequential memory access, 100% prefetcher friendly.
 
-#### 1.3 TurboQuant4 Forward Encoding & Compression
-- **Target Files**: `pkg/quant/turboquant4.go`, `pkg/quant/turboquant4_test.go`
+#### A.3 Direct Shunting-Yard Bytecode Compiler
+- **Target Files**: `pkg/bytecode/compiler.go`, `internal/jit/canonical_to_bytecode.go`
 - **Actions**:
-  1. Implement `Pack4Bit(indices []byte, packed []byte)`:
-     - Vectorized packing of 16-bin indices (0–15) into contiguous 4-bit nibbles (2 per byte).
-  2. Implement `EncodeTurboQuant4(vec []float32, pow2 int) ([]byte, error)`:
-     - Computes vector norm / radius $R = \|\mathbf{x}\|_2$.
-     - Computes recursive polar coordinate angles.
-     - Quantizes angles to 16 precomputed bins matching `TQ4Lookup`.
-     - Computes QJL 1-bit residual signs for the hypercube correction.
-     - Packs header, packed angle bytes, and QJL bitmask into final byte slice.
-- **Success Criteria**: Full round-trip test: `vec -> EncodeTurboQuant4 -> ReconstructTQ4 -> cosine similarity > 0.98`.
+  1. Lowering from `jit.Node` AST and `jit.EMLNode` canonical tree via post-order traversal.
+  2. Implement direct Shunting-Yard tokenizer/compiler from infix string expressions directly to `Program` without intermediate AST node allocations.
+  3. Precompute `MaxStackDepth` during lowering to ensure callers can safely size stack scratch spaces.
+
+#### A.4 Linear Genetic Programming (LGP) Operators
+- **Target Files**: `pkg/bytecode/genetic.go`
+- **Actions**:
+  1. Implement linear crossover on `Ops []OpCode`: select random split points, splice slices, and perform $O(M)$ net stack balance validation:
+     $$\Delta_{\text{stack}}(\text{op}) = 1 - \text{arity}(\text{op})$$
+     A valid program satisfies $\sum_{i=0}^{k} \Delta_{\text{stack}}(\text{op}_i) \ge 1$ for all prefixes, and final sum equals $1$.
+  2. Point mutation: mutate single `OpCode` or jitter `Consts[i]` with zero memory reallocations.
 
 ---
 
-### Phase 2: GPU Completeness & Native Acceleration
+### Track B: Fast Minimax Polynomial Approximations (Principle B)
 
-#### 2.1 Complete Missing CUDA Device Kernels
-- **Target Files**: `cuda/eml_cuda.cu`, `cuda/eml_cuda.h`, `cuda/eml_capi.cu`, `cuda/eml_capi.h`, `internal/gpu/bridge.go`
-- **Actions**:
-  1. Implement device kernels in `cuda/eml_cuda.cu`:
-     - `kernel_abs<<<grid, block>>>(x, result, n)` via `fabs()`
-     - `kernel_neg<<<grid, block>>>(x, result, n)` via `-x[idx]`
-     - `kernel_inv<<<grid, block>>>(x, result, n)` via `1.0 / x[idx]`
-     - `kernel_pow<<<grid, block>>>(x, exp, result, n)` via `pow()`
-     - `kernel_fma<<<grid, block>>>(a, b, c, result, n)` via `fma()`
-  2. Expose C-API functions in `cuda/eml_capi.cu` and declarations in `cuda/eml_capi.h`.
-  3. Wire Go bindings in `internal/gpu/bridge.go` replacing the `fmt.Errorf("GPU execution not implemented for ...")` stubs.
-- **Success Criteria**: `TestGPUExtendedOps` validates numerical equivalence against CPU standard library for $N = 10^6$ elements.
+#### B.1 Fast $\exp(x)$ Approximations
+- **Target Files**: `pkg/fastmath/fast_exp.go`, `internal/eml/fast_math.go`
+- **Algorithmic Specifications**:
+  1. **Schraudolph's Method** (Ultra-Fast Bit Manipulation):
+     - Based on IEEE 754 float representation: $x \mapsto 2^{x / \ln 2}$.
+     - Formula:
+       $$I = \text{int64}\left( \frac{2^{52}}{\ln 2} x + 1023 \cdot 2^{52} - C \right)$$
+       where $C \approx 457999 \times 2^{32} \approx 1967114903552$.
+     - Implementation:
+       ```go
+       func FastExpBitCast(x float64) float64 {
+           if x < -700.0 { return 0.0 }
+           if x > 700.0 { return math.Inf(1) }
+           val := int64(6497320849556798.0*x + 4606853616390177000.0)
+           return math.Float64frombits(uint64(val))
+       }
+       ```
+     - **Performance**: ~1.5 ns (3 CPU cycles). Relative error: $\sim 1.5\%$.
+  2. **Degree-4 Remez Minimax Polynomial with Range Reduction**:
+     - Range reduction:
+       $$k = \lfloor x \cdot (1/\ln 2) + 0.5 \rfloor, \quad r = x - k \cdot \ln 2 \in \left[-\frac{1}{2}\ln 2, \frac{1}{2}\ln 2\right] \subset [-0.35, 0.35]$$
+     - Minimax approximation $P_4(r)$ minimizing maximum relative error:
+       $$P_4(r) = 1.0 + r \cdot (1.0 + r \cdot (0.500000044 + r \cdot (0.16666505 + r \cdot 0.0416654)))$$
+     - Reconstruction:
+       $$\exp(x) = P_4(r) \cdot 2^k = P_4(r) \times \text{Float64frombits}\left(\text{uint64}(1023 + k) \ll 52\right)$$
+     - **Performance**: ~3.2 ns (4x faster than `math.Exp`). Max relative error: $< 1.2 \times 10^{-6}$ (over 20 bits of mantissa).
 
-#### 2.2 Standard Element-Wise Vector Arithmetic on GPU
-- **Target Files**: `cuda/eml_cuda.cu`, `cuda/eml_capi.cu`, `internal/gpu/gpu.go`, `internal/gpu/bridge.go`, `internal/gpu/stub.go`
-- **Actions**:
-  1. Implement binary CUDA kernels:
-     - `AddBatch(a, b []float64) ([]float64, error)`
-     - `SubBatch(a, b []float64) ([]float64, error)`
-     - `MulBatch(a, b []float64) ([]float64, error)`
-     - `DivBatch(a, b []float64) ([]float64, error)`
-  2. Implement corresponding in-place `*To` variants (`AddBatchTo`, `MulBatchTo`) to eliminate intermediate host-device allocations.
-  3. Provide `float32` and `complex` counterparts for all arithmetic kernels.
+#### B.2 Fast $\ln(y)$ Approximations
+- **Target Files**: `pkg/fastmath/fast_log.go`, `internal/eml/fast_math.go`
+- **Algorithmic Specifications**:
+  1. **Bit-Cast IEEE 754 Exponent Extraction + Chebyshev Mantissa Approximation**:
+     - Bit extraction:
+       `bits := math.Float64bits(y)`
+       Unbiased exponent: $e = \text{int}((\text{bits} \gg 52) \& 0x7\text{FF}) - 1023$.
+       Mantissa extraction normalized to $[1.0, 2.0)$:
+       `m := math.Float64frombits((bits & 0x000FFFFFFFFFFFFF) | 0x3FF0000000000000)`
+     - Range reduction to $[1/\sqrt{2}, \sqrt{2}] \approx [0.7071, 1.4142]$:
+       If $m > 1.414213562373095$, set $m = m \cdot 0.5$ and $e = e + 1$.
+     - Let $z = m - 1.0 \in [-0.2929, 0.4142]$.
+     - Degree-4 Chebyshev polynomial on $z$:
+       $$P_4(z) = z \cdot (0.99999642 + z \cdot (-0.49987412 + z \cdot (0.33179903 - 0.24073381 \cdot z)))$$
+     - Final reconstruction:
+       $$\ln(y) = e \cdot \ln(2) + P_4(z)$$
+     - **Key Feature**: **ZERO division instructions**! Only float bit-shifts, subtractions, and 4 FMAs.
+     - **Performance**: ~3.5 ns (5x–6x faster than `math.Log`). Relative error: $< 3 \times 10^{-5}$.
 
-#### 2.3 CUDA Int8 & TurboQuant4 Accelerated Vector Distance Kernels
-- **Target Files**: `cuda/eml_cuda.cu`, `cuda/eml_capi.cu`, `internal/gpu/bridge.go`
+#### B.3 Fused Fast EML Scalar Kernel
+- **Target Files**: `internal/eml/fast_eml.go`, `pkg/fastmath/fastmath.go`
 - **Actions**:
-  1. Implement `eml_launch_cosine_int8(const int8_t* a, const int8_t* b, float* dist, int n)` using `__dp4a` intrinsics (SIMD dot products of 4 signed 8-bit integers).
-  2. Implement batch vector search kernel: computing distance from 1 query vector against $M$ database vectors of dimension $D$ in a single launch.
-  3. Implement GPU TurboQuant4 decompression & distance kernel directly reading packed global device memory.
-- **Success Criteria**: Int8 cosine distance achieves >100× throughput over single-threaded CPU for $10^6$ 768-dim embeddings.
-
-#### 2.4 Apple Metal Backend Parity (`darwin/arm64`)
-- **Target Files**: `internal/gpu/metal.go`, `internal/gpu/metal_kernels.metal`
-- **Actions**:
-  1. Add Single-Precision (`float32`) Metal shader kernels alongside existing `float64` kernels.
-  2. Implement CommandQueue-based asynchronous streams to allow concurrent buffer copies and compute passes.
-  3. Implement Metal shared memory buffer allocation for true zero-copy unified memory access on Apple Silicon.
+  1. Implement `FastEml(x, y float64) float64`: combines `FastExpMinimax(x) - FastLogMinimax(y)`.
+  2. Implement `FastEmlSchraudolph(x, y float64) float64`: ultra-fast exploration kernel running in ~5 ns.
+  3. Wire into `pkg/fastmath` public API: `fastmath.ExpFast`, `fastmath.LogFast`, `fastmath.EmlFast`.
 
 ---
 
-### Phase 3: Cross-Platform & JIT Multi-Architecture Portability
+### Track C: AVX2 / AVX-512 SIMD Kernel Acceleration (Principle C)
 
-#### 3.1 Windows Executable Memory Management
-- **Target Files**: `internal/jit/jit_windows.go`, `internal/jit/jit_posix.go`, `internal/jit/jit.go`
-- **Actions**:
-  1. Separate POSIX mmap allocation from Windows `VirtualAlloc`:
-     ```go
-     // internal/jit/jit_windows.go
-     //go:build windows
-     func AllocateExecutableMemory(code []byte) (unsafe.Pointer, error) {
-         ptr, err := windows.VirtualAlloc(0, uintptr(len(code)),
-             windows.MEM_COMMIT|windows.MEM_RESERVE, windows.PAGE_EXECUTE_READWRITE)
-         ...
-     }
-     ```
-  2. Add `//go:build !windows && (!js || !wasm)` build tags to POSIX implementation.
-- **Success Criteria**: `go build -v ./internal/jit` compiles cleanly under Windows AMD64 cross-compilation (`GOOS=windows go build ./...`).
+#### C.1 Vectorized Bytecode Batch VM Engine
+- **Target Files**: `pkg/bytecode/eval_batch.go`, `pkg/bytecode/eval_batch_test.go`
+- **Mechanism (Interpretation Amortization)**:
+  Instead of evaluating an expression per-sample in a scalar loop (which incurs $M \times K$ bytecode dispatch stalls):
+  ```
+  Traditional: for each of 100,000 samples -> for each of 10 ops -> dispatch op
+  Amortized:   for each of 10 ops -> execute vectorized SIMD kernel over 100,000 samples
+  ```
+- **Execution Workflow**:
+  1. VM allocates a small columnar register stack `[][]float64`, where each stack slot holds a slice of length $N$ (or chunk size $C = 1024$ fitting in L1/L2 cache).
+  2. `OpConst`: broadcasts constant across vector register lanes.
+  3. `OpVar`: references column vector `data[varIdx]`.
+  4. `OpEML`: executes fused vector kernel `fastEmlAVX2` or `fastEmlAVX512` directly on chunk slices.
+  5. **Interpretation Overhead**: Incurred exactly once per op per chunk, amortizing interpretation cost to virtually zero ($< 0.1\%$).
 
-#### 3.2 ARM64 (AArch64) Native JIT Engine
-- **Target Files**: `internal/jit/codegen_arm64.go`, `internal/jit/codegen_stub.go`
-- **Actions**:
-  1. Implement AArch64 machine code encoder:
-     - Floating point arithmetic: `FADD D0, D0, D1`, `FSUB`, `FMUL`, `FDIV`, `FSQRT`, `FNEG`, `FABS`
-     - Register allocation across `D0`–`D7` (callee-saved: `D8`–`D15`)
-     - Immediate loading via `MOVK`/`MOVZ` or literal pool PC-relative `LDR D0, [PC, #offset]`
-  2. Support macOS Apple Silicon ABI requirements (`pthread_jit_write_protect_np` or dual RW/RX memory mappings).
-- **Success Criteria**: Expression compilation works on `darwin/arm64` and `linux/arm64` with performance matching AMD64.
+#### C.2 Handcrafted Plan9 AVX2 & AVX-512 Assembly Kernels
+- **Target Files**: `internal/eml/simd_fast_amd64.s`, `internal/eml/simd_fast_amd64.go`
+- **Kernel Designs**:
+  1. **`fastExpAVX2` & `fastExpAVX512`**:
+     - Hoist all polynomial constants ($1/\ln 2, \ln 2, c_2, c_3, c_4, 1.0, 1023$) into dedicated vector registers ($Y6..Y15$ / $Z6..Z15$) *before* the loop. Eliminates the per-iteration general register broadcasts in current `simd_amd64.s`.
+     - In AVX2: process 4 double-precision floats (`YMM0`) per iteration.
+     - In AVX-512: process 8 double-precision floats (`ZMM0`) per iteration via `VFMADD213PD`.
+     - Integer bit-shift scaling via `VPSLLQ` and `VPADDQ`.
+  2. **`fastLogAVX2` & `fastLogAVX512`**:
+     - Vectorized bit extraction: `VPSRLQ $52, Z0, Z1` extracts exponents for 8 lanes simultaneously.
+     - Mantissa extraction via `VPAND` and `VPOR`.
+     - Evaluate degree-4 Chebyshev polynomial via 4 sequential `VFMADD213PD` instructions.
+     - Add exponent contribution: `VFMADD213PD Z_ln2, Z_exp, Z_poly`.
+     - Completely eliminates `VDIVPD` vector division (latency drops from 28 cycles to 4 cycles).
+  3. **`fastEmlAVX2` & `fastEmlAVX512`**:
+     - Fused calculation: loads $x$ into `Z0`, $y$ into `Z1`.
+     - Computes $\exp(x)$ into `Z0`, computes $\ln(y)$ into `Z1` in registers.
+     - Subtracts `VSUBPD Z1, Z0, Z2` and writes directly to `result`.
+     - Zero temporary slice allocations and zero RAM round-trips.
 
-#### 3.3 WebAssembly AST Fallback
-- **Target Files**: `internal/jit/jit_wasm.go`
-- **Actions**:
-  1. In `internal/jit/jit_wasm.go`, update `Compile(expr string)` to parse into an AST and return an evaluation closure:
-     ```go
-     func (c *Compiler) Compile(expr string) (Func, error) {
-         node, err := Parse(expr)
-         if err != nil { return nil, err }
-         return func(x float64) float64 {
-             v, _ := Eval(node, x)
-             return v
-         }, nil
-     }
-     ```
-  2. Fully satisfies the `jit.Func` interface on WebAssembly without runtime failure.
-
-#### 3.4 Handcrafted ARM64 NEON & SVE2 Assembly
-- **Target Files**: `internal/eml/simd_arm64.s`, `internal/eml/simd_arm64.go`, `internal/eml/simd_sve.go`
-- **Actions**:
-  1. Write Go assembly in `simd_arm64.s`:
-     - `addNEON`: `VADD.2D V0, V1, V2`
-     - `subNEON`, `mulNEON`, `divNEON`
-     - `fmaNEON`: `VFMLA.2D`
-     - `sqrtNEON`: `FSQRT.2D`
-  2. Implement dynamic SVE length loops for ARMv8.2-A+ systems (AWS Graviton3/4).
-
----
-
-### Phase 4: High-Performance SIMD & Public API Parity
-
-#### 4.1 Native Single-Precision Float32 AVX2/AVX512 Transcendentals
+#### C.3 Native Single-Precision Float32 AVX2/AVX-512
 - **Target Files**: `internal/eml/simd_f32_amd64.s`, `internal/eml/simd_f32.go`
 - **Actions**:
-  1. Implement 8-lane `float32` polynomial approximations in AVX2:
-     - `expAVX2F32`, `logAVX2F32`, `sinAVX2F32`, `cosAVX2F32`
-  2. Replace float64 upcast loops in `simd_f32.go` with native AVX2 calls.
-- **Success Criteria**: Single-precision transcendental batch throughput increases by 1.8×–2.2× over current baseline.
+  1. Implement `fastExpAVX2F32` (8 floats/vector) and `fastExpAVX512F32` (16 floats/vector).
+  2. Implement `fastLogAVX2F32` and `fastEmlAVX2F32`.
+  3. Replace the float64 upcast loops in `internal/eml/simd_f32.go` with native AVX2/AVX-512 calls, doubling single-precision throughput.
 
-#### 4.2 Vectorized Hyperbolic AVX2 Kernels
-- **Target Files**: `internal/eml/simd_hyper_amd64.s`, `internal/eml/simd.go`
+#### C.4 Hardware Vectorized Libraries Integration (Intel SVML & SLEEF)
+- **Target Files**: `internal/eml/svml_stub.go`, `internal/eml/svml_cgo.go`
 - **Actions**:
-  1. Vectorize `Sinh` and `Cosh` by evaluating $e^x$ and $e^{-x}$ in parallel across 4-lane SIMD registers using existing `expAVX2` logic.
-  2. Vectorize `Tanh` using rational Padé approximants for $|x| < 4.0$ and $\pm 1.0$ clamping for large $|x|$.
-  3. Replace `parallelizeGeneric` fallback in `SinhBatch`, `CoshBatch`, `TanhBatch`.
+  1. Add optional build tags `//go:build svml` and `//go:build sleef`.
+  2. Connect to Intel SVML (`__m256d _mm256_exp_pd`, `__m512d _mm512_exp_pd`) and SLEEF (`Sleef_expd4_u10avx2`) for workloads requiring 1-ULP mathematical exactness at hardware SIMD speed.
 
-#### 4.3 Comprehensive Zero-Allocation `*BatchTo` APIs
-- **Target Files**: `pkg/arithmetic/arith.go`, `pkg/logexp/exp.go`, `pkg/trig/trig.go`, `pkg/hyper/hyper.go`
-- **Actions**:
-  1. Add `ExpBatchTo(x, dst []float64)`, `LogBatchTo(x, dst []float64)` in `pkg/logexp`.
-  2. Add `SinBatchTo(x, dst []float64)`, `CosBatchTo(x, dst []float64)`, `TanBatchTo(x, dst []float64)` in `pkg/trig`.
-  3. Optimize `TanBatch` in `pkg/trig/trig.go` to call `eml.TanSIMD(x)` directly, removing 3 temporary allocations.
-  4. Upgrade `pkg/fastmath/fastmath.go:SqrtBatchToF32` from scalar loop to SIMD.
+---
 
-#### 4.4 Multi-Type Vector Arithmetic Parity in `pkg/arithmetic`
-- **Target Files**: `pkg/arithmetic/arith_f32.go`, `pkg/arithmetic/arith_complex.go`, `pkg/arithmetic/arith_int_ext.go`
+### Track D: Algebraic Simplification & Domain Guardrails (Principle D)
+
+#### D.1 Constant Folding & EML Reductions
+- **Target Files**: `internal/jit/canonical.go`, `pkg/bytecode/optimizer.go`
+- **Rules to Implement**:
+  1. Fold constant EML nodes:
+     $$\text{eml}(c_1, c_2) \to e^{c_1} - \ln(c_2)$$
+  2. Exact mathematical constant identity:
+     $$\text{eml}(1, 1) \to e \quad (\text{stored as exact } \mathtt{math.E})$$
+  3. Zero-argument identities:
+     $$\text{eml}(0, 1) \to 1.0$$
+     $$\text{eml}(x, 1) \to \exp(x)$$
+     $$\text{eml}(0, y) \to 1.0 - \ln(y)$$
+     $$\text{eml}(x, e) \to \exp(x) - 1.0 = \text{expm1}(x)$$
+
+#### D.2 Pattern Collapsing of Nested EML Clusters
+- **Target Files**: `internal/jit/canonical.go:Simplify`, `pkg/bytecode/optimizer.go`
+- **Identities to Detect and Collapse**:
+  The EML basis represents elementary functions as nested trees with constant 1. During optimization and canonicalization, collapse these clusters into native operations:
+  
+  | Target Operation | Canonical EML Expression Pattern | Native Bytecode Reduction |
+  | :--- | :--- | :--- |
+  | **Natural Log** $\ln(x)$ | $\text{eml}(1, \text{eml}(\text{eml}(1, x), 1))$ | Collapse 3 EML ops $\to$ `OpLog(x)` |
+  | **Exponential** $e^x$ | $\text{eml}(x, 1)$ | Collapse 1 EML op $\to$ `OpExp(x)` |
+  | **Negation** $-x$ | $\text{eml}(\text{eml}(1, \text{eml}(x, 1)), \text{eml}(1, 1))$ | Collapse 3 EML ops $\to$ `OpNeg(x)` |
+  | **Reciprocal** $1/x$ | $\text{eml}(\text{eml}(1, x), \text{eml}(x, 1))$ | Collapse 2 EML ops $\to$ `OpInv(x)` |
+  | **Addition** $x + y$ | $\text{eml}(1, \text{eml}(\text{eml}(y, 1), \text{eml}(1, x)))$ | Collapse 4 EML ops $\to$ `OpAdd(x, y)` |
+  | **Subtraction** $x - y$ | $x + (-y)$ | Collapse to `OpSub(x, y)` |
+
+- **Benefits**:
+  - Replaces nested transcendental calls with hardware arithmetic (e.g. 4 EML calls $\to$ 1 single-cycle `addsd`).
+  - Eliminates intermediate exponential overflow and numerical instability.
+  - Generates compact, human-readable decompiled expressions.
+
+#### D.3 Domain Guardrails & Smooth Regularization
+- **Target Files**: `internal/eml/guardrails.go`, `pkg/fastmath/guardrails.go`, `pkg/bytecode/eval.go`
+- **Mathematical Formulations**:
+  1. **Clipped Logarithm**:
+     $$\ln_\epsilon(y) = \ln(\max(y, \epsilon)), \quad \epsilon = 10^{-12} \ (\text{float64}), \ 10^{-6} \ (\text{float32})$$
+     Prevents NaN and $-\infty$; continuous $C^0$.
+  2. **Smooth Analytic Regularization ($C^\infty$)**:
+     $$\ln_\epsilon(y) = \frac{1}{2}\ln(y^2 + \epsilon^2)$$
+     - For $y > 0, y \gg \epsilon$: $\frac{1}{2}\ln(y^2) = \ln(y)$.
+     - For $y < 0$: evaluates to $\ln(|y|)$ smoothly.
+     - At $y = 0$: evaluates smoothly to $\ln(\epsilon)$.
+     - Continuous derivative:
+       $$\frac{d}{dy}\left[\frac{1}{2}\ln(y^2 + \epsilon^2)\right] = \frac{y}{y^2 + \epsilon^2}$$
+       At $y = 0$, the derivative is exactly 0. There are no singularities or undefined gradients, making it ideal for gradient-based parameter optimization.
+  3. **Clamped Exponential**:
+     $$\exp_\text{clamp}(x) = \exp(\text{clamp}(x, -700.0, 700.0))$$
+     Eliminates $+\infty$ overflow and subnormal denormal stalls.
+
+#### D.4 Configurable Guardrail Modes
+- **Design**:
+  ```go
+  type GuardrailMode uint8
+
+  const (
+      GuardrailStrict GuardrailMode = iota // IEEE 754 compliant (NaN and Inf propagate)
+      GuardrailClip                        // ln(max(y, eps))
+      GuardrailSmooth                      // 0.5 * ln(y^2 + eps^2)
+  )
+  ```
+  Expose across `pkg/bytecode`, `pkg/fastmath`, and `internal/eml`.
+
+---
+
+### Track E: Cross-Platform, GPU & System Parity
+
+#### E.1 Complete Missing CUDA Device Kernels & Arithmetic
+- **Target Files**: `cuda/eml_cuda.cu`, `cuda/eml_capi.cu`, `internal/gpu/bridge.go`
 - **Actions**:
-  1. Add `AddF32`, `SubF32`, `MulF32`, `DivF32`, `DotF32` for `float32`.
-  2. Add `AddC64`, `MulC64`, `AddC128`, `MulC128`, `DotC128` for complex numbers.
-  3. Add `AddInt16`, `MulInt16`, `AddInt32`, `DotInt32` for multi-width integer vectors.
+  1. Implement device kernels in `cuda/eml_cuda.cu`:
+     - `kernel_abs<<<grid, block>>>(x, result, n)`
+     - `kernel_neg<<<grid, block>>>(x, result, n)`
+     - `kernel_inv<<<grid, block>>>(x, result, n)`
+     - `kernel_pow<<<grid, block>>>(x, exp, result, n)`
+     - `kernel_fma<<<grid, block>>>(a, b, c, result, n)`
+     - Binary arithmetic: `AddBatch`, `SubBatch`, `MulBatch`, `DivBatch`.
+  2. Wire Go bridge functions in `internal/gpu/bridge.go`, replacing the stubs.
+
+#### E.2 TurboQuant4 Forward Encoding & Compression
+- **Target Files**: `pkg/quant/turboquant4.go`, `pkg/quant/turboquant4_test.go`
+- **Actions**:
+  1. Implement `Pack4Bit(indices []byte, packed []byte)`: vectorizes 16-bin nibbles into contiguous bytes.
+  2. Implement `EncodeTurboQuant4(vec []float32, pow2 int) ([]byte, error)`: computes $L_2$ radius, quantizes recursive polar angles, and packs QJL 1-bit residual signs.
+
+#### E.3 Windows JIT & ARM64 JIT Codegen Engine
+- **Target Files**: `internal/jit/jit_windows.go`, `internal/jit/codegen_arm64.go`, `internal/jit/jit_wasm.go`
+- **Actions**:
+  1. Windows AMD64 executable memory via `VirtualAlloc`/`VirtualProtect`.
+  2. AArch64 machine code generator emitting `FADD`, `FSUB`, `FMUL`, `FDIV`, `FSQRT` on `D0`–`D7`.
+  3. WebAssembly AST fallback in `jit_wasm.go`.
+
+#### E.4 Handcrafted ARM64 NEON & SVE2 Assembly
+- **Target Files**: `internal/eml/simd_arm64.s`, `internal/eml/simd_sve.go`
+- **Actions**:
+  1. Implement `addNEON`, `subNEON`, `mulNEON`, `fmaNEON` (`VFMLA.2D`) in `simd_arm64.s`.
+  2. Implement dynamic SVE length vector loops.
+
+---
+
+## Phased Implementation Roadmap
+
+```
+Phase 1: Linear Bytecode VM & Domain Guardrails (v0.5.0)
+ ├── 1.1 pkg/bytecode: OpCode & Program SoA structures
+ ├── 1.2 Zero-allocation stack VM (Eval)
+ ├── 1.3 Lowering AST & EMLNode -> Program
+ ├── 1.4 Algebraic simplification & EML identity reductions
+ └── 1.5 Domain guardrails (ln_eps and exp_clamp)
+
+Phase 2: Fast Minimax Polynomial Approximations (v0.6.0)
+ ├── 2.1 FastExp: Schraudolph & Degree-4 Remez Minimax
+ ├── 2.2 FastLog: IEEE Bit-Cast & Chebyshev Mantissa
+ ├── 2.3 Fused FastEml scalar kernels
+ └── 2.4 pkg/fastmath public API updates & benchmarks
+
+Phase 3: AVX2 / AVX-512 SIMD Acceleration (v0.7.0)
+ ├── 3.1 Vectorized Bytecode Batch VM (Program.EvalBatch)
+ ├── 3.2 Plan9 fastExpAVX2, fastExpAVX512, fastLogAVX2, fastLogAVX512
+ ├── 3.3 Fused fastEmlAVX2 and fastEmlAVX512 assembly
+ └── 3.4 Native single-precision float32 AVX2/AVX-512 transcendentals
+
+Phase 4: Hardware & GPU Subsystem Completeness (v0.8.0)
+ ├── 4.1 Missing CUDA kernels (Abs, Neg, Pow, Inv, FMA, Add, Sub, Mul, Div)
+ ├── 4.2 CUDA Int8 vector search kernel (__dp4a)
+ ├── 4.3 TurboQuant4 forward encoder (EncodeTurboQuant4, Pack4Bit)
+ └── 4.4 Apple Metal backend float32 & async streams
+
+Phase 5: Cross-Platform & Production Release (v1.0.0)
+ ├── 5.1 Windows JIT executable memory (VirtualAlloc)
+ ├── 5.2 ARM64 native JIT machine code engine
+ ├── 5.3 WebAssembly AST fallback
+ ├── 5.4 Hand-tuned ARM64 NEON & SVE2 assembly
+ └── 5.5 Optional Intel SVML / SLEEF integration layer
+```
 
 ---
 
 ## Verification & Testing Matrix
 
-| Component | Automated Test Suite | Validation Threshold | Tooling / Checkers |
+| Component / Subsystem | Test Suite & Target | Target Metric / Validation Criteria | Tools |
 | :--- | :--- | :--- | :--- |
-| **Gosec Security** | `/home/rsd/go/bin/gosec -exclude-generated -tags purego ./...` | **0 Issues**, 0 SSA Type Errors | `gosec` |
-| **Race Detector** | `go test -race ./...` and `go test -race -tags cuda ./internal/gpu` | 0 race reports, 0 panics | Go runtime race detector |
-| **JIT Compiler** | `go test -v ./internal/jit/...` | 100% AST op parity, < 1 ULP diff vs stdlib | Unit & Fuzz tests |
-| **GPU Subsystem** | `go test -v -tags cuda ./internal/gpu` | GPU results match CPU stdlib across $10^6$ elements | NVIDIA CUDA 12+, Valgrind/cuda-memcheck |
-| **Quantization** | `go test -v ./pkg/quant/...` | Encode $\to$ Reconstruct cosine similarity $> 0.98$ | Numerical regression tests |
-| **Cross-Platform** | `GOOS=windows GOARCH=amd64 go build ./...`<br>`GOOS=darwin GOARCH=arm64 go build ./...`<br>`GOOS=js GOARCH=wasm go build ./...` | Clean build on all 3 target triplets | Go cross-compiler |
+| **Linear Bytecode VM** | `go test -v ./pkg/bytecode/...` | 100% numerical parity vs AST `Eval`, 0 heap allocations per eval | Go benchmark (`-benchmem`) |
+| **Minimax Fast Math** | `go test -v ./pkg/fastmath/...` | `FastExp`: max rel err $< 1.2 \times 10^{-6}$; `FastLog`: max rel err $< 3 \times 10^{-5}$ | High-precision `bigmath` tests |
+| **AVX2 / AVX-512 SIMD** | `go test -v ./internal/eml/...` | AVX2/AVX-512 results match scalar within 2 ULP; zero division instructions | Valgrind / Intel SDE |
+| **Domain Guardrails** | `go test -v ./pkg/bytecode/...` | $10^6$ random inputs in $[-1000, 1000]$ produce **0 NaNs** and **0 Infs** | Fuzz tests (`go test -fuzz`) |
+| **Identity Simplification** | `go test -v ./internal/jit/...` | $\text{eml}(1,1) \to e$, nested $\text{eml} \to \ln, -, 1/x, +$ exact reduction | Structural AST assertion |
+| **GPU Subsystem** | `go test -v -tags cuda ./internal/gpu` | GPU results match CPU stdlib across $10^6$ elements | NVIDIA CUDA 12+, cuda-memcheck |
+| **Security Audit** | `gosec -exclude-generated -tags purego ./...` | **0 Issues**, 0 SSA Type Errors | `gosec` |
+| **Race Detector** | `go test -race ./...` | 0 race reports, 0 panics | Go race detector |
+| **Cross-Platform Compilation** | `GOOS=windows GOARCH=amd64 go build ./...`<br>`GOOS=darwin GOARCH=arm64 go build ./...`<br>`GOOS=js GOARCH=wasm go build ./...` | Clean build on all 3 target triplets | Go cross-compiler |
 
 ---
 
 ## Release Milestones & Versioning
 
-- **v0.4.0 (Current Baseline)**: Fixed GPU/TurboQuant4/Int8 regressions, full multi-precision GPU parity, modernized Go 1.25 benchmark loops, clean gosec audit, clean race detector validation.
-- **v0.4.1 (Phase 1 Target)**: JIT codegen power operator (`^`), extended math functions in JIT, multi-argument AST, TurboQuant4 `EncodeTurboQuant4` & `Pack4Bit`.
-- **v0.5.0 (Phase 2 Target)**: Complete CUDA kernel suite (`AbsBatch`, `NegBatch`, `PowBatch`, `InvBatch`, `FmaBatch`), element-wise GPU arithmetic, CUDA-accelerated Int8 ANN search.
-- **v0.6.0 (Phase 3 Target)**: Cross-platform JIT (Windows `VirtualAlloc`, ARM64 AArch64 JIT, WebAssembly AST fallback), hand-tuned NEON assembly.
-- **v1.0.0 (Phase 4 Target)**: Production release with full API type parity (`float32`, `float64`, `complex64`, `complex128`, `int8`–`int64`), native single-precision AVX2 transcendentals, zero-allocation `*BatchTo` APIs across all packages.
+- **v0.4.0 (Current Baseline)**: GPU transcendentals, TurboQuant4 distance, Int8 arithmetic, Go 1.25 benchmark loops, clean gosec and race detection.
+- **v0.5.0 (Phase 1 Target)**: Data-Oriented Memory Layout (`pkg/bytecode`), Zero-Allocation Stack VM, Identity Reductions, Soft Clamping & Domain Guardrails.
+- **v0.6.0 (Phase 2 Target)**: Fast Minimax Polynomial Approximations (`FastExpMinimax`, `FastLogMinimax`, `FastEml`), public `pkg/fastmath` update, 4x–6x scalar speedup.
+- **v0.7.0 (Phase 3 Target)**: Vectorized Bytecode Batch VM, Plan9 AVX2 & AVX-512 Fast Exp/Log/Eml assembly kernels, native Float32 transcendentals.
+- **v0.8.0 (Phase 4 Target)**: CUDA missing kernels (`Abs`, `Neg`, `Pow`, `Inv`, `Fma`, `Add`, `Sub`), TurboQuant4 forward encoder (`EncodeTurboQuant4`, `Pack4Bit`).
+- **v1.0.0 (Phase 5 Target)**: Cross-platform JIT (Windows `VirtualAlloc`, ARM64 AArch64 JIT, WebAssembly fallback), hand-tuned NEON assembly, optional Intel SVML/SLEEF bindings, production release.
