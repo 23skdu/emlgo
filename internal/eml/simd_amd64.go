@@ -1,7 +1,9 @@
-//go:build amd64
-// +build amd64
+//go:build amd64 && !purego
+// +build amd64,!purego
 
 package eml
+
+import _ "unsafe"
 
 func cpuid(op, op2 uint32) (eax, ebx, ecx, edx uint32)
 

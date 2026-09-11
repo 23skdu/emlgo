@@ -159,4 +159,3 @@ func bytesToFloat64(b []byte) []float64 {
 	}
 	return res
 }
-

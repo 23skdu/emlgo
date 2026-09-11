@@ -14,7 +14,6 @@ func Log2SIMDTo(x, result []float64) {
 	parallelizeGeneric(x, result, nativeLog2)
 }
 
-
 // Log10SIMDTo computes the base-10 logarithm of each element in x and stores the result in result.
 func Log10SIMDTo(x, result []float64) {
 	if len(x) != len(result) {
@@ -28,4 +27,3 @@ func Log10SIMDTo(x, result []float64) {
 	}
 	parallelizeGeneric(x, result, nativeLog10)
 }
-

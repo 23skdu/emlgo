@@ -14,41 +14,40 @@ func TestExtraEmlCoverage(t *testing.T) {
 	resLarge := make([]float64, 1000)
 	resHuge := make([]float64, 1000000)
 	_ = resHuge
-	
+
 	// Fused
 	f := fusedOps{}
 	f.ExpAddBatch(empty, empty, empty)
 	f.ExpAddBatch(small, small, resSmall)
 	f.ExpAddBatch(large, large, resLarge)
-	
+
 	f.LogDivBatch(empty, empty, empty)
 	f.LogDivBatch(small, small, resSmall)
 	f.LogDivBatch(large, large, resLarge)
-	
+
 	f.LogSubBatch(empty, empty, empty)
 	f.LogSubBatch(small, small, resSmall)
 	f.LogSubBatch(large, large, resLarge)
-	
+
 	f.ExpMulBatch(empty, empty, empty)
 	f.ExpMulBatch(small, small, resSmall)
 	f.ExpMulBatch(large, large, resLarge)
-	
+
 	// FMA
 	FmaSIMD(empty, empty, empty)
 	FmaSIMD(small, small, small)
 	FmaSIMD(large, large, large)
 	FmaSIMDTo(empty, empty, empty, empty)
-	
+
 	// Expanded
 	Log2SIMDTo(empty, empty)
 	Log2SIMDTo(small, resSmall)
 	Log2SIMDTo(large, resLarge)
-	
+
 	Log10SIMDTo(empty, empty)
 	Log10SIMDTo(small, resSmall)
 	Log10SIMDTo(large, resLarge)
 
-	
 	// Large chunks
 	GetParallelChunkSize(1000000)
 	ExpAddBatch(huge, huge)
@@ -57,7 +56,7 @@ func TestExtraEmlCoverage(t *testing.T) {
 func TestEmlPanics(t *testing.T) {
 	a5 := make([]float64, 5)
 	a4 := make([]float64, 4)
-	
+
 	tests := []func(){
 		func() { ExpSIMDTo(a5, a4) },
 		func() { LogSIMDTo(a5, a4) },
@@ -86,7 +85,7 @@ func TestEmlPanics(t *testing.T) {
 		func() { FmaSIMDTo(a5, a5, a4, a5) },
 		func() { FmaSIMDTo(a5, a5, a5, a4) },
 	}
-	
+
 	for _, fn := range tests {
 		assertPanic(t, fn)
 	}
@@ -111,7 +110,7 @@ func TestNativeWrappersAndStubs(t *testing.T) {
 	nativeMax(5, 10)
 	nativeMin(5, math.NaN())
 	nativeMin(10, 5)
-	
+
 	// AMD64 stubs
 	addAVX2(nil, nil, nil)
 	subAVX2(nil, nil, nil)
@@ -130,11 +129,11 @@ func TestNativeWrappersAndStubs(t *testing.T) {
 	fmaAVX2(nil, nil, nil, nil)
 	fmaAVX512(nil, nil, nil, nil)
 	detectAMD64SIMD()
-	
+
 	// SVE stubs
 	addSVE(nil, nil, nil)
 	detectSVE()
-	
+
 	// SIMD wrappers
 	small := []float64{1, 2, 3}
 	TanhBatch(small)

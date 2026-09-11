@@ -7,26 +7,26 @@ import (
 )
 
 const (
-	One     float64 = 1.0
-	E       float64 = math.E
-	Pi      float64 = math.Pi
-	NegOne  float64 = -1.0
-	Two     float64 = 2.0
-	Half    float64 = 0.5
-	Sqrt2   float64 = 1.4142135623730951
-	Sqrt3   float64 = 1.7320508075688772
-	Ln2     float64 = 0.6931471805599453
-	Ln10    float64 = 2.302585092994046
-	SqrtPi  float64 = 1.7724538509055159
-	Phi     float64 = 1.618033988749895
+	One    float64 = 1.0
+	E      float64 = math.E
+	Pi     float64 = math.Pi
+	NegOne float64 = -1.0
+	Two    float64 = 2.0
+	Half   float64 = 0.5
+	Sqrt2  float64 = 1.4142135623730951
+	Sqrt3  float64 = 1.7320508075688772
+	Ln2    float64 = 0.6931471805599453
+	Ln10   float64 = 2.302585092994046
+	SqrtPi float64 = 1.7724538509055159
+	Phi    float64 = 1.618033988749895
 )
 
 var I = complex(0, 1)
 
 const (
-	ComplexOne   complex128 = 1
-	ComplexI     complex128 = complex(0, 1)
-	ComplexNegI  complex128 = complex(0, -1)
+	ComplexOne  complex128 = 1
+	ComplexI    complex128 = complex(0, 1)
+	ComplexNegI complex128 = complex(0, -1)
 )
 
 func GenerateE() float64 {

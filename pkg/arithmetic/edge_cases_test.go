@@ -77,7 +77,7 @@ func TestArithmeticEdgeExtra(t *testing.T) {
 func TestArithmeticCoverageFinal(t *testing.T) {
 	GCD(5, -5)
 	LCM(5, -5)
-	
+
 	// Pow coverage
 	Pow(0, 2)
 	Pow(0, -2)

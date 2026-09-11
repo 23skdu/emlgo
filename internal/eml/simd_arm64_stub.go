@@ -3,5 +3,4 @@
 
 package eml
 
-func addSVE(_, _, _ []float64)        {}
-
+func addSVE(_, _, _ []float64) {}

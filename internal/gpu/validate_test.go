@@ -90,7 +90,8 @@ func TestULPDiffZero(t *testing.T) {
 	if d := ulpDiff(0.0, 0.0); d != 0 {
 		t.Errorf("ulpDiff(0, 0) = %d, want 0", d)
 	}
-	if d := ulpDiff(0.0, -0.0); d != 0 {
+	negZero := math.Copysign(0.0, -1.0)
+	if d := ulpDiff(0.0, negZero); d != 0 {
 		t.Errorf("ulpDiff(0, -0) = %d, want 0", d)
 	}
 }
@@ -268,7 +269,7 @@ func TestCPURefsAll(t *testing.T) {
 
 func BenchmarkULPDiff(b *testing.B) {
 	a, c := 1.0, math.Nextafter(1.0, 2.0)
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		ulpDiff(a, c)
 	}
 }
@@ -283,8 +284,7 @@ func BenchmarkVerifyOp(b *testing.B) {
 	}
 	ref := func(x float64) float64 { return x }
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, _, _ = v.VerifyOp("bench", input, result, ref)
 	}
 }

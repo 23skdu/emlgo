@@ -93,7 +93,7 @@ func TestSqrtCbrtPowExhaustive(t *testing.T) {
 }
 
 func TestSinCosTanExhaustive(t *testing.T) {
-	tests := []float64{-math.Pi, -math.Pi/2, -math.Pi/4, 0, math.Pi/4, math.Pi/2, math.Pi}
+	tests := []float64{-math.Pi, -math.Pi / 2, -math.Pi / 4, 0, math.Pi / 4, math.Pi / 2, math.Pi}
 	for _, x := range tests {
 		t.Run("Sin", func(t *testing.T) {
 			_ = Sin(x)

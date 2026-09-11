@@ -6,7 +6,7 @@ import (
 
 func TestExtraBatchFunctions(t *testing.T) {
 	testData := []float64{1, 2, 3, 4, 5}
-	
+
 	t.Run("FmaBatch", func(t *testing.T) {
 		a := []float64{1, 2, 3}
 		b := []float64{2, 2, 2}

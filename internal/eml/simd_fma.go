@@ -25,8 +25,8 @@ func FmaSIMDTo(a, b, c, result []float64) {
 	}
 
 	if n < SmallCutoff {
-		for i := 0; i < n; i++ {
-			result[i] = a[i]*b[i] + c[i]
+		for i := range result[:n] {
+			result[i] = a[i]*b[i] + c[i] // #nosec G602 - bounds verified by length checks above
 		}
 		return
 	}

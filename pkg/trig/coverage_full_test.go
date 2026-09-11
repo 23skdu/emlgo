@@ -7,12 +7,12 @@ import (
 
 func TestSecFullCoverage(t *testing.T) {
 	_ = Sec(0)
-	_ = Sec(math.Pi/6)
-	_ = Sec(math.Pi/4)
-	_ = Sec(math.Pi/3)
-	_ = Sec(math.Pi/2)
+	_ = Sec(math.Pi / 6)
+	_ = Sec(math.Pi / 4)
+	_ = Sec(math.Pi / 3)
+	_ = Sec(math.Pi / 2)
 	_ = Sec(math.Pi)
-	_ = Sec(2*math.Pi)
+	_ = Sec(2 * math.Pi)
 	_ = Sec(-math.Pi)
 	_ = Sec(math.NaN())
 	_ = Sec(math.Inf(1))
@@ -21,12 +21,12 @@ func TestSecFullCoverage(t *testing.T) {
 
 func TestCscFullCoverage(t *testing.T) {
 	_ = Csc(0)
-	_ = Csc(math.Pi/6)
-	_ = Csc(math.Pi/4)
-	_ = Csc(math.Pi/3)
-	_ = Csc(math.Pi/2)
+	_ = Csc(math.Pi / 6)
+	_ = Csc(math.Pi / 4)
+	_ = Csc(math.Pi / 3)
+	_ = Csc(math.Pi / 2)
 	_ = Csc(math.Pi)
-	_ = Csc(2*math.Pi)
+	_ = Csc(2 * math.Pi)
 	_ = Csc(-math.Pi)
 	_ = Csc(math.NaN())
 	_ = Csc(math.Inf(1))
@@ -35,10 +35,10 @@ func TestCscFullCoverage(t *testing.T) {
 
 func TestCotFullCoverage(t *testing.T) {
 	_ = Cot(0)
-	_ = Cot(math.Pi/6)
-	_ = Cot(math.Pi/4)
-	_ = Cot(math.Pi/3)
-	_ = Cot(math.Pi/2)
+	_ = Cot(math.Pi / 6)
+	_ = Cot(math.Pi / 4)
+	_ = Cot(math.Pi / 3)
+	_ = Cot(math.Pi / 2)
 	_ = Cot(math.Pi)
 	_ = Cot(-math.Pi)
 	_ = Cot(math.NaN())
@@ -215,7 +215,7 @@ func TestAcschFullCoverage(t *testing.T) {
 }
 
 func TestSinCosAll(t *testing.T) {
-	values := []float64{0, math.Pi/6, math.Pi/4, math.Pi/3, math.Pi/2, math.Pi, 3*math.Pi/2, 2*math.Pi, -math.Pi, -math.Pi/2, math.NaN(), math.Inf(1), math.Inf(-1)}
+	values := []float64{0, math.Pi / 6, math.Pi / 4, math.Pi / 3, math.Pi / 2, math.Pi, 3 * math.Pi / 2, 2 * math.Pi, -math.Pi, -math.Pi / 2, math.NaN(), math.Inf(1), math.Inf(-1)}
 	for _, x := range values {
 		_, _ = SinCos(x)
 	}
@@ -229,7 +229,7 @@ func TestSinhCoshAll(t *testing.T) {
 }
 
 func TestTanFastAll(t *testing.T) {
-	values := []float64{0, math.Pi/6, math.Pi/4, math.Pi/3, math.Pi/2, math.Pi, 3*math.Pi/2, -math.Pi, 10, -10, 100, -100, math.NaN(), math.Inf(1), math.Inf(-1)}
+	values := []float64{0, math.Pi / 6, math.Pi / 4, math.Pi / 3, math.Pi / 2, math.Pi, 3 * math.Pi / 2, -math.Pi, 10, -10, 100, -100, math.NaN(), math.Inf(1), math.Inf(-1)}
 	for _, x := range values {
 		_ = TanFast(x)
 	}

@@ -198,19 +198,19 @@ func TestDefaultBlockSizeConstant(t *testing.T) {
 }
 
 func BenchmarkGridSize(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		GridSize(1000000, 256)
 	}
 }
 
 func BenchmarkDefaultLaunchConfig(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		DefaultLaunchConfig(1000000, 256)
 	}
 }
 
 func BenchmarkMatMulLaunchConfig(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		MatMulLaunchConfig(4096, 4096, 16)
 	}
 }

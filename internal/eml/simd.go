@@ -6,12 +6,12 @@ import (
 )
 
 var (
-	cpuNum = runtime.NumCPU()
-	hasSSE4   bool
-	hasAVX2   bool
-	hasAVX512 bool
-	hasNeon   bool
-	hasNeonDot bool
+	cpuNum      = runtime.NumCPU()
+	hasSSE4     bool
+	hasAVX2     bool
+	hasAVX512   bool
+	hasNeon     bool
+	hasNeonDot  bool
 	hasSVE      bool
 	hasFMA      bool
 	hasAVXVNNI  bool
@@ -44,28 +44,35 @@ func GetParallelChunkSize(n int) int {
 	return chunkSize
 }
 
-
 // HasSSE4 reports whether the CPU supports SSE4 instructions.
 func HasSSE4() bool { return hasSSE4 }
+
 // HasAVX2 reports whether the CPU supports AVX2 instructions.
 func HasAVX2() bool { return hasAVX2 }
+
 // HasAVX512 reports whether the CPU supports AVX-512 instructions.
 func HasAVX512() bool { return hasAVX512 }
+
 // HasNeon reports whether the CPU supports ARM Neon instructions.
 func HasNeon() bool { return hasNeon }
+
 // HasNeonDot reports whether the CPU supports ARM Neon dot product instructions.
 func HasNeonDot() bool { return hasNeonDot }
+
 // HasSVE reports whether the CPU supports ARM SVE instructions.
 func HasSVE() bool { return hasSVE }
+
 // HasFMA reports whether the CPU supports FMA instructions.
 func HasFMA() bool { return hasFMA }
+
 // HasAVXVNNI reports whether the CPU supports AVX-VNNI instructions.
 func HasAVXVNNI() bool { return hasAVXVNNI }
+
 // HasWasmSIMD reports whether WASM SIMD is available.
 func HasWasmSIMD() bool { return hasWasmSIMD }
 
-
 // FmaScalar returns a * b + c.
+//
 //go:inline
 func FmaScalar(a, b, c float64) float64 {
 	if hasFMA {
@@ -75,27 +82,30 @@ func FmaScalar(a, b, c float64) float64 {
 }
 
 // SqrtScalar returns the square root of x.
+//
 //go:inline
 func SqrtScalar(x float64) float64 { return sqrtScalar(x) }
 
 // AbsScalar returns the absolute value of x.
+//
 //go:inline
 func AbsScalar(x float64) float64 { return absScalar(x) }
 
 // NegScalar returns the negation of x.
+//
 //go:inline
 func NegScalar(x float64) float64 { return negScalar(x) }
-
 
 // SIMD computes Exp(x[i]) - Log(y[i]) for each element and stores it in result.
 func SIMD(x, y, result []float64) {
 	if len(x) != len(y) || len(x) != len(result) {
 		panic("slice length mismatch")
 	}
-	if len(x) == 0 { return }
+	if len(x) == 0 {
+		return
+	}
 	emlSIMD(x, y, result)
 }
-
 
 // ExpSIMD returns a new slice containing the exponential of each element in x.
 func ExpSIMD(x []float64) []float64 {
@@ -104,13 +114,13 @@ func ExpSIMD(x []float64) []float64 {
 	return result
 }
 
-
 // ExpSIMDTo computes the exponential of each element in x and stores it in result.
 func ExpSIMDTo(x, result []float64) {
-	if len(x) != len(result) { panic("slice length mismatch") }
+	if len(x) != len(result) {
+		panic("slice length mismatch")
+	}
 	expSIMDTo(x, result)
 }
-
 
 func expSIMDTo(x, result []float64) {
 	dispatchExpSIMDTo(x, result)
@@ -123,13 +133,13 @@ func LogSIMD(x []float64) []float64 {
 	return result
 }
 
-
 // LogSIMDTo computes the natural logarithm of each element in x and stores it in result.
 func LogSIMDTo(x, result []float64) {
-	if len(x) != len(result) { panic("slice length mismatch") }
+	if len(x) != len(result) {
+		panic("slice length mismatch")
+	}
 	logSIMDTo(x, result)
 }
-
 
 func logSIMDTo(x, result []float64) {
 	dispatchLogSIMDTo(x, result)
@@ -142,13 +152,13 @@ func SqrtSIMD(x []float64) []float64 {
 	return result
 }
 
-
 // SqrtSIMDTo computes the square root of each element in x and stores it in result.
 func SqrtSIMDTo(x, result []float64) {
-	if len(x) != len(result) { panic("slice length mismatch") }
+	if len(x) != len(result) {
+		panic("slice length mismatch")
+	}
 	sqrtSIMDTo(x, result)
 }
-
 
 func sqrtSIMDTo(x, result []float64) {
 	dispatchSqrtSIMDTo(x, result)
@@ -161,13 +171,13 @@ func SinSIMD(x []float64) []float64 {
 	return result
 }
 
-
 // SinSIMDTo computes the sine of each element in x and stores it in result.
 func SinSIMDTo(x, result []float64) {
-	if len(x) != len(result) { panic("slice length mismatch") }
+	if len(x) != len(result) {
+		panic("slice length mismatch")
+	}
 	sinSIMDTo(x, result)
 }
-
 
 func sinSIMDTo(x, result []float64) {
 	dispatchSinSIMDTo(x, result)
@@ -180,13 +190,13 @@ func CosSIMD(x []float64) []float64 {
 	return result
 }
 
-
 // CosSIMDTo computes the cosine of each element in x and stores it in result.
 func CosSIMDTo(x, result []float64) {
-	if len(x) != len(result) { panic("slice length mismatch") }
+	if len(x) != len(result) {
+		panic("slice length mismatch")
+	}
 	cosSIMDTo(x, result)
 }
-
 
 func cosSIMDTo(x, result []float64) {
 	dispatchCosSIMDTo(x, result)
@@ -199,13 +209,13 @@ func TanSIMD(x []float64) []float64 {
 	return result
 }
 
-
 // TanSIMDTo computes the tangent of each element in x and stores it in result.
 func TanSIMDTo(x, result []float64) {
-	if len(x) != len(result) { panic("slice length mismatch") }
+	if len(x) != len(result) {
+		panic("slice length mismatch")
+	}
 	tanSIMDTo(x, result)
 }
-
 
 func tanSIMDTo(x, result []float64) {
 	dispatchTanSIMDTo(x, result)
@@ -219,13 +229,13 @@ func SinCosSIMD(x []float64) (sin, cos []float64) {
 	return
 }
 
-
 // SinCosSIMDTo computes the sine and cosine of each element in x and stores them in sin and cos respectively.
 func SinCosSIMDTo(x, sin, cos []float64) {
-	if len(x) != len(sin) || len(x) != len(cos) { panic("slice length mismatch") }
+	if len(x) != len(sin) || len(x) != len(cos) {
+		panic("slice length mismatch")
+	}
 	sincosSIMDTo(x, sin, cos)
 }
-
 
 func sincosSIMDTo(x, sin, cos []float64) {
 	dispatchSinCosSIMDTo(x, sin, cos)
@@ -241,7 +251,6 @@ func AddSIMD(a, b []float64) []float64 {
 	return result
 }
 
-
 // SubSIMD returns a new slice containing the difference of elements in a and b.
 func SubSIMD(a, b []float64) []float64 {
 	if len(a) != len(b) {
@@ -251,7 +260,6 @@ func SubSIMD(a, b []float64) []float64 {
 	dispatchSubSIMD(a, b, result)
 	return result
 }
-
 
 // MulSIMD returns a new slice containing the product of elements in a and b.
 func MulSIMD(a, b []float64) []float64 {
@@ -263,7 +271,6 @@ func MulSIMD(a, b []float64) []float64 {
 	return result
 }
 
-
 // DivSIMD returns a new slice containing the quotient of elements in a and b.
 func DivSIMD(a, b []float64) []float64 {
 	if len(a) != len(b) {
@@ -274,7 +281,6 @@ func DivSIMD(a, b []float64) []float64 {
 	return result
 }
 
-
 // AbsSIMD returns a new slice containing the absolute value of each element in x.
 func AbsSIMD(x []float64) []float64 {
 	result := make([]float64, len(x))
@@ -282,13 +288,13 @@ func AbsSIMD(x []float64) []float64 {
 	return result
 }
 
-
 // AbsSIMDTo computes the absolute value of each element in x and stores it in result.
 func AbsSIMDTo(x, result []float64) {
-	if len(x) != len(result) { panic("slice length mismatch") }
+	if len(x) != len(result) {
+		panic("slice length mismatch")
+	}
 	absSIMD(x, result)
 }
-
 
 func absSIMD(x, result []float64) {
 	dispatchAbsSIMD(x, result)
@@ -301,13 +307,13 @@ func NegSIMD(x []float64) []float64 {
 	return result
 }
 
-
 // NegSIMDTo computes the negation of each element in x and stores it in result.
 func NegSIMDTo(x, result []float64) {
-	if len(x) != len(result) { panic("slice length mismatch") }
+	if len(x) != len(result) {
+		panic("slice length mismatch")
+	}
 	negSIMD(x, result)
 }
-
 
 func negSIMD(x, result []float64) {
 	dispatchNegSIMD(x, result)
@@ -320,13 +326,13 @@ func InvSIMD(x []float64) []float64 {
 	return result
 }
 
-
 // InvSIMDTo computes the inverse of each element in x and stores it in result.
 func InvSIMDTo(x, result []float64) {
-	if len(x) != len(result) { panic("slice length mismatch") }
+	if len(x) != len(result) {
+		panic("slice length mismatch")
+	}
 	invSIMD(x, result)
 }
-
 
 func invSIMD(x, result []float64) {
 	dispatchInvSIMD(x, result)
@@ -339,14 +345,12 @@ func SinhBatch(x []float64) []float64 {
 	return res
 }
 
-
 // CoshBatch returns a new slice containing the hyperbolic cosine of each element in x.
 func CoshBatch(x []float64) []float64 {
 	res := make([]float64, len(x))
 	parallelizeGeneric(x, res, Cosh)
 	return res
 }
-
 
 // TanhBatch returns a new slice containing the hyperbolic tangent of each element in x.
 func TanhBatch(x []float64) []float64 {
@@ -355,14 +359,12 @@ func TanhBatch(x []float64) []float64 {
 	return res
 }
 
-
 // AsinhBatch returns a new slice containing the inverse hyperbolic sine of each element in x.
 func AsinhBatch(x []float64) []float64 {
 	res := make([]float64, len(x))
 	parallelizeGeneric(x, res, Asinh)
 	return res
 }
-
 
 // AcoshBatch returns a new slice containing the inverse hyperbolic cosine of each element in x.
 func AcoshBatch(x []float64) []float64 {
@@ -371,14 +373,12 @@ func AcoshBatch(x []float64) []float64 {
 	return res
 }
 
-
 // AtanhBatch returns a new slice containing the inverse hyperbolic tangent of each element in x.
 func AtanhBatch(x []float64) []float64 {
 	res := make([]float64, len(x))
 	parallelizeGeneric(x, res, Atanh)
 	return res
 }
-
 
 type parallelJob struct {
 	x        []float64
@@ -396,7 +396,7 @@ type parallelJob struct {
 }
 
 const (
-	fusedNone  = 0
+	fusedNone   = 0
 	fusedExpMul = 1
 	fusedExpAdd = 2
 	fusedLogDiv = 3
@@ -475,8 +475,10 @@ func applyFusedOp(job parallelJob) {
 
 func parallelizeGeneric(x, result []float64, fn func(float64) float64) {
 	n := len(x)
-	if n == 0 { return }
-	
+	if n == 0 {
+		return
+	}
+
 	if n < SmallCutoff {
 		for j := 0; j < n; j++ {
 			result[j] = fn(x[j])
@@ -488,7 +490,9 @@ func parallelizeGeneric(x, result []float64, fn func(float64) float64) {
 	var wg sync.WaitGroup
 	for i := 0; i < n; i += chunkSize {
 		end := i + chunkSize
-		if end > n { end = n }
+		if end > n {
+			end = n
+		}
 		wg.Add(1)
 		jobQueue <- parallelJob{
 			x:      x,
@@ -504,8 +508,10 @@ func parallelizeGeneric(x, result []float64, fn func(float64) float64) {
 
 func parallelizeSinCos(x, sin, cos []float64) {
 	n := len(x)
-	if n == 0 { return }
-	
+	if n == 0 {
+		return
+	}
+
 	if n < SmallCutoff {
 		for j := 0; j < n; j++ {
 			sin[j], cos[j] = Sincos(x[j])
@@ -517,7 +523,9 @@ func parallelizeSinCos(x, sin, cos []float64) {
 	var wg sync.WaitGroup
 	for i := 0; i < n; i += chunkSize {
 		end := i + chunkSize
-		if end > n { end = n }
+		if end > n {
+			end = n
+		}
 		wg.Add(1)
 		jobQueue <- parallelJob{
 			x:        x,
@@ -534,7 +542,9 @@ func parallelizeSinCos(x, sin, cos []float64) {
 
 func parallelizeFused(a, b, result []float64, fusedOp int) {
 	n := len(a)
-	if n == 0 { return }
+	if n == 0 {
+		return
+	}
 
 	if n < SmallCutoff {
 		applyFusedOp(parallelJob{a: a, b: b, result: result, fusedOp: fusedOp, start: 0, end: n})
@@ -545,7 +555,9 @@ func parallelizeFused(a, b, result []float64, fusedOp int) {
 	var wg sync.WaitGroup
 	for i := 0; i < n; i += chunkSize {
 		end := i + chunkSize
-		if end > n { end = n }
+		if end > n {
+			end = n
+		}
 		wg.Add(1)
 		jobQueue <- parallelJob{
 			a:       a,
@@ -567,7 +579,6 @@ const (
 	LargeCutoff = 4096
 )
 
-
 // ErrLengthMismatch is returned when slice lengths do not match.
 var ErrLengthMismatch = Error("slice length mismatch")
 
@@ -577,18 +588,17 @@ type Error string
 // Error returns the string representation of the error.
 func (e Error) Error() string { return string(e) }
 
-
 // Batch applies a VectorFunc to x and y.
 func Batch(x, y []float64, fn VectorFunc) error {
-	if len(x) != len(y) { return ErrLengthMismatch }
+	if len(x) != len(y) {
+		return ErrLengthMismatch
+	}
 	result := make([]float64, len(x))
 	return fn(x, y, result)
 }
 
-
 // VectorFunc is a function that operates on two input slices and one result slice.
 type VectorFunc func(x, y, result []float64) error
-
 
 // AddScalarSIMD returns a new slice containing each element in a plus b.
 func AddScalarSIMD(a []float64, b float64) []float64 {
@@ -597,13 +607,13 @@ func AddScalarSIMD(a []float64, b float64) []float64 {
 	return result
 }
 
-
 // AddScalarSIMDTo adds b to each element in a and stores it in result.
 func AddScalarSIMDTo(a []float64, b float64, result []float64) {
-	if len(a) != len(result) { panic("slice length mismatch") }
+	if len(a) != len(result) {
+		panic("slice length mismatch")
+	}
 	dispatchAddScalarSIMD(a, b, result)
 }
-
 
 // MulScalarSIMD returns a new slice containing each element in a multiplied by b.
 func MulScalarSIMD(a []float64, b float64) []float64 {
@@ -612,14 +622,13 @@ func MulScalarSIMD(a []float64, b float64) []float64 {
 	return result
 }
 
-
 // MulScalarSIMDTo multiplies each element in a by b and stores it in result.
 func MulScalarSIMDTo(a []float64, b float64, result []float64) {
-	if len(a) != len(result) { panic("slice length mismatch") }
+	if len(a) != len(result) {
+		panic("slice length mismatch")
+	}
 	dispatchMulScalarSIMD(a, b, result)
 }
 
-
 // L1TileSize is the suggested tile size for L1 cache optimizations.
 const L1TileSize = 32768
-

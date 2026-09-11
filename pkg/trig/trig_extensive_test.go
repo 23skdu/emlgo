@@ -820,37 +820,37 @@ func TestFastFunctionsComprehensive(t *testing.T) {
 }
 
 func BenchmarkSin(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		Sin(1.5)
 	}
 }
 
 func BenchmarkCos(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		Cos(1.5)
 	}
 }
 
 func BenchmarkTan(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		Tan(1.5)
 	}
 }
 
 func BenchmarkSinh(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		Sinh(1.5)
 	}
 }
 
 func BenchmarkCosh(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		Cosh(1.5)
 	}
 }
 
 func BenchmarkTanh(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		Tanh(1.5)
 	}
 }

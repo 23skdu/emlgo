@@ -99,7 +99,7 @@ func TestLogExpBatch(t *testing.T) {
 	})
 	t.Run("ExpBatch_empty", func(t *testing.T) {
 		result := ExpBatch([]float64{})
-		if result != nil && len(result) != 0 {
+		if len(result) != 0 {
 			t.Errorf("ExpBatch empty = %v", result)
 		}
 	})
@@ -117,7 +117,7 @@ func TestLogExpBatch(t *testing.T) {
 	})
 	t.Run("LogBatch_empty", func(t *testing.T) {
 		result := LogBatch([]float64{})
-		if result != nil && len(result) != 0 {
+		if len(result) != 0 {
 			t.Errorf("LogBatch empty = %v", result)
 		}
 	})
@@ -172,13 +172,13 @@ func TestFastFunctions(t *testing.T) {
 }
 
 func BenchmarkExp(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		Exp(1.5)
 	}
 }
 
 func BenchmarkLog(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		Log(1.5)
 	}
 }

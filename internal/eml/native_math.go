@@ -162,7 +162,6 @@ func nativeMin(x, y float64) float64 {
 	return y
 }
 
-
 func copysign(x, y float64) float64 {
 	return math.Copysign(x, y)
 }

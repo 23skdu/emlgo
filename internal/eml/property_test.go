@@ -53,7 +53,6 @@ func TestOneProperty(t *testing.T) {
 	}
 }
 
-
 func TestOneEmlProperty(t *testing.T) {
 	f := func(y float64) bool {
 		if y <= 0 || y > 1e300 || math.IsInf(y, 0) || math.IsNaN(y) {

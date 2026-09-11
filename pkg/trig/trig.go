@@ -10,18 +10,18 @@ import (
 var (
 	pi          = eml.Pi
 	piOver2     = eml.PiOver2
-	inf  = eml.Inf
-	nan  = eml.NaN
-	isNaN = eml.IsNaN
-	isInf = eml.IsInf
-	nativeSin  = eml.Sin
-	nativeCos  = eml.Cos
-	nativeTan  = eml.Tan
-	nativeAsin = eml.Asin
-	nativeAcos = eml.Acos
-	nativeAtan = eml.Atan
+	inf         = eml.Inf
+	nan         = eml.NaN
+	isNaN       = eml.IsNaN
+	isInf       = eml.IsInf
+	nativeSin   = eml.Sin
+	nativeCos   = eml.Cos
+	nativeTan   = eml.Tan
+	nativeAsin  = eml.Asin
+	nativeAcos  = eml.Acos
+	nativeAtan  = eml.Atan
 	nativeAtan2 = eml.Atan2
-	nativeSqrt = eml.Sqrt
+	nativeSqrt  = eml.Sqrt
 
 	nativeSinh = eml.Sinh
 	nativeCosh = eml.Cosh

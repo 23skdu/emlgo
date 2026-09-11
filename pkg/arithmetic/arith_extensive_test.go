@@ -1033,31 +1033,31 @@ func TestFusedBatchFunctionsComprehensive(t *testing.T) {
 }
 
 func BenchmarkAdd(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		Add(1.5, 2.5)
 	}
 }
 
 func BenchmarkMul(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		Mul(1.5, 2.5)
 	}
 }
 
 func BenchmarkDiv(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		Div(1.5, 2.5)
 	}
 }
 
 func BenchmarkPow(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		Pow(1.5, 2.5)
 	}
 }
 
 func BenchmarkSqrt(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		Sqrt(1.5)
 	}
 }

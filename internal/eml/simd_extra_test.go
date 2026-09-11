@@ -102,7 +102,6 @@ func TestSIMD2(t *testing.T) {
 	}
 }
 
-
 func TestVariousSIMD2(t *testing.T) {
 	for _, n := range []int{1, 8, 16, 64} {
 		x := make([]float64, n)
