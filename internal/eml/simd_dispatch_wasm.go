@@ -43,3 +43,5 @@ func dispatchAddScalarSIMD(a []float64, b float64, result []float64) {
 func dispatchMulScalarSIMD(a []float64, b float64, result []float64) {
 	mulScalarWasmSIMD(a, b, result)
 }
+
+var _ = parallelizeSinCos

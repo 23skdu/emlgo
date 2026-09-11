@@ -386,6 +386,12 @@ func tanhWasmSIMD(a, result []float64) {
 	}
 }
 
+var (
+	_ = sinhWasmSIMD
+	_ = coshWasmSIMD
+	_ = tanhWasmSIMD
+)
+
 func sincosWasmSIMD(x, sin, cos []float64) {
 	n := len(x)
 	i := 0

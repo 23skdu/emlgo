@@ -113,6 +113,32 @@ func TestEncodeTurboQuant4(t *testing.T) {
 	if dist < 0 || math.IsNaN(float64(dist)) {
 		t.Errorf("Invalid distance: %v", dist)
 	}
+
+	// Error cases
+	_, err = EncodeTurboQuant4(vec, 15) // not pow2
+	if err == nil {
+		t.Errorf("Expected error for non-pow2")
+	}
+	_, err = EncodeTurboQuant4(nil, 16)
+	if err == nil {
+		t.Errorf("Expected error for empty vec")
+	}
+	_, err = EncodeTurboQuant4(make([]float32, 32), 16)
+	if err == nil {
+		t.Errorf("Expected error for oversized vec")
+	}
+
+	// Distance error cases
+	_, err = TurboQuant4Distance(vec, []byte{1, 2}, dim, pow2)
+	if err == nil {
+		t.Errorf("Expected error for short tqData")
+	}
+	_, err = TurboQuant4DistanceScratch(vec, []byte{1, 2, 3, 4}, dim, pow2, nil, nil)
+	if err == nil {
+		t.Errorf("Expected error for corrupted tqData")
+	}
+	// Test scratch reallocation
+	_, _ = TurboQuant4DistanceScratch(vec, encoded, dim, pow2, make([]float32, 1), make([]byte, 1))
 }
 
 func BenchmarkTurboQuant4Distance(b *testing.B) {
