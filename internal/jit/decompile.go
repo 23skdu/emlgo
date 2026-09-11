@@ -134,41 +134,6 @@ func wrapParenDecomp(n *EMLNode) string {
 	return Decompile(n)
 }
 
-func wrapSubDecomp(n *EMLNode) string {
-	if n.Kind == EMLFunc && (n.Name == "add" || n.Name == "sub") {
-		return "(" + Decompile(n) + ")"
-	}
-	return Decompile(n)
-}
-
-func wrapSubDecompR(n *EMLNode) string {
-	if n.Kind == EMLFunc && (n.Name == "add" || n.Name == "sub") {
-		return "(" + Decompile(n) + ")"
-	}
-	return Decompile(n)
-}
-
-func wrapMulDecomp(n *EMLNode) string {
-	if n.Kind == EMLFunc && (n.Name == "add" || n.Name == "sub") {
-		return "(" + Decompile(n) + ")"
-	}
-	return Decompile(n)
-}
-
-func wrapDivDecomp(n *EMLNode) string {
-	if n.Kind == EMLFunc && (n.Name == "add" || n.Name == "sub" || n.Name == "mul" || n.Name == "div") {
-		return "(" + Decompile(n) + ")"
-	}
-	return Decompile(n)
-}
-
-func wrapPowerDecomp(n *EMLNode) string {
-	if n.Kind == EMLOp || (n.Kind == EMLFunc && n.Name != "pow" && n.Name != "neg") {
-		return "(" + Decompile(n) + ")"
-	}
-	return Decompile(n)
-}
-
 func wrapLatex(s string) string {
 	if strings.Contains(s, "+") || strings.Contains(s, "-") {
 		return "(" + s + ")"
