@@ -1,4 +1,4 @@
-//go:build darwin && arm64 && !cuda
+//go:build darwin && arm64 && cgo && !cuda
 
 package gpu
 
@@ -204,6 +204,39 @@ func (d *Device) EmlBatch(x, y []float64) ([]float64, error) {
 		return nil, fmt.Errorf("Metal EML kernel failed: error %d", int(err))
 	}
 	return result, nil
+}
+
+func (d *Device) AbsBatch(x []float64) ([]float64, error) {
+	_ = d
+	_ = x
+	return nil, fmt.Errorf("Metal execution not implemented for AbsBatch")
+}
+
+func (d *Device) NegBatch(x []float64) ([]float64, error) {
+	_ = d
+	_ = x
+	return nil, fmt.Errorf("Metal execution not implemented for NegBatch")
+}
+
+func (d *Device) PowBatch(x []float64, exponent float64) ([]float64, error) {
+	_ = d
+	_ = x
+	_ = exponent
+	return nil, fmt.Errorf("Metal execution not implemented for PowBatch")
+}
+
+func (d *Device) InvBatch(x []float64) ([]float64, error) {
+	_ = d
+	_ = x
+	return nil, fmt.Errorf("Metal execution not implemented for InvBatch")
+}
+
+func (d *Device) FmaBatch(a, b, c []float64) ([]float64, error) {
+	_ = d
+	_ = a
+	_ = b
+	_ = c
+	return nil, fmt.Errorf("Metal execution not implemented for FmaBatch")
 }
 
 func NewStream() (*Stream, error) {

@@ -196,8 +196,8 @@ func PowInt(x float64, n int) float64 {
 		return 1
 	}
 	if n < 0 {
-		if n == math.MinInt64 {
-			return 1 / (PowInt(x, math.MaxInt64) * x)
+		if n == math.MinInt {
+			return 1 / (PowInt(x, math.MaxInt) * x)
 		}
 		return 1 / PowInt(x, -n)
 	}

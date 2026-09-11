@@ -39,11 +39,6 @@ func tanAVX2(a, result []float64) { _, _ = a, result }
 func fmaAVX2(a, b, c, result []float64)   { _, _, _, _ = a, b, c, result }
 func fmaAVX512(a, b, c, result []float64) { _, _, _, _ = a, b, c, result }
 
-func sqrtScalar(x float64) float64      { return x }
-func fmaScalar(a, b, c float64) float64 { return a*b + c }
-func negScalar(x float64) float64       { return -x }
-func absScalar(x float64) float64       { if x < 0 { return -x }; return x }
-
 func cpuid(op, op2 uint32) (eax, ebx, ecx, edx uint32) {
 	_, _ = op, op2
 	return 0, 0, 0, 0
