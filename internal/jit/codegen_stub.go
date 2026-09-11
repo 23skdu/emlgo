@@ -1,10 +1,9 @@
-//go:build !amd64
-// +build !amd64
+//go:build !amd64 && (!js || !wasm)
 
 package jit
 
 import "fmt"
 
-func compileToCode(n Node) ([]byte, error) {
+func compileToCode(_ Node) ([]byte, error) {
 	return nil, fmt.Errorf("JIT codegen requires amd64")
 }
