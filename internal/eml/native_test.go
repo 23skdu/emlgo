@@ -149,83 +149,125 @@ func TestNativeEdge(t *testing.T) {
 	}
 
 	// nativePow branches
-	if nativePow(1.0, 5.0) != 1.0 { t.Error("nativePow(1, 5) failed") }
-	if nativePow(2.0, 0.0) != 1.0 { t.Error("nativePow(2, 0) failed") }
-	if nativePow(0.0, 2.0) != 0.0 { t.Error("nativePow(0, 2) failed") }
-	if !math.IsInf(nativePow(0.0, -1.0), 1) { t.Error("nativePow(0, -1) failed") }
-	if !math.IsNaN(nativePow(-2.0, 0.5)) { t.Error("nativePow(-2, 0.5) should be NaN") }
-	if nativePow(-2.0, 2.0) != 4.0 { t.Errorf("nativePow(-2, 2) = %v", nativePow(-2, 2)) }
-	if math.Abs(nativePow(-2.0, 3.0)-(-8.0)) > 1e-13 { t.Errorf("nativePow(-2, 3) = %v", nativePow(-2, 3)) }
+	if nativePow(1.0, 5.0) != 1.0 {
+		t.Error("nativePow(1, 5) failed")
+	}
+	if nativePow(2.0, 0.0) != 1.0 {
+		t.Error("nativePow(2, 0) failed")
+	}
+	if nativePow(0.0, 2.0) != 0.0 {
+		t.Error("nativePow(0, 2) failed")
+	}
+	if !math.IsInf(nativePow(0.0, -1.0), 1) {
+		t.Error("nativePow(0, -1) failed")
+	}
+	if !math.IsNaN(nativePow(-2.0, 0.5)) {
+		t.Error("nativePow(-2, 0.5) should be NaN")
+	}
+	if nativePow(-2.0, 2.0) != 4.0 {
+		t.Errorf("nativePow(-2, 2) = %v", nativePow(-2, 2))
+	}
+	if math.Abs(nativePow(-2.0, 3.0)-(-8.0)) > 1e-13 {
+		t.Errorf("nativePow(-2, 3) = %v", nativePow(-2, 3))
+	}
 
 	// nativeLog1p and nativeExpm1
-	if nativeLog1p(0) != 0 { t.Error("nativeLog1p(0) failed") }
-	if nativeExpm1(0) != 0 { t.Error("nativeExpm1(0) failed") }
+	if nativeLog1p(0) != 0 {
+		t.Error("nativeLog1p(0) failed")
+	}
+	if nativeExpm1(0) != 0 {
+		t.Error("nativeExpm1(0) failed")
+	}
 
 	// nativeMax/Min with NaNs (our implementation returns the non-NaN value)
-	if nativeMax(math.NaN(), 1.0) != 1.0 { t.Error("nativeMax with NaN failed") }
-	if nativeMin(math.NaN(), 1.0) != 1.0 { t.Error("nativeMin with NaN failed") }
-	
+	if nativeMax(math.NaN(), 1.0) != 1.0 {
+		t.Error("nativeMax with NaN failed")
+	}
+	if nativeMin(math.NaN(), 1.0) != 1.0 {
+		t.Error("nativeMin with NaN failed")
+	}
+
 	// nativeMax/Min with Infs
-	if nativeMax(math.Inf(1), 1.0) != math.Inf(1) { t.Error("nativeMax with Inf failed") }
-	if nativeMin(math.Inf(-1), 1.0) != math.Inf(-1) { t.Error("nativeMin with -Inf failed") }
+	if nativeMax(math.Inf(1), 1.0) != math.Inf(1) {
+		t.Error("nativeMax with Inf failed")
+	}
+	if nativeMin(math.Inf(-1), 1.0) != math.Inf(-1) {
+		t.Error("nativeMin with -Inf failed")
+	}
 
 	// nativeAbs/Neg edge cases
-	if nativeAbs(math.Inf(-1)) != math.Inf(1) { t.Error("nativeAbs(-Inf) failed") }
-	if nativeNeg(math.Inf(1)) != math.Inf(-1) { t.Error("nativeNeg(Inf) failed") }
+	if nativeAbs(math.Inf(-1)) != math.Inf(1) {
+		t.Error("nativeAbs(-Inf) failed")
+	}
+	if nativeNeg(math.Inf(1)) != math.Inf(-1) {
+		t.Error("nativeNeg(Inf) failed")
+	}
 
 	// nativeInv edge cases
-	if !math.IsInf(nativeInv(0), 1) { t.Error("nativeInv(0) failed") }
+	if !math.IsInf(nativeInv(0), 1) {
+		t.Error("nativeInv(0) failed")
+	}
 
 	// nativeMod/Remainder edge cases
-	if !math.IsNaN(nativeMod(10, 0)) { t.Error("nativeMod(10, 0) should be NaN") }
-	if !math.IsNaN(nativeRemainder(10, 0)) { t.Error("nativeRemainder(10, 0) should be NaN") }
+	if !math.IsNaN(nativeMod(10, 0)) {
+		t.Error("nativeMod(10, 0) should be NaN")
+	}
+	if !math.IsNaN(nativeRemainder(10, 0)) {
+		t.Error("nativeRemainder(10, 0) should be NaN")
+	}
 
 	// nativeHypot edge cases
-	if math.IsInf(nativeHypot(math.Inf(1), 0), 1) == false { t.Error("nativeHypot(Inf, 0) failed") }
+	if math.IsInf(nativeHypot(math.Inf(1), 0), 1) == false {
+		t.Error("nativeHypot(Inf, 0) failed")
+	}
 
 	// nativeCbrt edge cases
-	if nativeCbrt(0) != 0 { t.Error("nativeCbrt(0) failed") }
-	if nativeCbrt(-8) != -2 { t.Error("nativeCbrt(-8) failed") }
+	if nativeCbrt(0) != 0 {
+		t.Error("nativeCbrt(0) failed")
+	}
+	if nativeCbrt(-8) != -2 {
+		t.Error("nativeCbrt(-8) failed")
+	}
 }
 
 func BenchmarkAbsScalar(b *testing.B) {
 	x := -1.23
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = nativeAbs(x)
 	}
 }
 
 func BenchmarkNegScalar(b *testing.B) {
 	x := 1.23
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = nativeNeg(x)
 	}
 }
 
 func BenchmarkSqrtScalar(b *testing.B) {
 	x := 2.0
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = nativeSqrt(x)
 	}
 }
 
 func BenchmarkFMAScalar(b *testing.B) {
 	x, y, z := 1.2, 3.4, 5.6
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = fmaScalar(x, y, z)
 	}
 }
 
 func BenchmarkExpScalar(b *testing.B) {
 	x := 1.0
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = nativeExp(x)
 	}
 }
 
 func BenchmarkLogScalar(b *testing.B) {
 	x := 2.0
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = nativeLog(x)
 	}
 }

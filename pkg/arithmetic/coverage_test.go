@@ -27,7 +27,7 @@ func TestArithmeticCoverage(t *testing.T) {
 		DivBatch(a, b)
 		AddScalarBatch(a, 10.0)
 		MulScalarBatch(a, 10.0)
-		
+
 		// Int and Uint ops
 		IntAdd(1, 2)
 		IntSub(1, 2)
@@ -37,7 +37,7 @@ func TestArithmeticCoverage(t *testing.T) {
 		IntAbs(-1)
 		IntMax(1, 2)
 		IntMin(1, 2)
-		
+
 		UintAdd(1, 2)
 		UintSub(1, 2)
 		UintMul(1, 2)
@@ -54,7 +54,7 @@ func TestArithEdgeCases(t *testing.T) {
 	IntMod(1, 0)
 	UintDiv(1, 0)
 	UintMod(1, 0)
-	
+
 	// Max/Min/Mod etc
 	Max(1.0, 2.0)
 	Min(1.0, 2.0)

@@ -38,10 +38,10 @@ var funcTable = map[string]jitFunc{
 }
 
 type encoder struct {
-	code     []byte
-	pool     []float64
-	fixups   []poolFixup
-	ptrPool  []uint64
+	code      []byte
+	pool      []float64
+	fixups    []poolFixup
+	ptrPool   []uint64
 	ptrFixups []poolFixup
 }
 
@@ -143,22 +143,21 @@ func (e *encoder) fixupConstants() {
 	for _, fx := range e.fixups {
 		insnEnd := fx.codeOff + fx.insLen
 		rel := (codeLen + fx.poolIdx*8) - insnEnd
-		e.code[fx.codeOff+fx.dispOff] = byte(rel)           // #nosec G115
-		e.code[fx.codeOff+fx.dispOff+1] = byte(rel >> 8)    // #nosec G115
-		e.code[fx.codeOff+fx.dispOff+2] = byte(rel >> 16)   // #nosec G115
-		e.code[fx.codeOff+fx.dispOff+3] = byte(rel >> 24)   // #nosec G115
+		e.code[fx.codeOff+fx.dispOff] = byte(rel)         // #nosec G115
+		e.code[fx.codeOff+fx.dispOff+1] = byte(rel >> 8)  // #nosec G115
+		e.code[fx.codeOff+fx.dispOff+2] = byte(rel >> 16) // #nosec G115
+		e.code[fx.codeOff+fx.dispOff+3] = byte(rel >> 24) // #nosec G115
 	}
 	// Fixup pointer pool references
 	for _, fx := range e.ptrFixups {
 		insnEnd := fx.codeOff + fx.insLen
 		rel := (float64PoolEnd + fx.poolIdx*8) - insnEnd
-		e.code[fx.codeOff+fx.dispOff] = byte(rel)           // #nosec G115
-		e.code[fx.codeOff+fx.dispOff+1] = byte(rel >> 8)    // #nosec G115
-		e.code[fx.codeOff+fx.dispOff+2] = byte(rel >> 16)   // #nosec G115
-		e.code[fx.codeOff+fx.dispOff+3] = byte(rel >> 24)   // #nosec G115
+		e.code[fx.codeOff+fx.dispOff] = byte(rel)         // #nosec G115
+		e.code[fx.codeOff+fx.dispOff+1] = byte(rel >> 8)  // #nosec G115
+		e.code[fx.codeOff+fx.dispOff+2] = byte(rel >> 16) // #nosec G115
+		e.code[fx.codeOff+fx.dispOff+3] = byte(rel >> 24) // #nosec G115
 	}
 }
-
 
 func (e *encoder) movsdXmmXmm(dst, src byte) {
 	e.sse2(0xF2, 0x10, dst, src)
@@ -389,7 +388,7 @@ func (g *generator) genPowWithSign(base Node, value float64, negate bool, dst by
 		}
 		idx := g.enc.addPool(1)
 		g.enc.loadConstant(dst, idx) // dst = 1.0
-		g.enc.divsd(dst, tmp)       // dst = 1.0 / x^|n|
+		g.enc.divsd(dst, tmp)        // dst = 1.0 / x^|n|
 		return nil
 	}
 	return g.genPowUint(base, n, dst)
@@ -459,7 +458,7 @@ func (g *generator) genPowUint(base Node, n int, dst byte) error {
 	if err := g.gen(base, dst); err != nil {
 		return err
 	}
-	
+
 	// If n is a power of two, we can avoid allocating any accumulator register.
 	if (n & (n - 1)) == 0 {
 		for n > 1 {
@@ -468,16 +467,16 @@ func (g *generator) genPowUint(base Node, n int, dst byte) error {
 		}
 		return nil
 	}
-	
+
 	// Otherwise, allocate a temporary accumulator register.
 	tempReg, err := g.alloc()
 	if err != nil {
 		return err
 	}
 	defer g.free(tempReg)
-	
+
 	accumInitialized := false
-	
+
 	for n > 0 {
 		if n&1 != 0 {
 			if !accumInitialized {
@@ -492,7 +491,7 @@ func (g *generator) genPowUint(base Node, n int, dst byte) error {
 			g.enc.mulsd(dst, dst)
 		}
 	}
-	
+
 	if accumInitialized {
 		g.enc.movsdXmmXmm(dst, tempReg)
 	}

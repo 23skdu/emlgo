@@ -75,7 +75,7 @@ func TestAtan2Exhaustive(t *testing.T) {
 }
 
 func TestSecCscCotExhaustive(t *testing.T) {
-	values := []float64{0, math.Pi/6, math.Pi/4, math.Pi/3, math.Pi/2, math.Pi}
+	values := []float64{0, math.Pi / 6, math.Pi / 4, math.Pi / 3, math.Pi / 2, math.Pi}
 	for _, x := range values {
 		t.Run("Sec", func(t *testing.T) {
 			_ = Sec(x)

@@ -29,8 +29,8 @@ var (
 	verbose      bool
 	testAccuracy bool
 	typeFilter   string
-	profile     string
-	device      string
+	profile      string
+	device       string
 )
 
 func init() {
@@ -119,7 +119,7 @@ func runGpuBenchmarks() {
 	for _, n := range sizes {
 		data := make([]float64, n)
 		for i := range data {
-			data[i] = float64(i%100) / 100.0 + 0.1
+			data[i] = float64(i%100)/100.0 + 0.1
 		}
 
 		// GPU Exp
@@ -328,7 +328,7 @@ func runAllBenchmarks() []BenchmarkResult {
 func runIntBenchmarks() []BenchmarkResult {
 	results := []BenchmarkResult{}
 
-results = append(results, benchmarkFuncInt("int", "Add", func(a, b int) {
+	results = append(results, benchmarkFuncInt("int", "Add", func(a, b int) {
 		_ = arithmetic.IntAdd(a, b)
 	}, func(a, b int) {
 		_ = a + b
@@ -618,9 +618,9 @@ func runFloat64Benchmarks() []BenchmarkResult {
 	results = append(results, benchmarkFloat64("Sin", func(x float64) float64 { return trig.Sin(x) }, func(x float64) float64 { return math.Sin(x) }))
 	results = append(results, benchmarkFloat64("Cos", func(x float64) float64 { return trig.Cos(x) }, func(x float64) float64 { return math.Cos(x) }))
 	results = append(results, benchmarkFloat64("Tan", func(x float64) float64 { return trig.Tan(x) }, func(x float64) float64 { return math.Tan(x) }))
-	results = append(results, benchmarkFloat64("Cot", func(x float64) float64 { return trig.Cot(x) }, func(x float64) float64 { return 1/math.Tan(x) }))
-	results = append(results, benchmarkFloat64("Sec", func(x float64) float64 { return trig.Sec(x) }, func(x float64) float64 { return 1/math.Cos(x) }))
-	results = append(results, benchmarkFloat64("Csc", func(x float64) float64 { return trig.Csc(x) }, func(x float64) float64 { return 1/math.Sin(x) }))
+	results = append(results, benchmarkFloat64("Cot", func(x float64) float64 { return trig.Cot(x) }, func(x float64) float64 { return 1 / math.Tan(x) }))
+	results = append(results, benchmarkFloat64("Sec", func(x float64) float64 { return trig.Sec(x) }, func(x float64) float64 { return 1 / math.Cos(x) }))
+	results = append(results, benchmarkFloat64("Csc", func(x float64) float64 { return trig.Csc(x) }, func(x float64) float64 { return 1 / math.Sin(x) }))
 
 	results = append(results, benchmarkFloat64("Asin", func(x float64) float64 { return trig.Asin(x) }, func(x float64) float64 { return math.Asin(x) }))
 	results = append(results, benchmarkFloat64("Acos", func(x float64) float64 { return trig.Acos(x) }, func(x float64) float64 { return math.Acos(x) }))
@@ -646,14 +646,14 @@ func runFloat64Benchmarks() []BenchmarkResult {
 	results = append(results, benchmarkFloat64("Trunc", func(x float64) float64 { return arithmetic.Trunc(x) }, func(x float64) float64 { return math.Trunc(x) }))
 	results = append(results, benchmarkFloat64("Abs", func(x float64) float64 { return arithmetic.Abs(x) }, func(x float64) float64 { return math.Abs(x) }))
 	results = append(results, benchmarkFloat64("Neg", func(x float64) float64 { return arithmetic.Neg(x) }, func(x float64) float64 { return -x }))
-	results = append(results, benchmarkFloat64("Inv", func(x float64) float64 { return arithmetic.Inv(x) }, func(x float64) float64 { return 1/x }))
-	results = append(results, benchmarkFloat64("Square", func(x float64) float64 { return arithmetic.Square(x) }, func(x float64) float64 { return x*x }))
-	results = append(results, benchmarkFloat64("Cube", func(x float64) float64 { return arithmetic.Cube(x) }, func(x float64) float64 { return x*x*x }))
+	results = append(results, benchmarkFloat64("Inv", func(x float64) float64 { return arithmetic.Inv(x) }, func(x float64) float64 { return 1 / x }))
+	results = append(results, benchmarkFloat64("Square", func(x float64) float64 { return arithmetic.Square(x) }, func(x float64) float64 { return x * x }))
+	results = append(results, benchmarkFloat64("Cube", func(x float64) float64 { return arithmetic.Cube(x) }, func(x float64) float64 { return x * x * x }))
 
 	results = append(results, benchmarkFloat64("Max", func(x float64) float64 { return arithmetic.Max(x, x+1) }, func(x float64) float64 { return math.Max(x, x+1) }))
 	results = append(results, benchmarkFloat64("Min", func(x float64) float64 { return arithmetic.Min(x, x+1) }, func(x float64) float64 { return math.Min(x, x+1) }))
 	results = append(results, benchmarkFloat64("Hypot", func(x float64) float64 { return arithmetic.Hypot(x, x+1) }, func(x float64) float64 { return math.Hypot(x, x+1) }))
-	results = append(results, benchmarkFloat64("FMA", func(x float64) float64 { return arithmetic.FMA(x, x+1, x+2) }, func(x float64) float64 { return x*(x+1) + (x+2) }))
+	results = append(results, benchmarkFloat64("FMA", func(x float64) float64 { return arithmetic.FMA(x, x+1, x+2) }, func(x float64) float64 { return x*(x+1) + (x + 2) }))
 
 	results = append(results, benchmarkFloat64("Add", func(x float64) float64 { return x + (x + 1) }, func(x float64) float64 { return x + (x + 1) }))
 	results = append(results, benchmarkFloat64("Sub", func(x float64) float64 { return x - (x + 1) }, func(x float64) float64 { return x - (x + 1) }))
@@ -1105,64 +1105,94 @@ func testAllAccuracy() {
 }
 
 func withinTol(a, b, tol float64) bool {
-	if math.IsNaN(a) && math.IsNaN(b) { return true }
-	if math.IsInf(a, 1) && math.IsInf(b, 1) { return true }
-	if math.IsInf(a, -1) && math.IsInf(b, -1) { return true }
+	if math.IsNaN(a) && math.IsNaN(b) {
+		return true
+	}
+	if math.IsInf(a, 1) && math.IsInf(b, 1) {
+		return true
+	}
+	if math.IsInf(a, -1) && math.IsInf(b, -1) {
+		return true
+	}
 	diff := math.Abs(a - b)
 	sumAbs := math.Abs(a) + math.Abs(b) + 1e-10
 	return diff < tol || diff/sumAbs < tol
 }
 
-func testExpParity() bool { return testOpParity(func(x float64) float64 { return logexp.Exp(x) }, math.Exp) }
-func testLogParity() bool { return testOpParity(func(x float64) float64 { return logexp.Log(x) }, math.Log) }
-func testSinParity() bool { return testOpParity(trig.Sin, math.Sin) }
-func testCosParity() bool { return testOpParity(trig.Cos, math.Cos) }
-func testTanParity() bool { return testOpParity(trig.Tan, math.Tan) }
-func testSinhParity() bool { return testOpParity(hyper.Sinh, math.Sinh) }
-func testCoshParity() bool { return testOpParity(hyper.Cosh, math.Cosh) }
-func testTanhParity() bool { return testOpParity(hyper.Tanh, math.Tanh) }
+func testExpParity() bool {
+	return testOpParity(func(x float64) float64 { return logexp.Exp(x) }, math.Exp)
+}
+func testLogParity() bool {
+	return testOpParity(func(x float64) float64 { return logexp.Log(x) }, math.Log)
+}
+func testSinParity() bool   { return testOpParity(trig.Sin, math.Sin) }
+func testCosParity() bool   { return testOpParity(trig.Cos, math.Cos) }
+func testTanParity() bool   { return testOpParity(trig.Tan, math.Tan) }
+func testSinhParity() bool  { return testOpParity(hyper.Sinh, math.Sinh) }
+func testCoshParity() bool  { return testOpParity(hyper.Cosh, math.Cosh) }
+func testTanhParity() bool  { return testOpParity(hyper.Tanh, math.Tanh) }
 func testAsinhParity() bool { return testOpParity(hyper.Asinh, math.Asinh) }
-func testAcoshParity() bool { return testOpParity(func(x float64) float64 { return hyper.Acosh(x+1) }, func(x float64) float64 { return math.Acosh(x+1) }) }
+func testAcoshParity() bool {
+	return testOpParity(func(x float64) float64 { return hyper.Acosh(x + 1) }, func(x float64) float64 { return math.Acosh(x + 1) })
+}
 func testAtanhParity() bool {
 	for i := 1; i <= 19; i++ {
 		x := float64(i) / 10.0
 		e, m := hyper.Atanh(x*0.5), math.Atanh(x*0.5)
 		if !withinTol(e, m, 1e-10) {
-			if verbose { fmt.Printf("  %f: emlgo=%f, math=%f\n", x, e, m) }
+			if verbose {
+				fmt.Printf("  %f: emlgo=%f, math=%f\n", x, e, m)
+			}
 			return false
 		}
 	}
 	return true
 }
 func testSqrtParity() bool { return testOpParity(arithmetic.Sqrt, math.Sqrt) }
-func testPowParity() bool { return testOpParity(func(x float64) float64 { return arithmetic.Pow(x, 2.5) }, func(x float64) float64 { return math.Pow(x, 2.5) }) }
+func testPowParity() bool {
+	return testOpParity(func(x float64) float64 { return arithmetic.Pow(x, 2.5) }, func(x float64) float64 { return math.Pow(x, 2.5) })
+}
 
 func testOpParity(emlgoFunc, mathFunc func(float64) float64) bool {
 	for i := -100; i <= 100; i++ {
 		x := float64(i) / 10.0
-		if x <= 0 { continue }
+		if x <= 0 {
+			continue
+		}
 		e, m := emlgoFunc(x), mathFunc(x)
 		if !withinTol(e, m, 1e-10) {
-			if verbose { fmt.Printf("  %f: emlgo=%f, math=%f\n", x, e, m) }
+			if verbose {
+				fmt.Printf("  %f: emlgo=%f, math=%f\n", x, e, m)
+			}
 			return false
 		}
 	}
 	return true
 }
 
-func testExpAccuracy() (uint64, bool) { return testOpAccuracy(func(x float64) float64 { return logexp.Exp(x) }, math.Exp) }
-func testLogAccuracy() (uint64, bool) { return testOpAccuracy(func(x float64) float64 { return logexp.Log(x) }, math.Log) }
-func testSinAccuracy() (uint64, bool) { return testOpAccuracy(trig.Sin, math.Sin) }
-func testCosAccuracy() (uint64, bool) { return testOpAccuracy(trig.Cos, math.Cos) }
-func testTanAccuracy() (uint64, bool) { return testOpAccuracy(trig.Tan, math.Tan) }
-func testSinhAccuracy() (uint64, bool) { return testOpAccuracy(hyper.Sinh, math.Sinh) }
-func testCoshAccuracy() (uint64, bool) { return testOpAccuracy(hyper.Cosh, math.Cosh) }
-func testTanhAccuracy() (uint64, bool) { return testOpAccuracy(hyper.Tanh, math.Tanh) }
+func testExpAccuracy() (uint64, bool) {
+	return testOpAccuracy(func(x float64) float64 { return logexp.Exp(x) }, math.Exp)
+}
+func testLogAccuracy() (uint64, bool) {
+	return testOpAccuracy(func(x float64) float64 { return logexp.Log(x) }, math.Log)
+}
+func testSinAccuracy() (uint64, bool)   { return testOpAccuracy(trig.Sin, math.Sin) }
+func testCosAccuracy() (uint64, bool)   { return testOpAccuracy(trig.Cos, math.Cos) }
+func testTanAccuracy() (uint64, bool)   { return testOpAccuracy(trig.Tan, math.Tan) }
+func testSinhAccuracy() (uint64, bool)  { return testOpAccuracy(hyper.Sinh, math.Sinh) }
+func testCoshAccuracy() (uint64, bool)  { return testOpAccuracy(hyper.Cosh, math.Cosh) }
+func testTanhAccuracy() (uint64, bool)  { return testOpAccuracy(hyper.Tanh, math.Tanh) }
 func testAsinhAccuracy() (uint64, bool) { return testOpAccuracy(hyper.Asinh, math.Asinh) }
-func testAcoshAccuracy() (uint64, bool) { return testOpAccuracy(func(x float64) float64 { return hyper.Acosh(x+1) }, func(x float64) float64 { return math.Acosh(x+1) }) }
-func testAtanhAccuracy() (uint64, bool) { return testOpAccuracy(func(x float64) float64 { return hyper.Atanh(x*0.5) }, func(x float64) float64 { return math.Atanh(x*0.5) }) }
+func testAcoshAccuracy() (uint64, bool) {
+	return testOpAccuracy(func(x float64) float64 { return hyper.Acosh(x + 1) }, func(x float64) float64 { return math.Acosh(x + 1) })
+}
+func testAtanhAccuracy() (uint64, bool) {
+	return testOpAccuracy(func(x float64) float64 { return hyper.Atanh(x * 0.5) }, func(x float64) float64 { return math.Atanh(x * 0.5) })
+}
 func testSqrtAccuracy() (uint64, bool) { return testOpAccuracy(arithmetic.Sqrt, math.Sqrt) }
-func testPowAccuracy() (uint64, bool) { return testOpAccuracy(func(x float64) float64 { return arithmetic.Pow(x, 2.5) }, func(x float64) float64 { return math.Pow(x, 2.5) }) }
+func testPowAccuracy() (uint64, bool) {
+	return testOpAccuracy(func(x float64) float64 { return arithmetic.Pow(x, 2.5) }, func(x float64) float64 { return math.Pow(x, 2.5) })
+}
 
 func testOpAccuracy(emlgoFunc, mathFunc func(float64) float64) (uint64, bool) {
 	var maxULP uint64 = 0
@@ -1170,18 +1200,30 @@ func testOpAccuracy(emlgoFunc, mathFunc func(float64) float64) (uint64, bool) {
 		x := float64(i) / 100.0
 		e, m := emlgoFunc(x), mathFunc(x)
 		ulp := ulpDiff(e, m)
-		if ulp > maxULP { maxULP = ulp }
-		if ulp > 200 { return maxULP, false }
+		if ulp > maxULP {
+			maxULP = ulp
+		}
+		if ulp > 200 {
+			return maxULP, false
+		}
 	}
 	return maxULP, true
 }
 
 func ulpDiff(a, b float64) uint64 {
-	if a == b { return 0 }
-	if math.IsNaN(a) || math.IsNaN(b) { return 0 }
-	if math.IsInf(a, 0) || math.IsInf(b, 0) { return 0 }
+	if a == b {
+		return 0
+	}
+	if math.IsNaN(a) || math.IsNaN(b) {
+		return 0
+	}
+	if math.IsInf(a, 0) || math.IsInf(b, 0) {
+		return 0
+	}
 	bits, targetBits := math.Float64bits(a), math.Float64bits(b)
-	if bits > targetBits { return bits - targetBits }
+	if bits > targetBits {
+		return bits - targetBits
+	}
 	return targetBits - bits
 }
 
@@ -1207,11 +1249,11 @@ var baseline = map[string]float64{
 func checkRegression(results []BenchmarkResult) {
 	regressionFlag := flag.Bool("regression", false, "Check for performance regression against baseline")
 	flag.Parse()
-	
+
 	if !*regressionFlag {
 		return
 	}
-	
+
 	fmt.Println("\n=== Regression Check ===")
 	regressions := 0
 	for _, r := range results {
@@ -1219,7 +1261,7 @@ func checkRegression(results []BenchmarkResult) {
 		if baselineRatio, ok := baseline[key]; ok {
 			regression := r.Ratio - baselineRatio
 			if regression > 0.10 {
-				fmt.Printf("⚠️  REGRESSION: %s ratio changed from %.2fx to %.2fx (+%.1f%%)\n", 
+				fmt.Printf("⚠️  REGRESSION: %s ratio changed from %.2fx to %.2fx (+%.1f%%)\n",
 					key, baselineRatio, r.Ratio, regression*100)
 				regressions++
 			} else if regression < -0.15 {

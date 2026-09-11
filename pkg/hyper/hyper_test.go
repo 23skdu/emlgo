@@ -1,9 +1,9 @@
 package hyper
 
 import (
+	"github.com/emlgo/eml/internal/eml"
 	"math"
 	"testing"
-	"github.com/emlgo/eml/internal/eml"
 )
 
 func TestSinhAll(t *testing.T) {
@@ -228,37 +228,37 @@ func close(a, b, tol float64) bool {
 }
 
 func BenchmarkSinh(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		Sinh(1.5)
 	}
 }
 
 func BenchmarkCosh(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		Cosh(1.5)
 	}
 }
 
 func BenchmarkTanh(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		Tanh(1.5)
 	}
 }
 
 func BenchmarkAsinh(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		Asinh(1.5)
 	}
 }
 
 func BenchmarkAcosh(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		Acosh(1.5)
 	}
 }
 
 func BenchmarkAtanh(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		Atanh(0.5)
 	}
 }

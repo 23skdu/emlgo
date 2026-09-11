@@ -9,10 +9,10 @@ import (
 )
 
 var (
-	isNaN    = eml.IsNaN
-	isInf    = eml.IsInf
-	nan      = eml.NaN
-	inf      = eml.Inf
+	isNaN       = eml.IsNaN
+	isInf       = eml.IsInf
+	nan         = eml.NaN
+	inf         = eml.Inf
 	nativeLog   = eml.Log
 	nativeLog1p = eml.Log1p
 	nativeSqrt  = eml.Sqrt
@@ -145,7 +145,6 @@ func TanBatch(x []float64) []float64 {
 	eml.TanSIMDTo(x, result)
 	return result
 }
-
 
 func Pow(x, y float64) float64 {
 	if isNaN(x) || isNaN(y) {

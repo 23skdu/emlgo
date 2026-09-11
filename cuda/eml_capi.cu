@@ -4,21 +4,9 @@
 #include "eml_capi.h"
 #include "eml_cuda.h"
 #include <cuda_runtime.h>
+#include <cuComplex.h>
 #include <string.h>
 #include <stdlib.h>
-
-// Forward declarations of kernels defined in eml_cuda.cu
-// (these are global functions in the .cu file, not in the header)
-extern __global__ void exp_kernel(const double*, double*, int);
-extern __global__ void log_kernel(const double*, double*, int);
-extern __global__ void sin_kernel(const double*, double*, int);
-extern __global__ void cos_kernel(const double*, double*, int);
-extern __global__ void tan_kernel(const double*, double*, int);
-extern __global__ void sinh_kernel(const double*, double*, int);
-extern __global__ void cosh_kernel(const double*, double*, int);
-extern __global__ void tanh_kernel(const double*, double*, int);
-extern __global__ void sqrt_kernel(const double*, double*, int);
-extern __global__ void eml_kernel(const double*, const double*, double*, int);
 
 // ---------- Lifecycle ----------
 
@@ -97,76 +85,12 @@ int eml_sync_device(void) {
     return (int)cudaDeviceSynchronize();
 }
 
-// ---------- Kernel Launchers (synchronous, stream=0) ----------
-
-int eml_launch_exp(const void* x, void* result, int n, int block_size) {
-    if (block_size <= 0 || block_size > 1024) block_size = 256;
-    int grid_size = (n + block_size - 1) / block_size;
-    exp_kernel<<<grid_size, block_size>>>((const double*)x, (double*)result, n);
-    return (int)cudaGetLastError();
+int eml_memset(void* ptr, int value, long long size) {
+    return (int)cudaMemset(ptr, value, (size_t)size);
 }
 
-int eml_launch_log(const void* x, void* result, int n, int block_size) {
-    if (block_size <= 0 || block_size > 1024) block_size = 256;
-    int grid_size = (n + block_size - 1) / block_size;
-    log_kernel<<<grid_size, block_size>>>((const double*)x, (double*)result, n);
-    return (int)cudaGetLastError();
-}
-
-int eml_launch_sin(const void* x, void* result, int n, int block_size) {
-    if (block_size <= 0 || block_size > 1024) block_size = 256;
-    int grid_size = (n + block_size - 1) / block_size;
-    sin_kernel<<<grid_size, block_size>>>((const double*)x, (double*)result, n);
-    return (int)cudaGetLastError();
-}
-
-int eml_launch_cos(const void* x, void* result, int n, int block_size) {
-    if (block_size <= 0 || block_size > 1024) block_size = 256;
-    int grid_size = (n + block_size - 1) / block_size;
-    cos_kernel<<<grid_size, block_size>>>((const double*)x, (double*)result, n);
-    return (int)cudaGetLastError();
-}
-
-int eml_launch_tan(const void* x, void* result, int n, int block_size) {
-    if (block_size <= 0 || block_size > 1024) block_size = 256;
-    int grid_size = (n + block_size - 1) / block_size;
-    tan_kernel<<<grid_size, block_size>>>((const double*)x, (double*)result, n);
-    return (int)cudaGetLastError();
-}
-
-int eml_launch_sinh(const void* x, void* result, int n, int block_size) {
-    if (block_size <= 0 || block_size > 1024) block_size = 256;
-    int grid_size = (n + block_size - 1) / block_size;
-    sinh_kernel<<<grid_size, block_size>>>((const double*)x, (double*)result, n);
-    return (int)cudaGetLastError();
-}
-
-int eml_launch_cosh(const void* x, void* result, int n, int block_size) {
-    if (block_size <= 0 || block_size > 1024) block_size = 256;
-    int grid_size = (n + block_size - 1) / block_size;
-    cosh_kernel<<<grid_size, block_size>>>((const double*)x, (double*)result, n);
-    return (int)cudaGetLastError();
-}
-
-int eml_launch_tanh(const void* x, void* result, int n, int block_size) {
-    if (block_size <= 0 || block_size > 1024) block_size = 256;
-    int grid_size = (n + block_size - 1) / block_size;
-    tanh_kernel<<<grid_size, block_size>>>((const double*)x, (double*)result, n);
-    return (int)cudaGetLastError();
-}
-
-int eml_launch_sqrt(const void* x, void* result, int n, int block_size) {
-    if (block_size <= 0 || block_size > 1024) block_size = 256;
-    int grid_size = (n + block_size - 1) / block_size;
-    sqrt_kernel<<<grid_size, block_size>>>((const double*)x, (double*)result, n);
-    return (int)cudaGetLastError();
-}
-
-int eml_launch_eml(const void* x, const void* y, void* result, int n, int block_size) {
-    if (block_size <= 0 || block_size > 1024) block_size = 256;
-    int grid_size = (n + block_size - 1) / block_size;
-    eml_kernel<<<grid_size, block_size>>>((const double*)x, (const double*)y, (double*)result, n);
-    return (int)cudaGetLastError();
+int eml_memset_stream(void* ptr, int value, long long size, long long stream) {
+    return (int)cudaMemsetAsync(ptr, value, (size_t)size, (cudaStream_t)stream);
 }
 
 // ---------- Pinned Memory ----------
@@ -198,77 +122,325 @@ int eml_sync_stream(long long stream) {
     return (int)cudaStreamSynchronize((cudaStream_t)stream);
 }
 
-// Streamed kernel launchers
-static int launch_exp_streamed(const void* x, void* result, int n, int block_size, cudaStream_t stream) {
+// ---------- Helper Template Launchers ----------
+
+template<typename T, typename KernelFunc>
+static inline int launch_unary_stream(const void* x, void* result, int n, int block_size, cudaStream_t stream, KernelFunc kernel) {
+    if (n <= 0) return 0;
     if (block_size <= 0 || block_size > 1024) block_size = 256;
     int grid_size = (n + block_size - 1) / block_size;
-    exp_kernel<<<grid_size, block_size, 0, stream>>>((const double*)x, (double*)result, n);
+    kernel<<<grid_size, block_size, 0, stream>>>((const T*)x, (T*)result, n);
     return (int)cudaGetLastError();
+}
+
+template<typename T, typename KernelFunc>
+static inline int launch_binary_stream(const void* x, const void* y, void* result, int n, int block_size, cudaStream_t stream, KernelFunc kernel) {
+    if (n <= 0) return 0;
+    if (block_size <= 0 || block_size > 1024) block_size = 256;
+    int grid_size = (n + block_size - 1) / block_size;
+    kernel<<<grid_size, block_size, 0, stream>>>((const T*)x, (const T*)y, (T*)result, n);
+    return (int)cudaGetLastError();
+}
+
+template<typename T, typename KernelFunc>
+static inline int launch_dot_stream(const void* a, const void* b, void* result, int n, int block_size, cudaStream_t stream, KernelFunc kernel) {
+    if (n <= 0) return 0;
+    if (block_size <= 0 || block_size > 1024) block_size = 256;
+    int grid_size = (n + block_size - 1) / block_size;
+    if (grid_size > 256) grid_size = 256;
+    if (grid_size == 0) grid_size = 1;
+
+    cudaError_t err = cudaMemsetAsync(result, 0, sizeof(T), stream);
+    if (err != cudaSuccess) return (int)err;
+
+    kernel<<<grid_size, block_size, 0, stream>>>((const T*)a, (const T*)b, (T*)result, n);
+    return (int)cudaGetLastError();
+}
+
+// ============================================================================
+// Float64 Kernel Launchers
+// ============================================================================
+
+int eml_launch_exp(const void* x, void* result, int n, int block_size) {
+    return eml_launch_exp_stream(x, result, n, block_size, 0);
+}
+int eml_launch_log(const void* x, void* result, int n, int block_size) {
+    return eml_launch_log_stream(x, result, n, block_size, 0);
+}
+int eml_launch_sin(const void* x, void* result, int n, int block_size) {
+    return eml_launch_sin_stream(x, result, n, block_size, 0);
+}
+int eml_launch_cos(const void* x, void* result, int n, int block_size) {
+    return eml_launch_cos_stream(x, result, n, block_size, 0);
+}
+int eml_launch_tan(const void* x, void* result, int n, int block_size) {
+    return eml_launch_tan_stream(x, result, n, block_size, 0);
+}
+int eml_launch_sinh(const void* x, void* result, int n, int block_size) {
+    return eml_launch_sinh_stream(x, result, n, block_size, 0);
+}
+int eml_launch_cosh(const void* x, void* result, int n, int block_size) {
+    return eml_launch_cosh_stream(x, result, n, block_size, 0);
+}
+int eml_launch_tanh(const void* x, void* result, int n, int block_size) {
+    return eml_launch_tanh_stream(x, result, n, block_size, 0);
+}
+int eml_launch_sqrt(const void* x, void* result, int n, int block_size) {
+    return eml_launch_sqrt_stream(x, result, n, block_size, 0);
+}
+int eml_launch_eml(const void* x, const void* y, void* result, int n, int block_size) {
+    return eml_launch_eml_stream(x, y, result, n, block_size, 0);
+}
+int eml_launch_dot(const void* a, const void* b, void* result, int n, int block_size) {
+    return eml_launch_dot_stream(a, b, result, n, block_size, 0);
 }
 
 int eml_launch_exp_stream(const void* x, void* result, int n, int block_size, long long stream) {
-    return launch_exp_streamed(x, result, n, block_size, (cudaStream_t)stream);
+    return launch_unary_stream<double>(x, result, n, block_size, (cudaStream_t)stream, exp_kernel);
 }
-
 int eml_launch_log_stream(const void* x, void* result, int n, int block_size, long long stream) {
-    if (block_size <= 0 || block_size > 1024) block_size = 256;
-    int grid_size = (n + block_size - 1) / block_size;
-    log_kernel<<<grid_size, block_size, 0, (cudaStream_t)stream>>>((const double*)x, (double*)result, n);
-    return (int)cudaGetLastError();
+    return launch_unary_stream<double>(x, result, n, block_size, (cudaStream_t)stream, log_kernel);
 }
-
 int eml_launch_sin_stream(const void* x, void* result, int n, int block_size, long long stream) {
-    if (block_size <= 0 || block_size > 1024) block_size = 256;
-    int grid_size = (n + block_size - 1) / block_size;
-    sin_kernel<<<grid_size, block_size, 0, (cudaStream_t)stream>>>((const double*)x, (double*)result, n);
-    return (int)cudaGetLastError();
+    return launch_unary_stream<double>(x, result, n, block_size, (cudaStream_t)stream, sin_kernel);
 }
-
 int eml_launch_cos_stream(const void* x, void* result, int n, int block_size, long long stream) {
-    if (block_size <= 0 || block_size > 1024) block_size = 256;
-    int grid_size = (n + block_size - 1) / block_size;
-    cos_kernel<<<grid_size, block_size, 0, (cudaStream_t)stream>>>((const double*)x, (double*)result, n);
-    return (int)cudaGetLastError();
+    return launch_unary_stream<double>(x, result, n, block_size, (cudaStream_t)stream, cos_kernel);
 }
-
 int eml_launch_tan_stream(const void* x, void* result, int n, int block_size, long long stream) {
-    if (block_size <= 0 || block_size > 1024) block_size = 256;
-    int grid_size = (n + block_size - 1) / block_size;
-    tan_kernel<<<grid_size, block_size, 0, (cudaStream_t)stream>>>((const double*)x, (double*)result, n);
-    return (int)cudaGetLastError();
+    return launch_unary_stream<double>(x, result, n, block_size, (cudaStream_t)stream, tan_kernel);
 }
-
 int eml_launch_sinh_stream(const void* x, void* result, int n, int block_size, long long stream) {
-    if (block_size <= 0 || block_size > 1024) block_size = 256;
-    int grid_size = (n + block_size - 1) / block_size;
-    sinh_kernel<<<grid_size, block_size, 0, (cudaStream_t)stream>>>((const double*)x, (double*)result, n);
-    return (int)cudaGetLastError();
+    return launch_unary_stream<double>(x, result, n, block_size, (cudaStream_t)stream, sinh_kernel);
 }
-
 int eml_launch_cosh_stream(const void* x, void* result, int n, int block_size, long long stream) {
-    if (block_size <= 0 || block_size > 1024) block_size = 256;
-    int grid_size = (n + block_size - 1) / block_size;
-    cosh_kernel<<<grid_size, block_size, 0, (cudaStream_t)stream>>>((const double*)x, (double*)result, n);
-    return (int)cudaGetLastError();
+    return launch_unary_stream<double>(x, result, n, block_size, (cudaStream_t)stream, cosh_kernel);
 }
-
 int eml_launch_tanh_stream(const void* x, void* result, int n, int block_size, long long stream) {
-    if (block_size <= 0 || block_size > 1024) block_size = 256;
-    int grid_size = (n + block_size - 1) / block_size;
-    tanh_kernel<<<grid_size, block_size, 0, (cudaStream_t)stream>>>((const double*)x, (double*)result, n);
-    return (int)cudaGetLastError();
+    return launch_unary_stream<double>(x, result, n, block_size, (cudaStream_t)stream, tanh_kernel);
 }
-
 int eml_launch_sqrt_stream(const void* x, void* result, int n, int block_size, long long stream) {
-    if (block_size <= 0 || block_size > 1024) block_size = 256;
-    int grid_size = (n + block_size - 1) / block_size;
-    sqrt_kernel<<<grid_size, block_size, 0, (cudaStream_t)stream>>>((const double*)x, (double*)result, n);
-    return (int)cudaGetLastError();
+    return launch_unary_stream<double>(x, result, n, block_size, (cudaStream_t)stream, sqrt_kernel);
+}
+int eml_launch_eml_stream(const void* x, const void* y, void* result, int n, int block_size, long long stream) {
+    return launch_binary_stream<double>(x, y, result, n, block_size, (cudaStream_t)stream, eml_kernel);
+}
+int eml_launch_dot_stream(const void* a, const void* b, void* result, int n, int block_size, long long stream) {
+    return launch_dot_stream<double>(a, b, result, n, block_size, (cudaStream_t)stream, dot_kernel_f64);
 }
 
-int eml_launch_eml_stream(const void* x, const void* y, void* result, int n, int block_size, long long stream) {
-    if (block_size <= 0 || block_size > 1024) block_size = 256;
-    int grid_size = (n + block_size - 1) / block_size;
-    eml_kernel<<<grid_size, block_size, 0, (cudaStream_t)stream>>>((const double*)x, (const double*)y, (double*)result, n);
-    return (int)cudaGetLastError();
+// ============================================================================
+// Float32 Kernel Launchers
+// ============================================================================
+
+int eml_launch_exp_f32(const void* x, void* result, int n, int block_size) {
+    return eml_launch_exp_stream_f32(x, result, n, block_size, 0);
+}
+int eml_launch_log_f32(const void* x, void* result, int n, int block_size) {
+    return eml_launch_log_stream_f32(x, result, n, block_size, 0);
+}
+int eml_launch_sin_f32(const void* x, void* result, int n, int block_size) {
+    return eml_launch_sin_stream_f32(x, result, n, block_size, 0);
+}
+int eml_launch_cos_f32(const void* x, void* result, int n, int block_size) {
+    return eml_launch_cos_stream_f32(x, result, n, block_size, 0);
+}
+int eml_launch_tan_f32(const void* x, void* result, int n, int block_size) {
+    return eml_launch_tan_stream_f32(x, result, n, block_size, 0);
+}
+int eml_launch_sinh_f32(const void* x, void* result, int n, int block_size) {
+    return eml_launch_sinh_stream_f32(x, result, n, block_size, 0);
+}
+int eml_launch_cosh_f32(const void* x, void* result, int n, int block_size) {
+    return eml_launch_cosh_stream_f32(x, result, n, block_size, 0);
+}
+int eml_launch_tanh_f32(const void* x, void* result, int n, int block_size) {
+    return eml_launch_tanh_stream_f32(x, result, n, block_size, 0);
+}
+int eml_launch_sqrt_f32(const void* x, void* result, int n, int block_size) {
+    return eml_launch_sqrt_stream_f32(x, result, n, block_size, 0);
+}
+int eml_launch_eml_f32(const void* x, const void* y, void* result, int n, int block_size) {
+    return eml_launch_eml_stream_f32(x, y, result, n, block_size, 0);
+}
+int eml_launch_dot_f32(const void* a, const void* b, void* result, int n, int block_size) {
+    return eml_launch_dot_stream_f32(a, b, result, n, block_size, 0);
+}
+
+int eml_launch_exp_stream_f32(const void* x, void* result, int n, int block_size, long long stream) {
+    return launch_unary_stream<float>(x, result, n, block_size, (cudaStream_t)stream, exp_kernel_f32);
+}
+int eml_launch_log_stream_f32(const void* x, void* result, int n, int block_size, long long stream) {
+    return launch_unary_stream<float>(x, result, n, block_size, (cudaStream_t)stream, log_kernel_f32);
+}
+int eml_launch_sin_stream_f32(const void* x, void* result, int n, int block_size, long long stream) {
+    return launch_unary_stream<float>(x, result, n, block_size, (cudaStream_t)stream, sin_kernel_f32);
+}
+int eml_launch_cos_stream_f32(const void* x, void* result, int n, int block_size, long long stream) {
+    return launch_unary_stream<float>(x, result, n, block_size, (cudaStream_t)stream, cos_kernel_f32);
+}
+int eml_launch_tan_stream_f32(const void* x, void* result, int n, int block_size, long long stream) {
+    return launch_unary_stream<float>(x, result, n, block_size, (cudaStream_t)stream, tan_kernel_f32);
+}
+int eml_launch_sinh_stream_f32(const void* x, void* result, int n, int block_size, long long stream) {
+    return launch_unary_stream<float>(x, result, n, block_size, (cudaStream_t)stream, sinh_kernel_f32);
+}
+int eml_launch_cosh_stream_f32(const void* x, void* result, int n, int block_size, long long stream) {
+    return launch_unary_stream<float>(x, result, n, block_size, (cudaStream_t)stream, cosh_kernel_f32);
+}
+int eml_launch_tanh_stream_f32(const void* x, void* result, int n, int block_size, long long stream) {
+    return launch_unary_stream<float>(x, result, n, block_size, (cudaStream_t)stream, tanh_kernel_f32);
+}
+int eml_launch_sqrt_stream_f32(const void* x, void* result, int n, int block_size, long long stream) {
+    return launch_unary_stream<float>(x, result, n, block_size, (cudaStream_t)stream, sqrt_kernel_f32);
+}
+int eml_launch_eml_stream_f32(const void* x, const void* y, void* result, int n, int block_size, long long stream) {
+    return launch_binary_stream<float>(x, y, result, n, block_size, (cudaStream_t)stream, eml_kernel_f32);
+}
+int eml_launch_dot_stream_f32(const void* a, const void* b, void* result, int n, int block_size, long long stream) {
+    return launch_dot_stream<float>(a, b, result, n, block_size, (cudaStream_t)stream, dot_kernel_f32);
+}
+
+// ============================================================================
+// Complex64 Kernel Launchers
+// ============================================================================
+
+int eml_launch_exp_c64(const void* x, void* result, int n, int block_size) {
+    return eml_launch_exp_stream_c64(x, result, n, block_size, 0);
+}
+int eml_launch_log_c64(const void* x, void* result, int n, int block_size) {
+    return eml_launch_log_stream_c64(x, result, n, block_size, 0);
+}
+int eml_launch_sin_c64(const void* x, void* result, int n, int block_size) {
+    return eml_launch_sin_stream_c64(x, result, n, block_size, 0);
+}
+int eml_launch_cos_c64(const void* x, void* result, int n, int block_size) {
+    return eml_launch_cos_stream_c64(x, result, n, block_size, 0);
+}
+int eml_launch_tan_c64(const void* x, void* result, int n, int block_size) {
+    return eml_launch_tan_stream_c64(x, result, n, block_size, 0);
+}
+int eml_launch_sinh_c64(const void* x, void* result, int n, int block_size) {
+    return eml_launch_sinh_stream_c64(x, result, n, block_size, 0);
+}
+int eml_launch_cosh_c64(const void* x, void* result, int n, int block_size) {
+    return eml_launch_cosh_stream_c64(x, result, n, block_size, 0);
+}
+int eml_launch_tanh_c64(const void* x, void* result, int n, int block_size) {
+    return eml_launch_tanh_stream_c64(x, result, n, block_size, 0);
+}
+int eml_launch_sqrt_c64(const void* x, void* result, int n, int block_size) {
+    return eml_launch_sqrt_stream_c64(x, result, n, block_size, 0);
+}
+int eml_launch_eml_c64(const void* x, const void* y, void* result, int n, int block_size) {
+    return eml_launch_eml_stream_c64(x, y, result, n, block_size, 0);
+}
+int eml_launch_dot_c64(const void* a, const void* b, void* result, int n, int block_size) {
+    return eml_launch_dot_stream_c64(a, b, result, n, block_size, 0);
+}
+
+int eml_launch_exp_stream_c64(const void* x, void* result, int n, int block_size, long long stream) {
+    return launch_unary_stream<cuFloatComplex>(x, result, n, block_size, (cudaStream_t)stream, exp_kernel_c64);
+}
+int eml_launch_log_stream_c64(const void* x, void* result, int n, int block_size, long long stream) {
+    return launch_unary_stream<cuFloatComplex>(x, result, n, block_size, (cudaStream_t)stream, log_kernel_c64);
+}
+int eml_launch_sin_stream_c64(const void* x, void* result, int n, int block_size, long long stream) {
+    return launch_unary_stream<cuFloatComplex>(x, result, n, block_size, (cudaStream_t)stream, sin_kernel_c64);
+}
+int eml_launch_cos_stream_c64(const void* x, void* result, int n, int block_size, long long stream) {
+    return launch_unary_stream<cuFloatComplex>(x, result, n, block_size, (cudaStream_t)stream, cos_kernel_c64);
+}
+int eml_launch_tan_stream_c64(const void* x, void* result, int n, int block_size, long long stream) {
+    return launch_unary_stream<cuFloatComplex>(x, result, n, block_size, (cudaStream_t)stream, tan_kernel_c64);
+}
+int eml_launch_sinh_stream_c64(const void* x, void* result, int n, int block_size, long long stream) {
+    return launch_unary_stream<cuFloatComplex>(x, result, n, block_size, (cudaStream_t)stream, sinh_kernel_c64);
+}
+int eml_launch_cosh_stream_c64(const void* x, void* result, int n, int block_size, long long stream) {
+    return launch_unary_stream<cuFloatComplex>(x, result, n, block_size, (cudaStream_t)stream, cosh_kernel_c64);
+}
+int eml_launch_tanh_stream_c64(const void* x, void* result, int n, int block_size, long long stream) {
+    return launch_unary_stream<cuFloatComplex>(x, result, n, block_size, (cudaStream_t)stream, tanh_kernel_c64);
+}
+int eml_launch_sqrt_stream_c64(const void* x, void* result, int n, int block_size, long long stream) {
+    return launch_unary_stream<cuFloatComplex>(x, result, n, block_size, (cudaStream_t)stream, sqrt_kernel_c64);
+}
+int eml_launch_eml_stream_c64(const void* x, const void* y, void* result, int n, int block_size, long long stream) {
+    return launch_binary_stream<cuFloatComplex>(x, y, result, n, block_size, (cudaStream_t)stream, eml_kernel_c64);
+}
+int eml_launch_dot_stream_c64(const void* a, const void* b, void* result, int n, int block_size, long long stream) {
+    return launch_dot_stream<cuFloatComplex>(a, b, result, n, block_size, (cudaStream_t)stream, dot_kernel_c64);
+}
+
+// ============================================================================
+// Complex128 Kernel Launchers
+// ============================================================================
+
+int eml_launch_exp_c128(const void* x, void* result, int n, int block_size) {
+    return eml_launch_exp_stream_c128(x, result, n, block_size, 0);
+}
+int eml_launch_log_c128(const void* x, void* result, int n, int block_size) {
+    return eml_launch_log_stream_c128(x, result, n, block_size, 0);
+}
+int eml_launch_sin_c128(const void* x, void* result, int n, int block_size) {
+    return eml_launch_sin_stream_c128(x, result, n, block_size, 0);
+}
+int eml_launch_cos_c128(const void* x, void* result, int n, int block_size) {
+    return eml_launch_cos_stream_c128(x, result, n, block_size, 0);
+}
+int eml_launch_tan_c128(const void* x, void* result, int n, int block_size) {
+    return eml_launch_tan_stream_c128(x, result, n, block_size, 0);
+}
+int eml_launch_sinh_c128(const void* x, void* result, int n, int block_size) {
+    return eml_launch_sinh_stream_c128(x, result, n, block_size, 0);
+}
+int eml_launch_cosh_c128(const void* x, void* result, int n, int block_size) {
+    return eml_launch_cosh_stream_c128(x, result, n, block_size, 0);
+}
+int eml_launch_tanh_c128(const void* x, void* result, int n, int block_size) {
+    return eml_launch_tanh_stream_c128(x, result, n, block_size, 0);
+}
+int eml_launch_sqrt_c128(const void* x, void* result, int n, int block_size) {
+    return eml_launch_sqrt_stream_c128(x, result, n, block_size, 0);
+}
+int eml_launch_eml_c128(const void* x, const void* y, void* result, int n, int block_size) {
+    return eml_launch_eml_stream_c128(x, y, result, n, block_size, 0);
+}
+int eml_launch_dot_c128(const void* a, const void* b, void* result, int n, int block_size) {
+    return eml_launch_dot_stream_c128(a, b, result, n, block_size, 0);
+}
+
+int eml_launch_exp_stream_c128(const void* x, void* result, int n, int block_size, long long stream) {
+    return launch_unary_stream<cuDoubleComplex>(x, result, n, block_size, (cudaStream_t)stream, exp_kernel_c128);
+}
+int eml_launch_log_stream_c128(const void* x, void* result, int n, int block_size, long long stream) {
+    return launch_unary_stream<cuDoubleComplex>(x, result, n, block_size, (cudaStream_t)stream, log_kernel_c128);
+}
+int eml_launch_sin_stream_c128(const void* x, void* result, int n, int block_size, long long stream) {
+    return launch_unary_stream<cuDoubleComplex>(x, result, n, block_size, (cudaStream_t)stream, sin_kernel_c128);
+}
+int eml_launch_cos_stream_c128(const void* x, void* result, int n, int block_size, long long stream) {
+    return launch_unary_stream<cuDoubleComplex>(x, result, n, block_size, (cudaStream_t)stream, cos_kernel_c128);
+}
+int eml_launch_tan_stream_c128(const void* x, void* result, int n, int block_size, long long stream) {
+    return launch_unary_stream<cuDoubleComplex>(x, result, n, block_size, (cudaStream_t)stream, tan_kernel_c128);
+}
+int eml_launch_sinh_stream_c128(const void* x, void* result, int n, int block_size, long long stream) {
+    return launch_unary_stream<cuDoubleComplex>(x, result, n, block_size, (cudaStream_t)stream, sinh_kernel_c128);
+}
+int eml_launch_cosh_stream_c128(const void* x, void* result, int n, int block_size, long long stream) {
+    return launch_unary_stream<cuDoubleComplex>(x, result, n, block_size, (cudaStream_t)stream, cosh_kernel_c128);
+}
+int eml_launch_tanh_stream_c128(const void* x, void* result, int n, int block_size, long long stream) {
+    return launch_unary_stream<cuDoubleComplex>(x, result, n, block_size, (cudaStream_t)stream, tanh_kernel_c128);
+}
+int eml_launch_sqrt_stream_c128(const void* x, void* result, int n, int block_size, long long stream) {
+    return launch_unary_stream<cuDoubleComplex>(x, result, n, block_size, (cudaStream_t)stream, sqrt_kernel_c128);
+}
+int eml_launch_eml_stream_c128(const void* x, const void* y, void* result, int n, int block_size, long long stream) {
+    return launch_binary_stream<cuDoubleComplex>(x, y, result, n, block_size, (cudaStream_t)stream, eml_kernel_c128);
+}
+int eml_launch_dot_stream_c128(const void* a, const void* b, void* result, int n, int block_size, long long stream) {
+    return launch_dot_stream<cuDoubleComplex>(a, b, result, n, block_size, (cudaStream_t)stream, dot_kernel_c128);
 }

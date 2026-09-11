@@ -87,8 +87,6 @@ func TestCoreSIMDExhaustive(t *testing.T) {
 	})
 }
 
-
-
 func TestExpSIMDExhaustive(t *testing.T) {
 	large := make([]float64, 10000)
 	for i := range large {

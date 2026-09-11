@@ -6,13 +6,13 @@ import (
 )
 
 var (
-	isNaN   = eml.IsNaN
-	isInf   = eml.IsInf
-	inf     = eml.Inf
-	nan     = eml.NaN
+	isNaN     = eml.IsNaN
+	isInf     = eml.IsInf
+	inf       = eml.Inf
+	nan       = eml.NaN
 	nativeExp = eml.Exp
 	nativeLog = eml.Log
-	nativeAbs  = eml.Abs
+	nativeAbs = eml.Abs
 )
 
 // Overflow threshold for exp-based hyperbolic functions:

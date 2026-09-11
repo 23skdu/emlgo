@@ -134,19 +134,19 @@ func closeTo(a, b, tol float64) bool {
 }
 
 func BenchmarkEml(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		Eml(1.5, 2.5)
 	}
 }
 
 func BenchmarkOne(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		One(1.5)
 	}
 }
 
 func BenchmarkOneEml(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		OneEml(1.5)
 	}
 }

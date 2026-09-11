@@ -3,28 +3,31 @@
 
 NVCC := nvcc
 TARGET := libeml_capi.so
-SRCS := eml_capi.cu
-OBJS := eml_capi.o
+SRCS := eml_cuda.cu eml_capi.cu
+OBJS := eml_cuda.o eml_capi.o
 
-# CUDA architecture: sm_70 = Volta, sm_75 = Turing, sm_80 = Ampere, sm_90 = Hopper
-# Adjust ARCH based on your GPU
-ARCH ?= sm_70
+# CUDA architecture: sm_70 = Volta, sm_75 = Turing, sm_80 = Ampere, sm_89 = Ada Lovelace, sm_90 = Hopper
+# Defaults to sm_89 for RTX 40-series; override with ARCH=sm_XX as needed.
+ARCH ?= sm_89
 
 CFLAGS := -O3 -arch=$(ARCH) -Xcompiler -fPIC
 LDFLAGS := -shared -lcuda -lcudart
 
-.PHONY: all clean
+.PHONY: all clean install example
 
 all: $(TARGET)
 
-$(OBJS): $(SRCS) eml_cuda.h eml_capi.h
-	$(NVCC) $(CFLAGS) -c $(SRCS) -o $(OBJS)
+eml_cuda.o: eml_cuda.cu eml_cuda.h
+	$(NVCC) $(CFLAGS) -c eml_cuda.cu -o eml_cuda.o
+
+eml_capi.o: eml_capi.cu eml_capi.h eml_cuda.h
+	$(NVCC) $(CFLAGS) -c eml_capi.cu -o eml_capi.o
 
 $(TARGET): $(OBJS)
 	$(NVCC) $(OBJS) $(LDFLAGS) -o $(TARGET)
 
 clean:
-	rm -f $(OBJS) $(TARGET)
+	rm -f $(OBJS) $(TARGET) eml_cuda_example
 
 install: $(TARGET)
 	@echo "To use: LD_LIBRARY_PATH=$(CURDIR) go build -tags cuda ./..."

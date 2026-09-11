@@ -77,4 +77,3 @@ func EvalVars(n Node, vars map[string]float64) float64 {
 	}
 	return 0
 }
-

@@ -15,9 +15,9 @@ import (
 )
 
 var (
-	verbose      bool
-	failedOnly   bool
-	typeFilter   string
+	verbose    bool
+	failedOnly bool
+	typeFilter string
 )
 
 func init() {
@@ -27,10 +27,10 @@ func init() {
 }
 
 type ValidationResult struct {
-	Type      string
-	Function  string
-	Passed    bool
-	Message   string
+	Type     string
+	Function string
+	Passed   bool
+	Message  string
 }
 
 var allResults []ValidationResult
@@ -885,7 +885,7 @@ func complexLog(r, i float64) complex128 {
 			return complex(math.Ln10*log10absR, arg)
 		}
 	}
-return complex(logMag, arg)
+	return complex(logMag, arg)
 }
 
 func complexSqrt(r, i float64) complex128 {

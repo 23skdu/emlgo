@@ -113,14 +113,14 @@ func BenchmarkExpSIMDF32VsF64(b *testing.B) {
 
 	b.Run("ExpF32", func(b *testing.B) {
 		b.ReportAllocs()
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			_ = ExpSIMDF32(f32in)
 		}
 	})
 
 	b.Run("ExpF64", func(b *testing.B) {
 		b.ReportAllocs()
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			_ = ExpSIMD(f64in)
 		}
 	})

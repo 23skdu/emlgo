@@ -1,5 +1,5 @@
-//go:build amd64
-// +build amd64
+//go:build amd64 && !purego
+// +build amd64,!purego
 
 package eml
 
@@ -344,9 +344,9 @@ func dispatchAddSIMD(a, b, result []float64) { amd64AddSIMD(a, b, result) }
 func dispatchSubSIMD(a, b, result []float64) { amd64SubSIMD(a, b, result) }
 func dispatchMulSIMD(a, b, result []float64) { amd64MulSIMD(a, b, result) }
 func dispatchDivSIMD(a, b, result []float64) { amd64DivSIMD(a, b, result) }
-func dispatchAbsSIMD(x, result []float64) { amd64AbsSIMD(x, result) }
-func dispatchNegSIMD(x, result []float64) { amd64NegSIMD(x, result) }
-func dispatchInvSIMD(x, result []float64) { amd64InvSIMD(x, result) }
+func dispatchAbsSIMD(x, result []float64)    { amd64AbsSIMD(x, result) }
+func dispatchNegSIMD(x, result []float64)    { amd64NegSIMD(x, result) }
+func dispatchInvSIMD(x, result []float64)    { amd64InvSIMD(x, result) }
 
 func dispatchAddScalarSIMD(a []float64, b float64, result []float64) {
 	amd64AddScalarSIMD(a, b, result)

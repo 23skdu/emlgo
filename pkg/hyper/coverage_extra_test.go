@@ -8,7 +8,7 @@ func TestLargeHyperBatchForCoverage(t *testing.T) {
 	n := 1000
 	data := make([]float64, n)
 	for i := range data {
-		data[i] = float64(i + 1) / 1000.0
+		data[i] = float64(i+1) / 1000.0
 	}
 
 	t.Run("SinhBatch_Large", func(t *testing.T) {

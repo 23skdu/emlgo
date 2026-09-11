@@ -125,9 +125,12 @@ func MinBranchless(a, b float64) float64 {
 		return a
 	}
 	diff := a - b
-	mask := -int64(math.Float64bits(diff) >> 63)
+	var mask uint64
+	if (math.Float64bits(diff) >> 63) != 0 {
+		mask = ^uint64(0)
+	}
 	return math.Float64frombits(
-		(math.Float64bits(a) & uint64(mask)) | (math.Float64bits(b) & ^uint64(mask)),
+		(math.Float64bits(a) & mask) | (math.Float64bits(b) & ^mask),
 	)
 }
 
@@ -146,31 +149,33 @@ func MaxBranchless(a, b float64) float64 {
 		return a
 	}
 	diff := a - b
-	mask := -int64(math.Float64bits(diff) >> 63)
+	var mask uint64
+	if (math.Float64bits(diff) >> 63) != 0 {
+		mask = ^uint64(0)
+	}
 	return math.Float64frombits(
-		(math.Float64bits(a) & ^uint64(mask)) | (math.Float64bits(b) & uint64(mask)),
+		(math.Float64bits(a) & ^mask) | (math.Float64bits(b) & mask),
 	)
 }
 
 // SelectBranchless returns ifTrue if cond is true, else ifFalse, without branching.
 func SelectBranchless(cond bool, ifTrue, ifFalse float64) float64 {
-	mask := -int64(boolToInt(cond))
+	var mask uint64
+	if cond {
+		mask = ^uint64(0)
+	}
 	return math.Float64frombits(
-		(math.Float64bits(ifTrue) & uint64(mask)) | (math.Float64bits(ifFalse) & ^uint64(mask)),
+		(math.Float64bits(ifTrue) & mask) | (math.Float64bits(ifFalse) & ^mask),
 	)
 }
 
 // SelectNaNBranchless returns alt if isNaN is true, else val, without branching.
 func SelectNaNBranchless(isNaN bool, val, alt float64) float64 {
-	mask := -int64(boolToInt(isNaN))
-	return math.Float64frombits(
-		(math.Float64bits(val) & ^uint64(mask)) | (math.Float64bits(alt) & uint64(mask)),
-	)
-}
-
-func boolToInt(b bool) uint64 {
-	if b {
-		return 1
+	var mask uint64
+	if isNaN {
+		mask = ^uint64(0)
 	}
-	return 0
+	return math.Float64frombits(
+		(math.Float64bits(val) & ^mask) | (math.Float64bits(alt) & mask),
+	)
 }

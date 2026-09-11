@@ -43,7 +43,6 @@ func TestSIMD(t *testing.T) {
 	}
 }
 
-
 func TestExpSIMD(t *testing.T) {
 	x := []float64{0, 0.5, 1, 1.5, 2, math.E, 10}
 	result := ExpSIMD(x)
@@ -132,7 +131,6 @@ func TestSIMDEmptySlice(t *testing.T) {
 	}
 }
 
-
 func TestSIMDLargeSlice(t *testing.T) {
 	n := 10000
 	x := make([]float64, n)
@@ -155,7 +153,6 @@ func TestSIMDLargeSlice(t *testing.T) {
 	}
 }
 
-
 func TestSIMDNaNHandling(t *testing.T) {
 	x := []float64{math.NaN(), 1, 2}
 	y := []float64{1, math.NaN(), 2}
@@ -170,7 +167,6 @@ func TestSIMDNaNHandling(t *testing.T) {
 		t.Error("Expected NaN for NaN y")
 	}
 }
-
 
 func TestSIMDInfHandling(t *testing.T) {
 	x := []float64{math.Inf(1), math.Inf(-1), 0}
@@ -190,7 +186,6 @@ func TestSIMDInfHandling(t *testing.T) {
 	}
 }
 
-
 func TestBatch(t *testing.T) {
 	x := []float64{1, 2, 3}
 	y := []float64{2, 3, 4}
@@ -205,7 +200,6 @@ func TestBatch(t *testing.T) {
 	}
 }
 
-
 func TestBatchLengthMismatch(t *testing.T) {
 	x := []float64{1, 2, 3}
 	y := []float64{2, 3}
@@ -218,7 +212,6 @@ func TestBatchLengthMismatch(t *testing.T) {
 		t.Error("Expected ErrLengthMismatch")
 	}
 }
-
 
 func BenchmarkSIMD(b *testing.B) {
 	sizes := []int{64, 256, 1024, 4096}
@@ -234,14 +227,12 @@ func BenchmarkSIMD(b *testing.B) {
 				y[i] = float64(i+1) * 0.1
 			}
 
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
+			for b.Loop() {
 				SIMD(x, y, result)
 			}
 		})
 	}
 }
-
 
 func BenchmarkExpSIMD(b *testing.B) {
 	n := 4096
@@ -250,8 +241,7 @@ func BenchmarkExpSIMD(b *testing.B) {
 		x[i] = float64(i) * 0.1
 	}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		ExpSIMD(x)
 	}
 }
@@ -263,8 +253,7 @@ func BenchmarkLogSIMD(b *testing.B) {
 		x[i] = float64(i+1) * 0.1
 	}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		LogSIMD(x)
 	}
 }
@@ -278,8 +267,7 @@ func BenchmarkAddSIMD(b *testing.B) {
 		c[i] = float64(n - i)
 	}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		AddSIMD(a, c)
 	}
 }
@@ -293,8 +281,7 @@ func BenchmarkMulSIMD(b *testing.B) {
 		c[i] = float64(i + 2)
 	}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		MulSIMD(a, c)
 	}
 }

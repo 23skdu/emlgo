@@ -117,14 +117,14 @@ func BenchmarkPipelineVsManual(b *testing.B) {
 
 	b.Run("Pipeline", func(b *testing.B) {
 		b.ReportAllocs()
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			_ = p.Run(input)
 		}
 	})
 
 	b.Run("Manual", func(b *testing.B) {
 		b.ReportAllocs()
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			tmp1 := make([]float64, n)
 			tmp2 := make([]float64, n)
 			for j, v := range input {

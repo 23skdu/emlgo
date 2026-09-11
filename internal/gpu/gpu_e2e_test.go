@@ -4,6 +4,7 @@ package gpu
 
 import (
 	"math"
+	"math/cmplx"
 	"testing"
 )
 
@@ -318,5 +319,150 @@ func TestE2EGPUMultipleDevices(t *testing.T) {
 		if len(result) != 3 {
 			t.Errorf("device %d: expected 3 results, got %d", i, len(result))
 		}
+	}
+}
+
+func TestE2EGPUFloat32(t *testing.T) {
+	d := requireGPU(t)
+
+	f32Data := []float32{0.0, 0.5, 1.0, 2.0, 3.0, -1.0}
+	res, err := d.ExpBatchF32(f32Data)
+	if err != nil {
+		t.Fatalf("ExpBatchF32 failed: %v", err)
+	}
+	for i, v := range res {
+		expected := float32(math.Exp(float64(f32Data[i])))
+		if math.Abs(float64(v-expected)) > 1e-5 {
+			t.Errorf("ExpBatchF32[%d] = %v, expected %v", i, v, expected)
+		}
+	}
+
+	dst := make([]float32, len(f32Data))
+	if err := d.ExpBatchToF32(dst, f32Data); err != nil {
+		t.Fatalf("ExpBatchToF32 failed: %v", err)
+	}
+	for i, v := range dst {
+		if v != res[i] {
+			t.Errorf("ExpBatchToF32[%d] = %v, want %v", i, v, res[i])
+		}
+	}
+
+	// Test DotBatchF32
+	a := []float32{1.0, 2.0, 3.0, 4.0}
+	b := []float32{2.0, 0.5, 1.0, 2.0}
+	dot, err := d.DotBatchF32(a, b)
+	if err != nil {
+		t.Fatalf("DotBatchF32 failed: %v", err)
+	}
+	var expectedDot float32 = 1.0*2.0 + 2.0*0.5 + 3.0*1.0 + 4.0*2.0 // 2 + 1 + 3 + 8 = 14
+	if math.Abs(float64(dot-expectedDot)) > 1e-5 {
+		t.Errorf("DotBatchF32 = %v, want %v", dot, expectedDot)
+	}
+
+	// Test Pinned F32
+	pinned, err := AllocatePinnedF32(64)
+	if err != nil {
+		t.Fatalf("AllocatePinnedF32 failed: %v", err)
+	}
+	defer FreePinnedF32(pinned)
+}
+
+func TestE2EGPUComplex64(t *testing.T) {
+	d := requireGPU(t)
+
+	c64Data := []complex64{
+		complex(1.0, 0.0),
+		complex(0.0, 1.0),
+		complex(1.0, 1.0),
+		complex(-0.5, 0.5),
+	}
+
+	res, err := d.ExpBatchC64(c64Data)
+	if err != nil {
+		t.Fatalf("ExpBatchC64 failed: %v", err)
+	}
+	for i, v := range res {
+		expected := complex64(cmplx.Exp(complex128(c64Data[i])))
+		diff := cmplx.Abs(complex128(v - expected))
+		if diff > 1e-5 {
+			t.Errorf("ExpBatchC64[%d] = %v, expected %v (diff: %v)", i, v, expected, diff)
+		}
+	}
+
+	// Test DotBatchC64 (Hermitian inner product: sum(a_i * conj(b_i)))
+	a := []complex64{complex(1, 2), complex(3, 4)}
+	b := []complex64{complex(2, -1), complex(1, 1)}
+	// a[0] * conj(b[0]) = (1+2i)*(2+1i) = 2 + i + 4i - 2 = 5i
+	// a[1] * conj(b[1]) = (3+4i)*(1-1i) = 3 - 3i + 4i + 4 = 7 + i
+	// sum = 7 + 6i
+	dot, err := d.DotBatchC64(a, b)
+	if err != nil {
+		t.Fatalf("DotBatchC64 failed: %v", err)
+	}
+	expectedDot := complex64(complex(7, 6))
+	if cmplx.Abs(complex128(dot-expectedDot)) > 1e-5 {
+		t.Errorf("DotBatchC64 = %v, want %v", dot, expectedDot)
+	}
+
+	pinned, err := AllocatePinnedC64(64)
+	if err != nil {
+		t.Fatalf("AllocatePinnedC64 failed: %v", err)
+	}
+	defer FreePinnedC64(pinned)
+}
+
+func TestE2EGPUComplex128(t *testing.T) {
+	d := requireGPU(t)
+
+	c128Data := []complex128{
+		complex(1.0, 0.0),
+		complex(0.0, 1.0),
+		complex(1.0, 1.0),
+		complex(-0.5, 0.5),
+	}
+
+	res, err := d.ExpBatchC128(c128Data)
+	if err != nil {
+		t.Fatalf("ExpBatchC128 failed: %v", err)
+	}
+	for i, v := range res {
+		expected := cmplx.Exp(c128Data[i])
+		diff := cmplx.Abs(v - expected)
+		if diff > 1e-12 {
+			t.Errorf("ExpBatchC128[%d] = %v, expected %v (diff: %v)", i, v, expected, diff)
+		}
+	}
+
+	// Test DotBatchC128
+	a := []complex128{complex(1, 2), complex(3, 4)}
+	b := []complex128{complex(2, -1), complex(1, 1)}
+	dot, err := d.DotBatchC128(a, b)
+	if err != nil {
+		t.Fatalf("DotBatchC128 failed: %v", err)
+	}
+	expectedDot := complex(7, 6)
+	if cmplx.Abs(dot-expectedDot) > 1e-12 {
+		t.Errorf("DotBatchC128 = %v, want %v", dot, expectedDot)
+	}
+
+	pinned, err := AllocatePinnedC128(64)
+	if err != nil {
+		t.Fatalf("AllocatePinnedC128 failed: %v", err)
+	}
+	defer FreePinnedC128(pinned)
+}
+
+func TestE2EGPUDotBatchF64(t *testing.T) {
+	d := requireGPU(t)
+
+	a := []float64{1.0, 2.0, 3.0, 4.0, 5.0}
+	b := []float64{2.0, 3.0, 4.0, 5.0, 6.0}
+	// 2 + 6 + 12 + 20 + 30 = 70
+	dot, err := d.DotBatch(a, b)
+	if err != nil {
+		t.Fatalf("DotBatch failed: %v", err)
+	}
+	if math.Abs(dot-70.0) > 1e-10 {
+		t.Errorf("DotBatch = %v, want 70.0", dot)
 	}
 }

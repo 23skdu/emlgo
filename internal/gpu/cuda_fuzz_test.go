@@ -97,21 +97,3 @@ func FuzzULPDiff(f *testing.F) {
 		_ = ulpDiff(a, b)
 	})
 }
-
-// ulpDiff computes the ULP distance between two float64 values.
-func ulpDiff(a, b float64) uint64 {
-	if a == b {
-		return 0
-	}
-	if math.IsNaN(a) || math.IsNaN(b) {
-		return 0
-	}
-	if math.IsInf(a, 0) || math.IsInf(b, 0) {
-		return 0
-	}
-	bits, targetBits := math.Float64bits(a), math.Float64bits(b)
-	if bits > targetBits {
-		return bits - targetBits
-	}
-	return targetBits - bits
-}

@@ -1,0 +1,10 @@
+{
+  "go.buildFlags": [
+    "-tags=cuda"
+  ],
+  "gopls": {
+    "build.buildFlags": [
+      "-tags=cuda"
+    ]
+  }
+}

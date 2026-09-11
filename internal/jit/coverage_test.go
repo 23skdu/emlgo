@@ -494,9 +494,9 @@ func TestFunctionCallString(t *testing.T) {
 // -- edge case: format expr with empty node --
 type emptyNode struct{}
 
-func (emptyNode) nodeSigil()         {}
-func (emptyNode) String() string     { return "?" }
-func (emptyNode) GoString() string   { return "?" }
+func (emptyNode) nodeSigil()       {}
+func (emptyNode) String() string   { return "?" }
+func (emptyNode) GoString() string { return "?" }
 func TestFormatExprEdgeCases(t *testing.T) {
 	n := BinaryOp{Left: Variable{}, Op: '+', Right: Variable{}}
 	got := FormatExpr(n)
@@ -551,11 +551,11 @@ func TestCompileMemoryAllocationError(t *testing.T) {
 	}
 	_, err := NewCompiler().Compile("x")
 	if err == nil || !strings.Contains(err.Error(), "memory allocation") {
-		unix.Setrlimit(unix.RLIMIT_AS, &oldRlim)
+		_ = unix.Setrlimit(unix.RLIMIT_AS, &oldRlim) // #nosec G104 - best effort cleanup in test
 		runtime.UnlockOSThread()
 		t.Fatalf("expected memory allocation error, got: %v", err)
 	}
-	unix.Setrlimit(unix.RLIMIT_AS, &oldRlim)
+	_ = unix.Setrlimit(unix.RLIMIT_AS, &oldRlim) // #nosec G104 - best effort cleanup in test
 	runtime.UnlockOSThread()
 }
 

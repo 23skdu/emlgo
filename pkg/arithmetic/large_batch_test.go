@@ -57,7 +57,7 @@ func TestArithmeticEdgeFinal(t *testing.T) {
 	HypotBatch(nil, nil)
 	MaxBatch(nil, 0)
 	MinBatch(nil, 0)
-	
+
 	// n == 32 (buffer path)
 	x32 := make([]float64, 32)
 	AbsBatch(x32)
@@ -91,7 +91,7 @@ func TestArithmeticEdgeFinal2(t *testing.T) {
 	HypotBatch(n100, n100)
 	MaxBatch(n100, 0)
 	MinBatch(n100, 0)
-	
+
 	// Max/Min NaNs
 	Max(math.NaN(), 1)
 	Max(1, math.NaN())
