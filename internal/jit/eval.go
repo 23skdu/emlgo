@@ -73,6 +73,22 @@ func EvalVars(n Node, vars map[string]float64) float64 {
 			return math.Trunc(arg)
 		case "round":
 			return math.Round(arg)
+		case "sinh":
+			return math.Sinh(arg)
+		case "cosh":
+			return math.Cosh(arg)
+		case "tanh":
+			return math.Tanh(arg)
+		case "asinh":
+			return math.Asinh(arg)
+		case "acosh":
+			return math.Acosh(arg)
+		case "atanh":
+			return math.Atanh(arg)
+		case "erf":
+			return math.Erf(arg)
+		case "gamma":
+			return math.Gamma(arg)
 		}
 	}
 	return 0

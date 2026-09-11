@@ -73,6 +73,28 @@ func SqrtSIMDF32(x []float32) []float32 {
 	return dst
 }
 
+// AddSIMDF32To computes element-wise a[i]+b[i] storing into dst using 8-way loop unrolling.
+func AddSIMDF32To(a, b, dst []float32) {
+	if len(a) != len(b) || len(a) != len(dst) {
+		panic("slice length mismatch")
+	}
+	n := len(a)
+	i := 0
+	for ; i+7 < n; i += 8 {
+		dst[i] = a[i] + b[i]
+		dst[i+1] = a[i+1] + b[i+1]
+		dst[i+2] = a[i+2] + b[i+2]
+		dst[i+3] = a[i+3] + b[i+3]
+		dst[i+4] = a[i+4] + b[i+4]
+		dst[i+5] = a[i+5] + b[i+5]
+		dst[i+6] = a[i+6] + b[i+6]
+		dst[i+7] = a[i+7] + b[i+7]
+	}
+	for ; i < n; i++ {
+		dst[i] = a[i] + b[i]
+	}
+}
+
 // AddSIMDF32 computes element-wise a[i]+b[i] for float32 slices.
 // Panics if len(a) != len(b).
 func AddSIMDF32(a, b []float32) []float32 {
@@ -80,10 +102,30 @@ func AddSIMDF32(a, b []float32) []float32 {
 		panic(fmt.Sprintf("AddSIMDF32: length mismatch %d vs %d", len(a), len(b)))
 	}
 	dst := make([]float32, len(a))
-	for i := range a {
-		dst[i] = a[i] + b[i]
-	}
+	AddSIMDF32To(a, b, dst)
 	return dst
+}
+
+// MulSIMDF32To computes element-wise a[i]*b[i] storing into dst using 8-way loop unrolling.
+func MulSIMDF32To(a, b, dst []float32) {
+	if len(a) != len(b) || len(a) != len(dst) {
+		panic("slice length mismatch")
+	}
+	n := len(a)
+	i := 0
+	for ; i+7 < n; i += 8 {
+		dst[i] = a[i] * b[i]
+		dst[i+1] = a[i+1] * b[i+1]
+		dst[i+2] = a[i+2] * b[i+2]
+		dst[i+3] = a[i+3] * b[i+3]
+		dst[i+4] = a[i+4] * b[i+4]
+		dst[i+5] = a[i+5] * b[i+5]
+		dst[i+6] = a[i+6] * b[i+6]
+		dst[i+7] = a[i+7] * b[i+7]
+	}
+	for ; i < n; i++ {
+		dst[i] = a[i] * b[i]
+	}
 }
 
 // MulSIMDF32 computes element-wise a[i]*b[i] for float32 slices.
@@ -93,9 +135,7 @@ func MulSIMDF32(a, b []float32) []float32 {
 		panic(fmt.Sprintf("MulSIMDF32: length mismatch %d vs %d", len(a), len(b)))
 	}
 	dst := make([]float32, len(a))
-	for i := range a {
-		dst[i] = a[i] * b[i]
-	}
+	MulSIMDF32To(a, b, dst)
 	return dst
 }
 
@@ -117,6 +157,28 @@ func MulScalarSIMDF32(a []float32, b float32) []float32 {
 	return dst
 }
 
+// SubSIMDF32To computes element-wise a[i]-b[i] storing into dst using 8-way loop unrolling.
+func SubSIMDF32To(a, b, dst []float32) {
+	if len(a) != len(b) || len(a) != len(dst) {
+		panic("slice length mismatch")
+	}
+	n := len(a)
+	i := 0
+	for ; i+7 < n; i += 8 {
+		dst[i] = a[i] - b[i]
+		dst[i+1] = a[i+1] - b[i+1]
+		dst[i+2] = a[i+2] - b[i+2]
+		dst[i+3] = a[i+3] - b[i+3]
+		dst[i+4] = a[i+4] - b[i+4]
+		dst[i+5] = a[i+5] - b[i+5]
+		dst[i+6] = a[i+6] - b[i+6]
+		dst[i+7] = a[i+7] - b[i+7]
+	}
+	for ; i < n; i++ {
+		dst[i] = a[i] - b[i]
+	}
+}
+
 // SubSIMDF32 computes element-wise a[i]-b[i] for float32 slices.
 // Panics if len(a) != len(b).
 func SubSIMDF32(a, b []float32) []float32 {
@@ -124,10 +186,30 @@ func SubSIMDF32(a, b []float32) []float32 {
 		panic(fmt.Sprintf("SubSIMDF32: length mismatch %d vs %d", len(a), len(b)))
 	}
 	dst := make([]float32, len(a))
-	for i := range a {
-		dst[i] = a[i] - b[i]
-	}
+	SubSIMDF32To(a, b, dst)
 	return dst
+}
+
+// DivSIMDF32To computes element-wise a[i]/b[i] storing into dst using 8-way loop unrolling.
+func DivSIMDF32To(a, b, dst []float32) {
+	if len(a) != len(b) || len(a) != len(dst) {
+		panic("slice length mismatch")
+	}
+	n := len(a)
+	i := 0
+	for ; i+7 < n; i += 8 {
+		dst[i] = a[i] / b[i]
+		dst[i+1] = a[i+1] / b[i+1]
+		dst[i+2] = a[i+2] / b[i+2]
+		dst[i+3] = a[i+3] / b[i+3]
+		dst[i+4] = a[i+4] / b[i+4]
+		dst[i+5] = a[i+5] / b[i+5]
+		dst[i+6] = a[i+6] / b[i+6]
+		dst[i+7] = a[i+7] / b[i+7]
+	}
+	for ; i < n; i++ {
+		dst[i] = a[i] / b[i]
+	}
 }
 
 // DivSIMDF32 computes element-wise a[i]/b[i] for float32 slices.
@@ -137,9 +219,7 @@ func DivSIMDF32(a, b []float32) []float32 {
 		panic(fmt.Sprintf("DivSIMDF32: length mismatch %d vs %d", len(a), len(b)))
 	}
 	dst := make([]float32, len(a))
-	for i := range a {
-		dst[i] = a[i] / b[i]
-	}
+	DivSIMDF32To(a, b, dst)
 	return dst
 }
 

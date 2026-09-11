@@ -76,6 +76,92 @@ func Unpack4Bit(packed []byte, dst []byte, count int) {
 	}
 }
 
+// Pack4Bit packs separate 4-bit nibble indices (0-15) from src into contiguous bytes in dst.
+func Pack4Bit(src []byte, dst []byte) {
+	numFullPairs := len(src) / 2
+	j := 0
+	for i := 0; i < numFullPairs && j < len(dst); i++ {
+		dst[j] = (src[2*i] & 0x0F) | ((src[2*i+1] & 0x0F) << 4)
+		j++
+	}
+	if len(src)%2 != 0 && j < len(dst) {
+		dst[j] = src[len(src)-1] & 0x0F
+	}
+}
+
+// EncodeTurboQuant4 compresses a high-dimensional float32 vector into TurboQuant4 format.
+// It computes recursive polar coordinate angles, quantizes them to 4-bit bins, and extracts QJL 1-bit residual signs.
+func EncodeTurboQuant4(vec []float32, pow2 int) ([]byte, error) {
+	if pow2 <= 1 || (pow2&(pow2-1)) != 0 {
+		return nil, fmt.Errorf("quant: pow2 must be a power of two > 1, got %d", pow2)
+	}
+	if len(vec) == 0 || len(vec) > pow2 {
+		return nil, fmt.Errorf("quant: vector dimension %d exceeds target pow2 %d", len(vec), pow2)
+	}
+
+	// Pad input to pow2
+	padded := make([]float32, pow2)
+	copy(padded, vec)
+
+	angleCount := pow2 - 1
+	qIndices := make([]byte, angleCount)
+
+	// Recursive tree polar decomposition
+	currentRadii := padded
+	angleOffset := 0
+
+	for currentLen := pow2; currentLen > 1; currentLen /= 2 {
+		halfLen := currentLen / 2
+		nextRadii := make([]float32, halfLen)
+		for i := 0; i < halfLen; i++ {
+			x := currentRadii[2*i]
+			y := currentRadii[2*i+1]
+			r := float32(math.Sqrt(float64(x*x + y*y)))
+			theta := math.Atan2(float64(y), float64(x))
+
+			bin := int(math.Round(((theta + math.Pi) / (2 * math.Pi)) * 15.0))
+			if bin < 0 {
+				bin = 0
+			} else if bin > 15 {
+				bin = 15
+			}
+			qIndices[angleOffset+i] = byte(bin)
+			nextRadii[i] = r
+		}
+		angleOffset += halfLen
+		currentRadii = nextRadii
+	}
+
+	radius := currentRadii[0]
+
+	// Reconstruct to compute QJL residuals
+	recon := make([]float32, pow2)
+	ReconstructTQ4(radius, qIndices, TQ4Lookup, pow2, recon)
+
+	// Compute QJL 1-bit residual mask
+	qjlBytesCount := (pow2 + 7) / 8
+	qjlBits := make([]byte, qjlBytesCount)
+	for i := 0; i < len(vec); i++ {
+		if vec[i] >= recon[i] {
+			qjlBits[i/8] |= byte(1 << uint(i%8))
+		}
+	}
+
+	// Pack 4-bit angles
+	angleBytes := (angleCount*4 + 7) / 8
+	packedAngles := make([]byte, angleBytes)
+	Pack4Bit(qIndices, packedAngles)
+
+	// Assemble final buffer: 4 bytes radius + packedAngles + qjlBits
+	totalSize := 4 + angleBytes + qjlBytesCount
+	out := make([]byte, totalSize)
+	binary.LittleEndian.PutUint32(out[0:4], math.Float32bits(radius))
+	copy(out[4:4+angleBytes], packedAngles)
+	copy(out[4+angleBytes:], qjlBits)
+
+	return out, nil
+}
+
 // PolarTransformBatch performs recursive 2D polar transformation on pairs of coordinates.
 func PolarTransformBatch(src, dstRadii, dstAngles []float32) {
 	n := len(src)

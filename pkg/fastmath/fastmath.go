@@ -34,9 +34,9 @@ func SqrtBatchTo(x, dst []float64) {
 	eml.SqrtSIMDTo(x, dst)
 }
 
-// Exp returns e^x.
+// Exp returns e^x using fast degree-4 Remez minimax polynomial approximation.
 func Exp(x float64) float64 {
-	return math.Exp(x)
+	return FastExp(x)
 }
 
 // Sin returns the sine of x.
@@ -49,9 +49,9 @@ func Cos(x float64) float64 {
 	return math.Cos(x)
 }
 
-// Log returns the natural logarithm of x.
+// Log returns the natural logarithm of x using fast Chebyshev polynomial approximation.
 func Log(x float64) float64 {
-	return math.Log(x)
+	return FastLog(x)
 }
 
 // ============================================================================
@@ -80,9 +80,9 @@ func SqrtBatchToF32(x, dst []float32) {
 	}
 }
 
-// ExpF32 returns e^x for float32.
+// ExpF32 returns e^x for float32 using fast polynomial approximation.
 func ExpF32(x float32) float32 {
-	return float32(math.Exp(float64(x)))
+	return FastExpF32(x)
 }
 
 // SinF32 returns sin(x) for float32.
@@ -95,9 +95,9 @@ func CosF32(x float32) float32 {
 	return float32(math.Cos(float64(x)))
 }
 
-// LogF32 returns ln(x) for float32.
+// LogF32 returns ln(x) for float32 using fast polynomial approximation.
 func LogF32(x float32) float32 {
-	return float32(math.Log(float64(x)))
+	return FastLogF32(x)
 }
 
 // ============================================================================

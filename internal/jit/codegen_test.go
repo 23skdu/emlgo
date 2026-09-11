@@ -259,3 +259,32 @@ func TestJITRegisterSpillError(t *testing.T) {
 		t.Fatal("Expected compiler error due to register exhaustion, but got nil")
 	}
 }
+
+func TestJITHyperbolicAndSpecial(t *testing.T) {
+	funcs := []struct {
+		name string
+		eval func(float64) float64
+	}{
+		{"sinh", math.Sinh},
+		{"cosh", math.Cosh},
+		{"tanh", math.Tanh},
+		{"asinh", math.Asinh},
+		{"erf", math.Erf},
+	}
+	c := NewCompiler()
+	for _, fn := range funcs {
+		expr := fmt.Sprintf("%s(x)", fn.name)
+		f, err := c.Compile(expr)
+		if err != nil {
+			t.Fatalf("Failed to compile %s: %v", expr, err)
+		}
+		for _, x := range []float64{0.0, 0.5, 1.0, -1.0} {
+			got := f(x)
+			want := fn.eval(x)
+			if math.Abs(got-want) > 1e-12 {
+				t.Errorf("%s(%v): got %v, want %v", fn.name, x, got, want)
+			}
+		}
+	}
+}
+

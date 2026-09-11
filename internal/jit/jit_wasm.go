@@ -19,9 +19,15 @@ func NewCompiler() *Compiler {
 	return &Compiler{}
 }
 
-// Compile is not supported on WebAssembly.
+// Compile parses the expression into an AST and returns an evaluation closure on WebAssembly targets.
 func (c *Compiler) Compile(expr string) (Func, error) {
-	return nil, fmt.Errorf("JIT compilation is not supported on WebAssembly")
+	node, err := Parse(expr)
+	if err != nil {
+		return nil, err
+	}
+	return func(x float64) float64 {
+		return Eval(node, x)
+	}, nil
 }
 
 // AllocateExecutableMemory is not supported on WebAssembly.
