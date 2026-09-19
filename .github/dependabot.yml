@@ -1,0 +1,26 @@
+version: 2
+
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    labels:
+      - dependencies
+      - github-actions
+    commit-message:
+      prefix: "ci"
+
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+    labels:
+      - dependencies
+      - go
+    commit-message:
+      prefix: "deps"
+    ignore:
+      # Only update patch versions automatically; minor/major require manual review
+      - dependency-name: "*"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
