@@ -76,6 +76,8 @@ func main() {
 | `pkg/hyper` | Sinh, Cosh, Tanh, Asinh, Acosh, Atanh, batch ops |
 | `pkg/logexp` | Exp, Log, ExpBatch, LogBatch, ExpFast, LogFast |
 | `pkg/fastmath` | FMA-optimized polynomial approximations for Exp, Sin, Cos, Log |
+| `pkg/bytecode` | Bytecode VM for EML expressions, compiler, optimizer, genetic programming |
+| `pkg/quant` | TurboQuant4: 4-bit polar-quantized vector search and distance |
 | `internal/eml` | Core EML operator, SIMD dispatch, worker pool, complex batch ops, Pipeline |
 | `internal/eml/bigmath` | Arbitrary-precision EML via `math/big.Float`, identity verifier |
 | `internal/jit` | JIT compiler, arena allocator, canonical trees, Diff, Simplify, Decompile, Cache |
@@ -247,11 +249,14 @@ exp32 := eml.ExpSIMDF32(x32)
 ## Building & Testing
 
 ```bash
-go build ./...                              # Build
-go test ./...                               # Test
-go test -race ./...                         # Race detection
-go vet ./...                                # Lint
-gosec ./...                                 # Security scan
+make build                                  # Build all packages
+make test                                   # Run tests
+make test-race                              # Race detection
+make test-cover                             # Coverage report
+make bench                                  # Run benchmarks
+make lint                                   # golangci-lint
+make fuzz                                   # Fuzz testing (30s per target)
+make gosec                                  # Security scan
 ./scripts/bench-compare.sh                  # Benchmark regression
 ```
 

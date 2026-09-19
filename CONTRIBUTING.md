@@ -47,11 +47,22 @@ Run govulncheck:
 govulncheck ./...
 ```
 
+## Dependency Management
+
+Dependencies are managed via Go modules. Dependabot is configured to automatically create PRs for:
+- **GitHub Actions**: weekly updates to action versions
+- **Go modules**: weekly patch-level updates (minor/major bumps require manual review)
+
+When updating `golang.org/x/sys` or other dependencies manually:
+1. Run `go test -race ./...` after updating to verify no regressions
+2. Run `gosec -tags purego ./...` to check for security issues
+3. Check cross-compilation: `GOOS=windows GOARCH=amd64 go build ./...` and `GOOS=darwin GOARCH=arm64 go build ./...`
+
 ## Pull Request Process
 
-1. Ensure all tests pass
-2. Run `go vet ./...` and fix any issues
-3. Run gosec and ensure no security issues
+1. Ensure all tests pass (`make test-race`)
+2. Run `make lint` and fix any issues
+3. Run `make gosec` and ensure no security issues
 4. Update documentation if needed
 5. Submit a pull request with a clear description
 
@@ -60,6 +71,7 @@ govulncheck ./...
 - Use clear, descriptive commit messages
 - Reference issues where applicable
 - Keep commits focused and atomic
+- Prefix commits: `ci:` for CI changes, `deps:` for dependency updates, `docs:` for documentation
 
 ## License
 
