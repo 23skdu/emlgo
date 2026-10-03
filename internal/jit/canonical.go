@@ -44,12 +44,20 @@ func (n *EMLNode) String() string {
 	return "?"
 }
 
+// MaxASTDepth defines the maximum allowable recursion depth for AST traversals
+// to prevent goroutine stack exhaustion on deeply nested expressions.
+const MaxASTDepth = 1000
+
 // EMLSize returns the total number of nodes in the expression tree rooted at n.
 func EMLSize(n *EMLNode) int {
-	if n == nil {
+	return emlSizeDepth(n, 0)
+}
+
+func emlSizeDepth(n *EMLNode, depth int) int {
+	if n == nil || depth > MaxASTDepth {
 		return 0
 	}
-	return 1 + EMLSize(n.Left) + EMLSize(n.Right)
+	return 1 + emlSizeDepth(n.Left, depth+1) + emlSizeDepth(n.Right, depth+1)
 }
 
 func emlNode(x, y *EMLNode) *EMLNode {
@@ -96,7 +104,11 @@ func CanonicalSqrt(x *EMLNode) *EMLNode {
 
 // EMLEval evaluates the canonical EML expression tree n with variable x set to the given value.
 func EMLEval(n *EMLNode, x float64) float64 {
-	if n == nil {
+	return emlEvalDepth(n, x, 0)
+}
+
+func emlEvalDepth(n *EMLNode, x float64, depth int) float64 {
+	if n == nil || depth > MaxASTDepth {
 		return 0
 	}
 	switch n.Kind {
@@ -105,9 +117,9 @@ func EMLEval(n *EMLNode, x float64) float64 {
 	case EMLVar:
 		return x
 	case EMLOp:
-		return math.Exp(EMLEval(n.Left, x)) - math.Log(EMLEval(n.Right, x))
+		return math.Exp(emlEvalDepth(n.Left, x, depth+1)) - math.Log(emlEvalDepth(n.Right, x, depth+1))
 	case EMLFunc:
-		arg := EMLEval(n.Left, x)
+		arg := emlEvalDepth(n.Left, x, depth+1)
 		switch n.Name {
 		case "sin":
 			return math.Sin(arg)
@@ -120,15 +132,15 @@ func EMLEval(n *EMLNode, x float64) float64 {
 		case "neg":
 			return -arg
 		case "add":
-			return arg + EMLEval(n.Right, x)
+			return arg + emlEvalDepth(n.Right, x, depth+1)
 		case "sub":
-			return arg - EMLEval(n.Right, x)
+			return arg - emlEvalDepth(n.Right, x, depth+1)
 		case "mul":
-			return arg * EMLEval(n.Right, x)
+			return arg * emlEvalDepth(n.Right, x, depth+1)
 		case "div":
-			return arg / EMLEval(n.Right, x)
+			return arg / emlEvalDepth(n.Right, x, depth+1)
 		case "pow":
-			return math.Pow(arg, EMLEval(n.Right, x))
+			return math.Pow(arg, emlEvalDepth(n.Right, x, depth+1))
 		case "sqrt":
 			return math.Sqrt(arg)
 		default:
@@ -144,7 +156,11 @@ func EMLEval(n *EMLNode, x float64) float64 {
 // ln_eps(y) = 0.5 * ln(y^2 + eps^2) and clamped exp.
 // This prevents NaN cascading during symbolic fitting and genetic programming.
 func EMLEvalRegularized(n *EMLNode, x float64, eps float64) float64 {
-	if n == nil {
+	return emlEvalRegularizedDepth(n, x, eps, 0)
+}
+
+func emlEvalRegularizedDepth(n *EMLNode, x float64, eps float64, depth int) float64 {
+	if n == nil || depth > MaxASTDepth {
 		return 0
 	}
 	if eps <= 0 {
@@ -156,8 +172,8 @@ func EMLEvalRegularized(n *EMLNode, x float64, eps float64) float64 {
 	case EMLVar:
 		return x
 	case EMLOp:
-		left := EMLEvalRegularized(n.Left, x, eps)
-		right := EMLEvalRegularized(n.Right, x, eps)
+		left := emlEvalRegularizedDepth(n.Left, x, eps, depth+1)
+		right := emlEvalRegularizedDepth(n.Right, x, eps, depth+1)
 		if left > 700.0 {
 			left = 700.0
 		} else if left < -700.0 {
@@ -165,7 +181,7 @@ func EMLEvalRegularized(n *EMLNode, x float64, eps float64) float64 {
 		}
 		return math.Exp(left) - 0.5*math.Log(right*right+eps*eps)
 	case EMLFunc:
-		arg := EMLEvalRegularized(n.Left, x, eps)
+		arg := emlEvalRegularizedDepth(n.Left, x, eps, depth+1)
 		switch n.Name {
 		case "sin":
 			return math.Sin(arg)
@@ -181,16 +197,16 @@ func EMLEvalRegularized(n *EMLNode, x float64, eps float64) float64 {
 		case "neg":
 			return -arg
 		case "add":
-			return arg + EMLEvalRegularized(n.Right, x, eps)
+			return arg + emlEvalRegularizedDepth(n.Right, x, eps, depth+1)
 		case "sub":
-			return arg - EMLEvalRegularized(n.Right, x, eps)
+			return arg - emlEvalRegularizedDepth(n.Right, x, eps, depth+1)
 		case "mul":
-			return arg * EMLEvalRegularized(n.Right, x, eps)
+			return arg * emlEvalRegularizedDepth(n.Right, x, eps, depth+1)
 		case "div":
-			denom := EMLEvalRegularized(n.Right, x, eps)
+			denom := emlEvalRegularizedDepth(n.Right, x, eps, depth+1)
 			return arg * denom / (denom*denom + eps*eps)
 		case "pow":
-			return math.Pow(arg, EMLEvalRegularized(n.Right, x, eps))
+			return math.Pow(arg, emlEvalRegularizedDepth(n.Right, x, eps, depth+1))
 		case "sqrt":
 			if arg < 0 {
 				arg = -arg
@@ -213,7 +229,11 @@ func EMLEvalRegularized(n *EMLNode, x float64, eps float64) float64 {
 
 // Canonicalize converts a Node interface value into the canonical EMLNode representation.
 func Canonicalize(n Node) *EMLNode {
-	if n == nil {
+	return canonicalizeDepth(n, 0)
+}
+
+func canonicalizeDepth(n Node, depth int) *EMLNode {
+	if n == nil || depth > MaxASTDepth {
 		return nil
 	}
 	switch v := n.(type) {
@@ -227,13 +247,13 @@ func Canonicalize(n Node) *EMLNode {
 		return &EMLNode{Kind: EMLVar, Name: name}
 	case UnaryOp:
 		if v.Op == '-' {
-			child := Canonicalize(v.Operand)
+			child := canonicalizeDepth(v.Operand, depth+1)
 			return &EMLNode{Kind: EMLFunc, Name: "neg", Left: child}
 		}
-		return Canonicalize(v.Operand)
+		return canonicalizeDepth(v.Operand, depth+1)
 	case BinaryOp:
-		left := Canonicalize(v.Left)
-		right := Canonicalize(v.Right)
+		left := canonicalizeDepth(v.Left, depth+1)
+		right := canonicalizeDepth(v.Right, depth+1)
 		switch v.Op {
 		case '+':
 			return &EMLNode{Kind: EMLFunc, Name: "add", Left: left, Right: right}
@@ -247,7 +267,7 @@ func Canonicalize(n Node) *EMLNode {
 			return &EMLNode{Kind: EMLFunc, Name: "pow", Left: left, Right: right}
 		}
 	case FunctionCall:
-		child := Canonicalize(v.Arg)
+		child := canonicalizeDepth(v.Arg, depth+1)
 		switch v.Name {
 		case "exp":
 			return CanonicalExp(child)
@@ -264,10 +284,14 @@ func Canonicalize(n Node) *EMLNode {
 
 // Depth returns the height of the EMLNode tree (leaf = 0).
 func Depth(n *EMLNode) int {
-	if n == nil {
+	return depthWithLimit(n, 0)
+}
+
+func depthWithLimit(n *EMLNode, d int) int {
+	if n == nil || d > MaxASTDepth {
 		return 0
 	}
-	l, r := Depth(n.Left), Depth(n.Right)
+	l, r := depthWithLimit(n.Left, d+1), depthWithLimit(n.Right, d+1)
 	if l > r {
 		return l + 1
 	}
@@ -287,12 +311,16 @@ func emlFuncUnary(name string, arg *EMLNode) *EMLNode {
 // Simplify performs constant folding and algebraic simplification on an EMLNode tree.
 // The returned tree evaluates to the same value as n for all inputs.
 func Simplify(n *EMLNode) *EMLNode {
-	if n == nil {
-		return nil
+	return simplifyDepth(n, 0)
+}
+
+func simplifyDepth(n *EMLNode, depth int) *EMLNode {
+	if n == nil || depth > MaxASTDepth {
+		return n
 	}
 	// Recursively simplify children first.
-	l := Simplify(n.Left)
-	r := Simplify(n.Right)
+	l := simplifyDepth(n.Left, depth+1)
+	r := simplifyDepth(n.Right, depth+1)
 	node := &EMLNode{Kind: n.Kind, Value: n.Value, Name: n.Name, Left: l, Right: r}
 
 	switch n.Kind {
@@ -359,6 +387,9 @@ func Simplify(n *EMLNode) *EMLNode {
 			if l != nil && r != nil && l.Kind == EMLConst && r.Kind == EMLConst {
 				return constNode(l.Value - r.Value)
 			}
+			if l != nil && l.Kind == EMLConst && l.Value == 0 {
+				return emlFuncUnary("neg", r)
+			}
 			if r != nil && r.Kind == EMLConst && r.Value == 0 {
 				return l
 			}
@@ -411,10 +442,24 @@ func Simplify(n *EMLNode) *EMLNode {
 	return node
 }
 
+// diffIsZeroDerivative reports whether name is a piecewise-constant function
+// whose derivative is zero almost everywhere.
+func diffIsZeroDerivative(name string) bool {
+	switch name {
+	case "ceil", "floor", "trunc", "round":
+		return true
+	}
+	return false
+}
+
 // Diff symbolically differentiates the EMLNode tree with respect to "x" (the variable).
 // The returned tree represents d(n)/dx in the EMLFunc representation.
 func Diff(n *EMLNode) *EMLNode {
-	if n == nil {
+	return diffDepth(n, 0)
+}
+
+func diffDepth(n *EMLNode, depth int) *EMLNode {
+	if n == nil || depth > MaxASTDepth {
 		return constNode(0)
 	}
 	switch n.Kind {
@@ -426,8 +471,8 @@ func Diff(n *EMLNode) *EMLNode {
 		// eml(u, v) = exp(u) - ln(v)
 		// d/dx = exp(u)·u' - v'/v
 		u, v := n.Left, n.Right
-		u_ := Diff(u)
-		v_ := Diff(v)
+		u_ := diffDepth(u, depth+1)
+		v_ := diffDepth(v, depth+1)
 		// exp(u) * u'
 		term1 := emlFuncBinary("mul", emlFuncUnary("exp", u), u_)
 		// v' / v
@@ -435,7 +480,7 @@ func Diff(n *EMLNode) *EMLNode {
 		return Simplify(emlFuncBinary("sub", term1, term2))
 	case EMLFunc:
 		arg := n.Left
-		arg_ := Diff(arg)
+		arg_ := diffDepth(arg, depth+1)
 		switch n.Name {
 		case "exp":
 			// d/dx exp(u) = exp(u) * u'
@@ -458,21 +503,21 @@ func Diff(n *EMLNode) *EMLNode {
 			return Simplify(emlFuncUnary("neg", arg_))
 		case "add":
 			// d/dx (u + v) = u' + v'
-			return Simplify(emlFuncBinary("add", Diff(arg), Diff(n.Right)))
+			return Simplify(emlFuncBinary("add", diffDepth(arg, depth+1), diffDepth(n.Right, depth+1)))
 		case "sub":
 			// d/dx (u - v) = u' - v'
-			return Simplify(emlFuncBinary("sub", Diff(arg), Diff(n.Right)))
+			return Simplify(emlFuncBinary("sub", diffDepth(arg, depth+1), diffDepth(n.Right, depth+1)))
 		case "mul":
 			// product rule: u'v + uv'
 			v := n.Right
-			v_ := Diff(v)
+			v_ := diffDepth(v, depth+1)
 			return Simplify(emlFuncBinary("add",
 				emlFuncBinary("mul", arg_, v),
 				emlFuncBinary("mul", arg, v_)))
 		case "div":
 			// quotient rule: (u'v - uv') / v²
 			v := n.Right
-			v_ := Diff(v)
+			v_ := diffDepth(v, depth+1)
 			num := emlFuncBinary("sub",
 				emlFuncBinary("mul", arg_, v),
 				emlFuncBinary("mul", arg, v_))
@@ -490,7 +535,7 @@ func Diff(n *EMLNode) *EMLNode {
 						arg_)))
 			}
 			// general: d/dx u^v = u^v * (v'*ln(u) + v*u'/u)
-			v_ := Diff(v)
+			v_ := diffDepth(v, depth+1)
 			term1 := emlFuncBinary("mul", v_, emlFuncUnary("log", arg))
 			term2 := emlFuncBinary("div", emlFuncBinary("mul", v, arg_), arg)
 			return Simplify(emlFuncBinary("mul", n, emlFuncBinary("add", term1, term2)))
@@ -557,20 +602,38 @@ func Diff(n *EMLNode) *EMLNode {
 			negU2 := emlFuncUnary("neg", u2)
 			expNegU2 := emlFuncUnary("exp", negU2)
 			return Simplify(emlFuncBinary("mul", constNode(twoOverSqrtPi), emlFuncBinary("mul", expNegU2, arg_)))
-		case "ceil", "floor", "trunc", "round", "gamma":
-			return constNode(0)
+		case "gamma":
+			// d/dx \Gamma(x) = \Gamma(x) * \psi(x) (where \psi is digamma).
+			// Digamma is not implemented, so return NaN instead of an incorrect 0.
+			return constNode(math.NaN())
+		case "ceil", "floor", "trunc", "round":
+			if diffIsZeroDerivative(n.Name) {
+				return constNode(0)
+			}
 		}
 	}
 	return constNode(0)
 }
 
-// DiffEval evaluates the symbolic derivative Diff(n) at x.
+// DiffEval evaluates the first derivative of expression n at x: EMLEval(Diff(n), x).
 func DiffEval(n *EMLNode, x float64) float64 {
 	return EMLEval(Diff(n), x)
 }
 
+// SecondDerivativeEval evaluates the second derivative of expression n at x: EMLEval(Diff(Diff(n)), x).
+func SecondDerivativeEval(n *EMLNode, x float64) float64 {
+	return EMLEval(Diff(Diff(n)), x)
+}
+
 // Equiv reports whether two EMLNode trees are structurally equivalent.
 func Equiv(a, b *EMLNode) bool {
+	return equivDepth(a, b, 0)
+}
+
+func equivDepth(a, b *EMLNode, depth int) bool {
+	if depth > MaxASTDepth {
+		return false
+	}
 	if a == nil && b == nil {
 		return true
 	}
@@ -586,12 +649,12 @@ func Equiv(a, b *EMLNode) bool {
 	case EMLVar:
 		return true
 	case EMLOp:
-		return Equiv(a.Left, b.Left) && Equiv(a.Right, b.Right)
+		return equivDepth(a.Left, b.Left, depth+1) && equivDepth(a.Right, b.Right, depth+1)
 	case EMLFunc:
 		if a.Name != b.Name {
 			return false
 		}
-		return Equiv(a.Left, b.Left) && Equiv(a.Right, b.Right)
+		return equivDepth(a.Left, b.Left, depth+1) && equivDepth(a.Right, b.Right, depth+1)
 	}
 	return false
 }

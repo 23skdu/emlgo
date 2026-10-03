@@ -54,3 +54,33 @@ benchmark_results.txt
 
 # opencode config (personal)
 opencode.json
+
+# Node & WASM build artifacts, dependencies, and caches
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+bun.lockb
+.pnpm-store/
+.npm/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+*.wasm
+wasm/*.wasm
+wasm/wasm_exec.js
+wasm/run.js
+.playwright/
+playwright/
+playwright-report/
+test-results/
+
+# Binaries and archives
+bin/
+/wasmbench
+*.bin
+*.a
+*.lib
+*.so.*
+

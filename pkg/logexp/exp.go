@@ -3,6 +3,7 @@ package logexp
 import (
 	"math"
 
+	"github.com/emlgo/eml/internal/constants"
 	"github.com/emlgo/eml/internal/eml"
 )
 
@@ -14,7 +15,7 @@ var (
 // Overflow/underflow thresholds for Exp:
 // expOverflow  ≈ ln(MaxFloat64)           — exp(x) → +Inf beyond this
 // expUnderflow ≈ ln(SmallestNonzeroFloat64) — exp(x) → 0 below this
-const expOverflow = 709.782712893384
+const expOverflow = constants.ExpOverflow
 const expUnderflow = -745.133224101734
 
 func Exp(x float64) float64 {
@@ -56,5 +57,5 @@ func LogFast(x float64) float64 {
 	if x == 0 {
 		return math.Inf(-1)
 	}
-	return math.Log(x)
+	return nativeLog(x)
 }

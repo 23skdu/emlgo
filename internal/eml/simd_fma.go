@@ -23,13 +23,14 @@ func FmaSIMDTo(a, b, c, result []float64) {
 	if n == 0 {
 		return
 	}
-
-	if n < SmallCutoff {
-		for i := range result[:n] {
-			result[i] = a[i]*b[i] + c[i] // #nosec G602 - bounds verified by length checks above
-		}
+	if n < SmallCutoff() || poolClosed.Load() {
+		fmaSIMD(a, b, c, result)
 		return
 	}
 
-	fmaSIMD(a, b, c, result)
+	ForEachChunk(n, func(start, end int) {
+		fmaSIMD(a[start:end], b[start:end], c[start:end], result[start:end])
+	})
 }
+
+

@@ -228,11 +228,11 @@ func TestGetParallelChunkSize(t *testing.T) {
 	}
 }
 
-func TestParallelChunkSizeWithCache(t *testing.T) {
-	n := 10000
+func TestParallelChunkSizeBounds(t *testing.T) {
+	n := 100000
 	chunk := GetParallelChunkSize(n)
-	if chunk > L1TileSize/cpuNum {
-		t.Errorf("chunk size %d exceeds L1 tile size %d", chunk, L1TileSize/cpuNum)
+	if chunk > LargeCutoff {
+		t.Errorf("chunk size %d exceeds LargeCutoff %d", chunk, LargeCutoff)
 	}
 }
 

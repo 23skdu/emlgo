@@ -10,6 +10,13 @@ func Eval(n Node, x float64) float64 {
 // EvalVars evaluates a Node tree with named variable bindings.
 // Variable nodes look up their Name in vars; unknown names evaluate to 0.
 func EvalVars(n Node, vars map[string]float64) float64 {
+	return evalVarsDepth(n, vars, 0)
+}
+
+func evalVarsDepth(n Node, vars map[string]float64, depth int) float64 {
+	if n == nil || depth > MaxASTDepth {
+		return 0
+	}
 	switch v := n.(type) {
 	case Number:
 		return v.Value
@@ -20,10 +27,10 @@ func EvalVars(n Node, vars map[string]float64) float64 {
 		}
 		return vars[name]
 	case UnaryOp:
-		return -EvalVars(v.Operand, vars)
+		return -evalVarsDepth(v.Operand, vars, depth+1)
 	case BinaryOp:
-		left := EvalVars(v.Left, vars)
-		right := EvalVars(v.Right, vars)
+		left := evalVarsDepth(v.Left, vars, depth+1)
+		right := evalVarsDepth(v.Right, vars, depth+1)
 		switch v.Op {
 		case '+':
 			return left + right
@@ -37,7 +44,7 @@ func EvalVars(n Node, vars map[string]float64) float64 {
 			return math.Pow(left, right)
 		}
 	case FunctionCall:
-		arg := EvalVars(v.Arg, vars)
+		arg := evalVarsDepth(v.Arg, vars, depth+1)
 		if result, ok := callMathFuncByName(v.Name, arg); ok {
 			return result
 		}

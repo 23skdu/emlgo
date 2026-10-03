@@ -3,6 +3,7 @@ package arithmetic
 import (
 	"math"
 
+	"github.com/emlgo/eml/internal/constants"
 	"github.com/emlgo/eml/internal/eml"
 )
 
@@ -44,22 +45,18 @@ func parallelMap2(a, b, result []float64, fn func(float64, float64) float64) {
 	})
 }
 
-//go:inline
 func Add(x, y float64) float64 {
 	return x + y
 }
 
-//go:inline
 func Sub(x, y float64) float64 {
 	return x - y
 }
 
-//go:inline
 func Mul(x, y float64) float64 {
 	return x * y
 }
 
-//go:inline
 func Div(x, y float64) float64 {
 	return x / y
 }
@@ -179,7 +176,7 @@ func LogBase2(x float64) float64 {
 	if x <= 0 || isNaN(x) {
 		return nan()
 	}
-	return nativeLog(x) / 0.693147180559945309417232121458
+	return nativeLog(x) / constants.Ln2
 }
 
 func LogBase10(x float64) float64 {
@@ -189,7 +186,6 @@ func LogBase10(x float64) float64 {
 	return eml.Log10(x)
 }
 
-//go:inline
 func Sqrt(x float64) float64 {
 	return nativeSqrt(x)
 }
@@ -228,47 +224,38 @@ func Min(x, y float64) float64 {
 	return y
 }
 
-//go:inline
 func Floor(x float64) float64 {
 	return nativeFloor(x)
 }
 
-//go:inline
 func Ceil(x float64) float64 {
 	return nativeCeil(x)
 }
 
-//go:inline
 func Trunc(x float64) float64 {
 	return nativeTrunc(x)
 }
 
-//go:inline
 func Round(x float64) float64 {
 	return nativeRound(x)
 }
 
-//go:inline
 func Abs(x float64) float64 {
 	return eml.AbsScalar(x)
 }
 
-//go:inline
 func Neg(x float64) float64 {
 	return -x
 }
 
-//go:inline
 func Inv(x float64) float64 {
 	return 1 / x
 }
 
-//go:inline
 func Square(x float64) float64 {
 	return x * x
 }
 
-//go:inline
 func Cube(x float64) float64 {
 	return x * x * x
 }
@@ -320,7 +307,6 @@ func Expm1(x float64) float64 {
 	return eml.Expm1(x)
 }
 
-//go:inline
 func FMA(x, y, z float64) float64 {
 	return eml.FmaScalar(x, y, z)
 }
@@ -589,16 +575,32 @@ func AddBatch(x, y []float64) []float64 {
 	return eml.AddSIMD(x, y)
 }
 
+func AddBatchTo(x, y, result []float64) {
+	eml.AddSIMDTo(x, y, result)
+}
+
 func SubBatch(x, y []float64) []float64 {
 	return eml.SubSIMD(x, y)
+}
+
+func SubBatchTo(x, y, result []float64) {
+	eml.SubSIMDTo(x, y, result)
 }
 
 func MulBatch(x, y []float64) []float64 {
 	return eml.MulSIMD(x, y)
 }
 
+func MulBatchTo(x, y, result []float64) {
+	eml.MulSIMDTo(x, y, result)
+}
+
 func DivBatch(x, y []float64) []float64 {
 	return eml.DivSIMD(x, y)
+}
+
+func DivBatchTo(x, y, result []float64) {
+	eml.DivSIMDTo(x, y, result)
 }
 
 func AddScalarBatch(x []float64, y float64) []float64 {
@@ -608,3 +610,4 @@ func AddScalarBatch(x []float64, y float64) []float64 {
 func MulScalarBatch(x []float64, y float64) []float64 {
 	return eml.MulScalarSIMD(x, y)
 }
+

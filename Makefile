@@ -1,7 +1,12 @@
-.PHONY: build test test-race test-cover bench lint vet fuzz clean
+.PHONY: build test test-race test-cover bench lint vet fuzz clean wasm
 
 build:
 	go build ./...
+
+wasm:
+	@mkdir -p wasm
+	cp "$$(go env GOROOT)/lib/wasm/wasm_exec.js" wasm/wasm_exec.js 2>/dev/null || cp "$$(go env GOROOT)/misc/wasm/wasm_exec.js" wasm/wasm_exec.js
+	GOOS=js GOARCH=wasm go build -o wasm/emlgo.wasm ./cmd/wasmbench
 
 test:
 	go test -count=1 ./...
@@ -47,5 +52,5 @@ gosec:
 	gosec -exclude-generated -tags purego ./...
 
 clean:
-	rm -f /bench /validate /emlcli coverage.out
-	rm -rf dist/
+	rm -f bench validate emlcli wasmbench coverage.out *.out *.test *.prof *.cov
+	rm -rf dist/ wasm/emlgo.wasm wasm/wasm_exec.js wasm/run.js node_modules/ .playwright/ playwright-report/ test-results/

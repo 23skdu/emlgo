@@ -38,5 +38,7 @@ func TestAmd64DispatchStubs(t *testing.T) {
 	cosAVX2(nil, nil)
 	tanAVX2(nil, nil)
 	_, _, _, _ = cpuid(0, 0)
+	_, _ = xgetbv(0)
 	detectAMD64SIMD()
 }
+

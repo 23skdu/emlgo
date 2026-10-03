@@ -5,12 +5,10 @@ package eml
 
 func arm64AddSIMD(a, b, result []float64) {
 	n := len(a)
-	if hasSVE {
-		addSVE(a, b, result)
-		return
-	}
 	simdLen := (n / 2) * 2
-	addNEON(a[:simdLen], b[:simdLen], result[:simdLen])
+	if simdLen > 0 {
+		addNEON(a[:simdLen], b[:simdLen], result[:simdLen])
+	}
 	for i := simdLen; i < n; i++ {
 		result[i] = a[i] + b[i]
 	}
@@ -18,12 +16,10 @@ func arm64AddSIMD(a, b, result []float64) {
 
 func arm64SubSIMD(a, b, result []float64) {
 	n := len(a)
-	if hasSVE {
-		subSVE(a, b, result)
-		return
-	}
 	simdLen := (n / 2) * 2
-	subNEON(a[:simdLen], b[:simdLen], result[:simdLen])
+	if simdLen > 0 {
+		subNEON(a[:simdLen], b[:simdLen], result[:simdLen])
+	}
 	for i := simdLen; i < n; i++ {
 		result[i] = a[i] - b[i]
 	}
@@ -31,12 +27,10 @@ func arm64SubSIMD(a, b, result []float64) {
 
 func arm64MulSIMD(a, b, result []float64) {
 	n := len(a)
-	if hasSVE {
-		mulSVE(a, b, result)
-		return
-	}
 	simdLen := (n / 2) * 2
-	mulNEON(a[:simdLen], b[:simdLen], result[:simdLen])
+	if simdLen > 0 {
+		mulNEON(a[:simdLen], b[:simdLen], result[:simdLen])
+	}
 	for i := simdLen; i < n; i++ {
 		result[i] = a[i] * b[i]
 	}
@@ -44,12 +38,10 @@ func arm64MulSIMD(a, b, result []float64) {
 
 func arm64DivSIMD(a, b, result []float64) {
 	n := len(a)
-	if hasSVE {
-		divSVE(a, b, result)
-		return
-	}
 	simdLen := (n / 2) * 2
-	divNEON(a[:simdLen], b[:simdLen], result[:simdLen])
+	if simdLen > 0 {
+		divNEON(a[:simdLen], b[:simdLen], result[:simdLen])
+	}
 	for i := simdLen; i < n; i++ {
 		result[i] = a[i] / b[i]
 	}
@@ -57,12 +49,10 @@ func arm64DivSIMD(a, b, result []float64) {
 
 func arm64AddScalarSIMD(a []float64, b float64, result []float64) {
 	n := len(a)
-	if hasSVE {
-		addScalarSVE(a, b, result)
-		return
-	}
 	simdLen := (n / 2) * 2
-	addScalarNEON(a[:simdLen], b, result[:simdLen])
+	if simdLen > 0 {
+		addScalarNEON(a[:simdLen], b, result[:simdLen])
+	}
 	for i := simdLen; i < n; i++ {
 		result[i] = a[i] + b
 	}
@@ -70,56 +60,55 @@ func arm64AddScalarSIMD(a []float64, b float64, result []float64) {
 
 func arm64MulScalarSIMD(a []float64, b float64, result []float64) {
 	n := len(a)
-	if hasSVE {
-		mulScalarSVE(a, b, result)
-		return
-	}
 	simdLen := (n / 2) * 2
-	mulScalarNEON(a[:simdLen], b, result[:simdLen])
+	if simdLen > 0 {
+		mulScalarNEON(a[:simdLen], b, result[:simdLen])
+	}
 	for i := simdLen; i < n; i++ {
 		result[i] = a[i] * b
 	}
 }
 
 func arm64SqrtSIMD(a, result []float64) {
-	if hasSVE {
-		sqrtSVE(a, result)
-		return
-	}
 	n := len(a)
 	simdLen := (n / 2) * 2
-	sqrtNEON(a[:simdLen], result[:simdLen])
+	if simdLen > 0 {
+		sqrtNEON(a[:simdLen], result[:simdLen])
+	}
 	for i := simdLen; i < n; i++ {
 		result[i] = nativeSqrt(a[i])
 	}
 }
 
 func arm64AbsSIMD(a, result []float64) {
-	if hasSVE {
-		absSVE(a, result)
-		return
+	n := len(a)
+	simdLen := (n / 2) * 2
+	if simdLen > 0 {
+		absNEON(a[:simdLen], result[:simdLen])
 	}
-	for i := range a {
+	for i := simdLen; i < n; i++ {
 		result[i] = nativeAbs(a[i])
 	}
 }
 
 func arm64NegSIMD(a, result []float64) {
-	if hasSVE {
-		negSVE(a, result)
-		return
+	n := len(a)
+	simdLen := (n / 2) * 2
+	if simdLen > 0 {
+		negNEON(a[:simdLen], result[:simdLen])
 	}
-	for i := range a {
+	for i := simdLen; i < n; i++ {
 		result[i] = nativeNeg(a[i])
 	}
 }
 
 func arm64InvSIMD(a, result []float64) {
-	if hasSVE {
-		invSVE(a, result)
-		return
+	n := len(a)
+	simdLen := (n / 2) * 2
+	if simdLen > 0 {
+		invNEON(a[:simdLen], result[:simdLen])
 	}
-	for i := range a {
+	for i := simdLen; i < n; i++ {
 		result[i] = nativeInv(a[i])
 	}
 }
@@ -160,11 +149,11 @@ func detectPlatformSIMD() {
 
 func fmaSIMD(a, b, c, result []float64) {
 	n := len(a)
-	if hasSVE {
-		fmaSVE(a, b, c, result)
-		return
+	simdLen := (n / 2) * 2
+	if simdLen > 0 {
+		fmaNEON(a[:simdLen], b[:simdLen], c[:simdLen], result[:simdLen])
 	}
-	for i := 0; i < n; i++ {
+	for i := simdLen; i < n; i++ {
 		result[i] = a[i]*b[i] + c[i]
 	}
 }
@@ -234,7 +223,12 @@ func dispatchMulScalarSIMD(a []float64, b float64, result []float64) {
 }
 
 func dispatchAddSatInt8SIMD(a, b, result []int8) {
-	for i := range a {
+	n := len(a)
+	simdLen := (n / 16) * 16
+	if simdLen > 0 {
+		addSatInt8NEON(a[:simdLen], b[:simdLen], result[:simdLen])
+	}
+	for i := simdLen; i < n; i++ {
 		v := int32(a[i]) + int32(b[i])
 		if v > 127 {
 			v = 127
@@ -246,7 +240,12 @@ func dispatchAddSatInt8SIMD(a, b, result []int8) {
 }
 
 func dispatchSubSatInt8SIMD(a, b, result []int8) {
-	for i := range a {
+	n := len(a)
+	simdLen := (n / 16) * 16
+	if simdLen > 0 {
+		subSatInt8NEON(a[:simdLen], b[:simdLen], result[:simdLen])
+	}
+	for i := simdLen; i < n; i++ {
 		v := int32(a[i]) - int32(b[i])
 		if v > 127 {
 			v = 127

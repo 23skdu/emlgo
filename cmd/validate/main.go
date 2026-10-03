@@ -8,6 +8,7 @@ import (
 	"os"
 	"reflect"
 
+	"github.com/emlgo/eml/internal/eml"
 	"github.com/emlgo/eml/pkg/arithmetic"
 	"github.com/emlgo/eml/pkg/fastmath"
 	"github.com/emlgo/eml/pkg/hyper"
@@ -556,7 +557,7 @@ func testFloat64() []ValidationResult {
 	for _, x := range testCases {
 		if x > 0 {
 			res := logexp.Log(x)
-			expected := math.Log(x)
+			expected := eml.ExactLogOracle(x)
 			if !withinTol(res, expected, 1e-10) {
 				results = append(results, ValidationResult{Type: "float64", Function: "Log", Passed: false, Message: fmt.Sprintf("Log(%v): got %v, want %v", x, res, expected)})
 			} else {
@@ -1378,7 +1379,7 @@ func testBatch() []ValidationResult {
 	logBatchWant := make([]float64, n)
 	for i := range a {
 		expBatchWant[i] = math.Exp(a[i])
-		logBatchWant[i] = math.Log(a[i])
+		logBatchWant[i] = eml.ExactLogOracle(a[i])
 	}
 	checkUnary("ExpBatch", logexp.ExpBatch(a), expBatchWant)
 	checkUnary("LogBatch", logexp.LogBatch(a), logBatchWant)

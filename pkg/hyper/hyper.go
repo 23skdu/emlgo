@@ -3,6 +3,7 @@ package hyper
 import (
 	"math"
 
+	"github.com/emlgo/eml/internal/constants"
 	"github.com/emlgo/eml/internal/eml"
 	"github.com/emlgo/eml/pkg/arithmetic"
 )
@@ -18,8 +19,8 @@ var (
 )
 
 // Overflow threshold for exp-based hyperbolic functions:
-// ln(MaxFloat64) ≈ 709.78 — exp(x) overflows to +Inf beyond this.
-const expOverflow = 709.78
+// ln(MaxFloat64) ≈ 709.782712893384 — exp(x) overflows to +Inf beyond this.
+const expOverflow = constants.ExpOverflow
 
 func Sinh(x float64) float64 {
 	if isNaN(x) || isInf(x, 0) || x == 0 {
@@ -102,7 +103,7 @@ func Asinh(x float64) float64 {
 		res = x
 	} else if x > 1e8 {
 		// ln(2x)
-		res = nativeLog(x) + 0.693147180559945309417232121458
+		res = nativeLog(x) + constants.Ln2
 	} else {
 		res = nativeLog(x + arithmetic.Sqrt(x*x+1))
 	}
@@ -123,7 +124,7 @@ func Acosh(x float64) float64 {
 		return x
 	}
 	if x > 1e8 {
-		return nativeLog(x) + 0.693147180559945309417232121458
+		return nativeLog(x) + constants.Ln2
 	}
 	return nativeLog(x + arithmetic.Sqrt(x-1)*arithmetic.Sqrt(x+1))
 }
