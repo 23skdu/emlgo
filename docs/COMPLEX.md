@@ -19,7 +19,7 @@ The library uses a dual-path design:
 - **float64 fast path**: All scalar `float64` operations use native EML + SIMD paths (AVX2/AVX512/NEON/WASM).
 - **complex128 path**: Uses `math/cmplx` for `Exp`, `Log`, `Sin`, `Cos`, `Tan` on complex arguments.
 
-Batch complex operations (`ComplexBatch`, `ComplexExpBatch`, etc.) process slices of `complex128` in parallel using the worker pool.
+Batch complex operations (`ComplexBatch`, `ComplexExpBatch`, etc.) process slices of `complex128` element-wise in a single serial loop.
 
 ## Batch Operations
 
@@ -195,4 +195,4 @@ The `internal/constants` package provides complex constants:
 
 - All complex batch operations panic on slice length mismatch.
 - Complex operations use `math/cmplx` which handles branch cuts per IEEE 754.
-- The worker pool parallelizes complex batch operations for large slices.
+- Complex batch operations are serial; the worker pool is not used on this path.

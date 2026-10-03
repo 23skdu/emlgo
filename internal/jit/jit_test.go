@@ -46,7 +46,7 @@ func TestParseAdd(t *testing.T) {
 	if !ok || b.Op != '+' {
 		t.Fatalf("expected BinaryOp(+), got %T(%v)", n, n)
 	}
-	if _, ok := b.Left.(Variable); !ok {
+	if _, isVar := b.Left.(Variable); !isVar {
 		t.Fatalf("expected Variable left, got %T", b.Left)
 	}
 	r, ok := b.Right.(Number)

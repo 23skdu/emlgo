@@ -32,6 +32,9 @@ func (n *EMLNode) String() string {
 	case EMLConst:
 		return fmt.Sprintf("%v", n.Value)
 	case EMLVar:
+		if n.Name != "" {
+			return n.Name
+		}
 		return "x"
 	case EMLOp:
 		return fmt.Sprintf("eml(%s, %s)", n.Left, n.Right)
@@ -128,6 +131,10 @@ func EMLEval(n *EMLNode, x float64) float64 {
 			return math.Pow(arg, EMLEval(n.Right, x))
 		case "sqrt":
 			return math.Sqrt(arg)
+		default:
+			if fn, ok := callMathFuncByName(n.Name, arg); ok {
+				return fn
+			}
 		}
 	}
 	return 0
@@ -189,6 +196,16 @@ func EMLEvalRegularized(n *EMLNode, x float64, eps float64) float64 {
 				arg = -arg
 			}
 			return math.Sqrt(arg)
+		default:
+			if res, ok := callMathFuncByName(n.Name, arg); ok {
+				if !math.IsNaN(res) {
+					return res
+				}
+				if !math.IsNaN(arg) {
+					return arg
+				}
+				return 0
+			}
 		}
 	}
 	return 0
@@ -203,7 +220,11 @@ func Canonicalize(n Node) *EMLNode {
 	case Number:
 		return constNode(v.Value)
 	case Variable:
-		return varNode()
+		name := v.Name
+		if name == "" {
+			name = "x"
+		}
+		return &EMLNode{Kind: EMLVar, Name: name}
 	case UnaryOp:
 		if v.Op == '-' {
 			child := Canonicalize(v.Operand)
@@ -313,23 +334,11 @@ func Simplify(n *EMLNode) *EMLNode {
 				}
 			}
 		}
-		// 2. eml(eml(1, eml(x, 1)), eml(1, 1)) -> -x (neg(x))
-		if l != nil && l.Kind == EMLOp && r != nil && r.Kind == EMLOp {
-			if r.Left != nil && r.Left.Kind == EMLConst && r.Left.Value == 1.0 &&
-				r.Right != nil && r.Right.Kind == EMLConst && r.Right.Value == 1.0 {
-				if l.Left != nil && l.Left.Kind == EMLConst && l.Left.Value == 1.0 &&
-					l.Right != nil && l.Right.Kind == EMLOp &&
-					l.Right.Right != nil && l.Right.Right.Kind == EMLConst && l.Right.Right.Value == 1.0 {
-					return &EMLNode{Kind: EMLFunc, Name: "neg", Left: l.Right.Left}
-				}
-			}
-			// 3. eml(eml(1, x), eml(x, 1)) -> 1/x (div(1, x))
-			if l.Left != nil && l.Left.Kind == EMLConst && l.Left.Value == 1.0 &&
-				r.Right != nil && r.Right.Kind == EMLConst && r.Right.Value == 1.0 &&
-				Equiv(l.Right, r.Left) {
-				return emlFuncBinary("div", constNode(1), l.Right)
-			}
-		}
+		// Note: no negation or reciprocal reductions are performed here. The
+		// candidate reductions (e.g. eml(eml(1, eml(x,1)), eml(1,1)) -> -x)
+		// are not identities for eml(u,v) = exp(u) - ln(v), and they are in any
+		// case unreachable here because the bottom-up recursion above has already
+		// folded eml(1,1) to the constant e and eml(x,1) to exp(x).
 		return node
 
 	case EMLFunc:
@@ -490,8 +499,72 @@ func Diff(n *EMLNode) *EMLNode {
 			v_ := Diff(v)
 			term1 := emlFuncBinary("mul", v_, emlFuncUnary("log", arg))
 			term2 := emlFuncBinary("div", emlFuncBinary("mul", v, arg_), arg)
-			return Simplify(emlFuncBinary("mul", n,
-				emlFuncBinary("add", term1, term2)))
+			return Simplify(emlFuncBinary("mul", n, emlFuncBinary("add", term1, term2)))
+		case "tan":
+			// d/dx tan(u) = (1 + tan(u)^2) * u'
+			tanU := emlFuncUnary("tan", arg)
+			sec2 := emlFuncBinary("add", constNode(1), emlFuncBinary("pow", tanU, constNode(2)))
+			return Simplify(emlFuncBinary("mul", sec2, arg_))
+		case "sinh":
+			// d/dx sinh(u) = cosh(u) * u'
+			return Simplify(emlFuncBinary("mul", emlFuncUnary("cosh", arg), arg_))
+		case "cosh":
+			// d/dx cosh(u) = sinh(u) * u'
+			return Simplify(emlFuncBinary("mul", emlFuncUnary("sinh", arg), arg_))
+		case "tanh":
+			// d/dx tanh(u) = (1 - tanh(u)^2) * u'
+			tanhU := emlFuncUnary("tanh", arg)
+			sech2 := emlFuncBinary("sub", constNode(1), emlFuncBinary("pow", tanhU, constNode(2)))
+			return Simplify(emlFuncBinary("mul", sech2, arg_))
+		case "asin":
+			// d/dx asin(u) = u' / sqrt(1 - u^2)
+			denom := emlFuncUnary("sqrt", emlFuncBinary("sub", constNode(1), emlFuncBinary("pow", arg, constNode(2))))
+			return Simplify(emlFuncBinary("div", arg_, denom))
+		case "acos":
+			// d/dx acos(u) = -u' / sqrt(1 - u^2)
+			denom := emlFuncUnary("sqrt", emlFuncBinary("sub", constNode(1), emlFuncBinary("pow", arg, constNode(2))))
+			return Simplify(emlFuncUnary("neg", emlFuncBinary("div", arg_, denom)))
+		case "atan":
+			// d/dx atan(u) = u' / (1 + u^2)
+			denom := emlFuncBinary("add", constNode(1), emlFuncBinary("pow", arg, constNode(2)))
+			return Simplify(emlFuncBinary("div", arg_, denom))
+		case "asinh":
+			// d/dx asinh(u) = u' / sqrt(u^2 + 1)
+			denom := emlFuncUnary("sqrt", emlFuncBinary("add", emlFuncBinary("pow", arg, constNode(2)), constNode(1)))
+			return Simplify(emlFuncBinary("div", arg_, denom))
+		case "acosh":
+			// d/dx acosh(u) = u' / sqrt(u^2 - 1)
+			denom := emlFuncUnary("sqrt", emlFuncBinary("sub", emlFuncBinary("pow", arg, constNode(2)), constNode(1)))
+			return Simplify(emlFuncBinary("div", arg_, denom))
+		case "atanh":
+			// d/dx atanh(u) = u' / (1 - u^2)
+			denom := emlFuncBinary("sub", constNode(1), emlFuncBinary("pow", arg, constNode(2)))
+			return Simplify(emlFuncBinary("div", arg_, denom))
+		case "abs":
+			// d/dx |u| = (u / |u|) * u'
+			sgn := emlFuncBinary("div", arg, emlFuncUnary("abs", arg))
+			return Simplify(emlFuncBinary("mul", sgn, arg_))
+		case "cbrt":
+			// d/dx cbrt(u) = u' / (3 * cbrt(u)^2)
+			denom := emlFuncBinary("mul", constNode(3), emlFuncBinary("pow", emlFuncUnary("cbrt", arg), constNode(2)))
+			return Simplify(emlFuncBinary("div", arg_, denom))
+		case "log2":
+			// d/dx log2(u) = u' / (u * ln 2)
+			denom := emlFuncBinary("mul", arg, constNode(math.Ln2))
+			return Simplify(emlFuncBinary("div", arg_, denom))
+		case "log10":
+			// d/dx log10(u) = u' / (u * ln 10)
+			denom := emlFuncBinary("mul", arg, constNode(math.Ln10))
+			return Simplify(emlFuncBinary("div", arg_, denom))
+		case "erf":
+			// d/dx erf(u) = (2 / sqrt(pi)) * exp(-u^2) * u'
+			const twoOverSqrtPi = 1.1283791670955125738961589
+			u2 := emlFuncBinary("pow", arg, constNode(2))
+			negU2 := emlFuncUnary("neg", u2)
+			expNegU2 := emlFuncUnary("exp", negU2)
+			return Simplify(emlFuncBinary("mul", constNode(twoOverSqrtPi), emlFuncBinary("mul", expNegU2, arg_)))
+		case "ceil", "floor", "trunc", "round", "gamma":
+			return constNode(0)
 		}
 	}
 	return constNode(0)

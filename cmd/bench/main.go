@@ -52,9 +52,16 @@ type BenchmarkResult struct {
 	Passed    bool
 }
 
+// newBenchmarkRand returns a deterministic generator seeded with a fixed value.
+// Using a local generator instead of the deprecated global rand.Seed keeps runs
+// reproducible without mutating package-level state.
+// #nosec G404 - benchmark data only, not security-sensitive
+func newBenchmarkRand() *rand.Rand {
+	return rand.New(rand.NewSource(42))
+}
+
 func main() {
 	flag.Parse()
-	rand.Seed(42)
 
 	if device == "gpu" {
 		runGpuBenchmarks()
@@ -230,6 +237,7 @@ func runJitBenchmarks() {
 func runProfiling() {
 	var profFile *os.File
 	var err error
+	rng := newBenchmarkRand()
 
 	switch profile {
 	case "cpu":
@@ -279,13 +287,13 @@ func runProfiling() {
 	data := make([]float64, n)
 	// #nosec G404
 	for i := range data {
-		data[i] = rand.Float64()*10 - 5
+		data[i] = rng.Float64()*10 - 5
 	}
 
 	benchData := make([]float64, iterations)
 	// #nosec G404
 	for i := range benchData {
-		benchData[i] = rand.Float64() * 10
+		benchData[i] = rng.Float64() * 10
 	}
 
 	for i := 0; i < 100; i++ {
@@ -410,12 +418,10 @@ func runIntBenchmarks() []BenchmarkResult {
 }
 
 func benchmarkFuncInt(typ, name string, emlgoFunc, mathFunc func(int, int)) BenchmarkResult {
-	rand.Seed(42)
+	rng := newBenchmarkRand()
 	randData := make([]int, iterations)
-	// nosec G404 - benchmark tool uses math/rand for deterministic test data
-	// #nosec G404 - benchmark tool uses math/rand for deterministic test data
 	for i := range randData {
-		randData[i] = rand.Intn(10000) - 5000
+		randData[i] = rng.Intn(10000) - 5000
 	}
 
 	start := time.Now()
@@ -477,12 +483,12 @@ func runUintBenchmarks() []BenchmarkResult {
 }
 
 func benchmarkFuncUint(typ, name string, emlgoFunc, mathFunc func(uint, uint)) BenchmarkResult {
-	rand.Seed(42)
+	rng := newBenchmarkRand()
 	randData := make([]uint, iterations)
 	// nosec G404 - benchmark tool uses math/rand for deterministic test data
 	// #nosec G404 - benchmark tool uses math/rand for deterministic test data
 	for i := range randData {
-		randData[i] = uint(rand.Intn(10000))
+		randData[i] = uint(rng.Intn(10000))
 	}
 
 	start := time.Now()
@@ -576,11 +582,10 @@ func runFloat32Benchmarks() []BenchmarkResult {
 }
 
 func benchmarkFuncFloat32(typ, name string, emlgoFunc, mathFunc func(float32)) BenchmarkResult {
-	rand.Seed(42)
+	rng := newBenchmarkRand()
 	randData := make([]float32, iterations)
-	// #nosec G404 - benchmark tool uses math/rand for deterministic test data
 	for i := range randData {
-		randData[i] = float32(rand.Float64()*10 - 5)
+		randData[i] = float32(rng.Float64()*10 - 5)
 	}
 
 	start := time.Now()
@@ -664,11 +669,11 @@ func runFloat64Benchmarks() []BenchmarkResult {
 }
 
 func benchmarkFloat64(name string, emlgoFunc, mathFunc func(float64) float64) BenchmarkResult {
-	rand.Seed(42)
+	rng := newBenchmarkRand()
 	randData := make([]float64, iterations)
 	// #nosec G404 - benchmark tool uses math/rand for deterministic test data
 	for i := range randData {
-		randData[i] = rand.Float64()*10 - 5
+		randData[i] = rng.Float64()*10 - 5
 	}
 
 	start := time.Now()
@@ -698,14 +703,14 @@ func benchmarkFloat64(name string, emlgoFunc, mathFunc func(float64) float64) Be
 func runComplex64Benchmarks() []BenchmarkResult {
 	results := []BenchmarkResult{}
 
-	results = append(results, benchmarkComplex64("Complex64", "Exp", func(x complex64) complex64 {
+	results = append(results, benchmarkComplex64("complex64", "Exp", func(x complex64) complex64 {
 		r := complexExp(float64(real(x)), float64(imag(x)))
 		return complex64(r)
 	}, func(x complex64) complex64 {
 		return complex64(cmplx.Exp(complex128(x)))
 	}))
 
-	results = append(results, benchmarkComplex64("Complex64", "Log", func(x complex64) complex64 {
+	results = append(results, benchmarkComplex64("complex64", "Log", func(x complex64) complex64 {
 		if x == 0 {
 			return 0
 		}
@@ -716,19 +721,19 @@ func runComplex64Benchmarks() []BenchmarkResult {
 		return complex64(cmplx.Log(complex128(x)))
 	}))
 
-	results = append(results, benchmarkComplex64("Complex64", "Sin", func(x complex64) complex64 {
+	results = append(results, benchmarkComplex64("complex64", "Sin", func(x complex64) complex64 {
 		return complex64(trigComplexSin(float64(real(x)), float64(imag(x))))
 	}, func(x complex64) complex64 {
 		return complex64(cmplx.Sin(complex128(x)))
 	}))
 
-	results = append(results, benchmarkComplex64("Complex64", "Cos", func(x complex64) complex64 {
+	results = append(results, benchmarkComplex64("complex64", "Cos", func(x complex64) complex64 {
 		return complex64(trigComplexCos(float64(real(x)), float64(imag(x))))
 	}, func(x complex64) complex64 {
 		return complex64(cmplx.Cos(complex128(x)))
 	}))
 
-	results = append(results, benchmarkComplex64("Complex64", "Sqrt", func(x complex64) complex64 {
+	results = append(results, benchmarkComplex64("complex64", "Sqrt", func(x complex64) complex64 {
 		r, i := float64(real(x)), float64(imag(x))
 		mag := arithmetic.Sqrt(r*r + i*i)
 		rPlus := (mag + r) / 2
@@ -745,11 +750,11 @@ func runComplex64Benchmarks() []BenchmarkResult {
 }
 
 func benchmarkComplex64(typ, name string, emlgoFunc, mathFunc func(complex64) complex64) BenchmarkResult {
-	rand.Seed(42)
+	rng := newBenchmarkRand()
 	randData := make([]complex64, iterations)
 	// #nosec G404 - benchmark tool uses math/rand for deterministic test data
 	for i := range randData {
-		randData[i] = complex(float32(rand.Float64()*10-5), float32(rand.Float64()*10-5))
+		randData[i] = complex(float32(rng.Float64()*10-5), float32(rng.Float64()*10-5))
 	}
 
 	start := time.Now()
@@ -831,11 +836,11 @@ func runComplex128Benchmarks() []BenchmarkResult {
 }
 
 func benchmarkComplex128(typ, name string, emlgoFunc, mathFunc func(complex128) complex128) BenchmarkResult {
-	rand.Seed(42)
+	rng := newBenchmarkRand()
 	randData := make([]complex128, iterations)
 	// #nosec G404 - benchmark tool uses math/rand for deterministic test data
 	for i := range randData {
-		randData[i] = complex(rand.Float64()*10-5, rand.Float64()*10-5)
+		randData[i] = complex(rng.Float64()*10-5, rng.Float64()*10-5)
 	}
 
 	start := time.Now()
@@ -940,17 +945,20 @@ func runBatchBenchmarks() []BenchmarkResult {
 }
 
 func benchmarkBatch(typ, name string, n int, emlgoFunc, mathFunc func([]float64, []float64)) BenchmarkResult {
-	rand.Seed(42)
+	rng := newBenchmarkRand()
 	a := make([]float64, n)
 	b := make([]float64, n)
 	// #nosec G404 - benchmark tool uses math/rand for deterministic test data
 	for i := 0; i < n; i++ {
-		a[i] = rand.Float64()*10 - 5
-		b[i] = rand.Float64()*10 - 5
+		a[i] = rng.Float64()*10 - 5
+		b[i] = rng.Float64()*10 - 5
 	}
 
-	// Adjust iterations for batch benchmarks to keep runtime reasonable
-	batchIterations := 100000
+	// Batch benchmarks process n elements per call, so scale the iteration
+	// count by the batch size. This keeps the total element throughput
+	// comparable to the scalar benchmarks and honours the -n flag, which was
+	// previously ignored here.
+	batchIterations := max(1, iterations/n)
 
 	start := time.Now()
 	for i := 0; i < batchIterations; i++ {
@@ -1246,6 +1254,39 @@ var baseline = map[string]float64{
 	"uint/Div":       1.00,
 }
 
+// regressionThreshold is the relative slowdown above which a benchmark is
+// reported as a regression.
+const regressionThreshold = 0.10
+
+// improvementThreshold is the relative speedup above which a benchmark is
+// reported as an improvement.
+const improvementThreshold = 0.15
+
+// classifyRegressions compares results against the recorded baseline and
+// reports which entries regressed and which improved. Entries without a
+// recorded baseline are ignored.
+func classifyRegressions(results []BenchmarkResult) (regressions, improvements []string) {
+	for _, r := range results {
+		key := r.Type + "/" + r.Name
+		baselineRatio, ok := baseline[key]
+		if !ok {
+			continue
+		}
+		delta := r.Ratio - baselineRatio
+		switch {
+		case delta > regressionThreshold:
+			regressions = append(regressions, fmt.Sprintf(
+				"REGRESSION: %s ratio changed from %.2fx to %.2fx (+%.1f%%)",
+				key, baselineRatio, r.Ratio, delta*100))
+		case delta < -improvementThreshold:
+			improvements = append(improvements, fmt.Sprintf(
+				"IMPROVEMENT: %s ratio changed from %.2fx to %.2fx (%.1f%% better)",
+				key, baselineRatio, r.Ratio, -delta*100))
+		}
+	}
+	return regressions, improvements
+}
+
 func checkRegression(results []BenchmarkResult) {
 	regressionFlag := flag.Bool("regression", false, "Check for performance regression against baseline")
 	flag.Parse()
@@ -1255,25 +1296,17 @@ func checkRegression(results []BenchmarkResult) {
 	}
 
 	fmt.Println("\n=== Regression Check ===")
-	regressions := 0
-	for _, r := range results {
-		key := r.Type + "/" + r.Name
-		if baselineRatio, ok := baseline[key]; ok {
-			regression := r.Ratio - baselineRatio
-			if regression > 0.10 {
-				fmt.Printf("⚠️  REGRESSION: %s ratio changed from %.2fx to %.2fx (+%.1f%%)\n",
-					key, baselineRatio, r.Ratio, regression*100)
-				regressions++
-			} else if regression < -0.15 {
-				fmt.Printf("✓  IMPROVEMENT: %s ratio changed from %.2fx to %.2fx (%.1f%% better)\n",
-					key, baselineRatio, r.Ratio, -regression*100)
-			}
-		}
+	regressions, improvements := classifyRegressions(results)
+	for _, msg := range regressions {
+		fmt.Printf("⚠️  %s\n", msg)
 	}
-	if regressions > 0 {
-		fmt.Printf("\n⚠️  WARNING: %d regressions detected (>15%% slower than baseline)\n", regressions)
+	for _, msg := range improvements {
+		fmt.Printf("✓  %s\n", msg)
+	}
+	if len(regressions) > 0 {
+		fmt.Printf("\n⚠️  WARNING: %d regressions detected (>%.0f%% slower than baseline)\n",
+			len(regressions), regressionThreshold*100)
 		os.Exit(1)
-	} else {
-		fmt.Println("\n✓ All benchmarks within 15% of baseline")
 	}
+	fmt.Printf("\n✓ All benchmarks within %.0f%% of baseline\n", regressionThreshold*100)
 }

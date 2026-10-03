@@ -2,6 +2,7 @@ package bytecode
 
 import (
 	"math"
+	"math/rand"
 	"testing"
 
 	"github.com/emlgo/eml/internal/jit"
@@ -177,11 +178,11 @@ func TestEvalAndEvalRegularizedOpcodes(t *testing.T) {
 	}
 	p.Consts = []float64{
 		2.0, 3.0, // Add -> 5
-		1.0,      // Sub -> 4
-		2.0,      // Mul -> 8
-		2.0,      // Div -> 4
-		2.0,      // Pow -> 16
-		2.0,      // EML arg
+		1.0, // Sub -> 4
+		2.0, // Mul -> 8
+		2.0, // Div -> 4
+		2.0, // Pow -> 16
+		2.0, // EML arg
 	}
 	p.CalculateMaxStackDepth()
 
@@ -297,12 +298,12 @@ func TestOptimizerAllRules(t *testing.T) {
 		2.0, 3.0, // EML
 		1.0, 1.0, // EML -> e
 		0.0, 1.0, // EML -> 1
-		5.0,      // Neg
-		2.0,      // Inv
-		4.0,      // Sqrt
-		1.0,      // Exp
-		2.0,      // Log
-		1.0,      // EML with const 1
+		5.0, // Neg
+		2.0, // Inv
+		4.0, // Sqrt
+		1.0, // Exp
+		2.0, // Log
+		1.0, // EML with const 1
 	}
 	p.VarIndices = []uint16{0}
 
@@ -328,30 +329,44 @@ func TestGeneticOperatorsComprehensive(t *testing.T) {
 	}
 
 	// Crossover
+	// #nosec G404 -- deterministic seeded generator for reproducible tests
+	rng := rand.New(rand.NewSource(1))
 	p1, _ := CompileExpr("x + 1")
 	p2, _ := CompileExpr("y * 2")
-	c1, c2, err := Crossover(p1, p2)
+	c1, c2, err := Crossover(p1, p2, rng)
 	if err != nil || c1 == nil || c2 == nil {
 		t.Errorf("Crossover failed: %v", err)
 	}
 
-	_, _, err = Crossover(nil, p2)
-	if err == nil {
+	if _, _, err = Crossover(nil, p2, rng); err == nil {
 		t.Errorf("Crossover(nil, p2) should error")
 	}
+	if _, _, err = Crossover(p1, p2, nil); err == nil {
+		t.Errorf("Crossover with a nil source should error")
+	}
 
-	// Mutate and mutateOp coverage
-	_ = mutateOp(OpConst)
-	_ = mutateOp(OpVar)
-	_ = mutateOp(OpNeg)
-	_ = mutateOp(OpAdd)
-	_ = mutateOp(OpCode(255))
+	// Mutate, and the mutation pool for every arity.
+	for _, op := range []OpCode{OpConst, OpVar, OpNeg, OpInv, OpAdd, OpEML, OpSin, OpCode(255)} {
+		if got := poolFor(op, 0); got.Arity() != op.Arity() && op != OpCode(255) {
+			t.Errorf("poolFor(%v) = %v changed arity from %d to %d",
+				op, got, op.Arity(), got.Arity())
+		}
+	}
+	for arity := range mutationPools {
+		if len(mutationPools[arity]) == 0 {
+			t.Errorf("mutation pool for arity %d is empty", arity)
+		}
+	}
 
-	m := Mutate(p1, 1.0)
+	m := Mutate(p1, 1.0, rng)
 	if m == nil {
 		t.Errorf("Mutate failed")
 	}
-	if Mutate(nil, 1.0) != nil {
+	if Mutate(nil, 1.0, rng) != nil {
 		t.Errorf("Mutate(nil) should be nil")
+	}
+	// A nil random source degrades to a clone rather than panicking.
+	if c := Mutate(p1, 1.0, nil); c == nil || len(c.Ops) != len(p1.Ops) {
+		t.Errorf("Mutate with a nil source = %v, want a clone", c)
 	}
 }

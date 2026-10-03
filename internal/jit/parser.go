@@ -44,7 +44,7 @@ func isFuncName(s string) bool {
 }
 
 func (l *lexer) next() token {
-	for l.pos < len(l.input) && l.input[l.pos] == ' ' {
+	for l.pos < len(l.input) && (l.input[l.pos] == ' ' || l.input[l.pos] == '\t' || l.input[l.pos] == '\n' || l.input[l.pos] == '\r') {
 		l.pos++
 	}
 	if l.pos >= len(l.input) {
@@ -59,10 +59,23 @@ func (l *lexer) next() token {
 		l.pos++
 		return token{typ: tokTypeFromRune(rune(c)), value: string(c)}
 	}
-	if c >= '0' && c <= '9' || c == '.' {
+	if (c >= '0' && c <= '9') || c == '.' {
 		start := l.pos
-		for l.pos < len(l.input) && (l.input[l.pos] >= '0' && l.input[l.pos] <= '9' || l.input[l.pos] == '.') {
+		for l.pos < len(l.input) && ((l.input[l.pos] >= '0' && l.input[l.pos] <= '9') || l.input[l.pos] == '.') {
 			l.pos++
+		}
+		// Support scientific notation (e.g. 1e-5, 2.5e+3, 1E10)
+		if l.pos < len(l.input) && (l.input[l.pos] == 'e' || l.input[l.pos] == 'E') {
+			expPos := l.pos + 1
+			if expPos < len(l.input) && (l.input[expPos] == '+' || l.input[expPos] == '-') {
+				expPos++
+			}
+			if expPos < len(l.input) && l.input[expPos] >= '0' && l.input[expPos] <= '9' {
+				l.pos = expPos
+				for l.pos < len(l.input) && l.input[l.pos] >= '0' && l.input[l.pos] <= '9' {
+					l.pos++
+				}
+			}
 		}
 		return token{typ: tokNumber, value: l.input[start:l.pos]}
 	}
@@ -164,15 +177,46 @@ func Parse(input string) (Node, error) {
 	return node, nil
 }
 
+func validateVars(n Node, allowed map[string]bool) error {
+	switch v := n.(type) {
+	case Variable:
+		name := v.Name
+		if name == "" {
+			name = "x"
+		}
+		if !allowed[name] {
+			return fmt.Errorf("undeclared variable %q", name)
+		}
+	case BinaryOp:
+		if err := validateVars(v.Left, allowed); err != nil {
+			return err
+		}
+		return validateVars(v.Right, allowed)
+	case UnaryOp:
+		return validateVars(v.Operand, allowed)
+	case FunctionCall:
+		return validateVars(v.Arg, allowed)
+	}
+	return nil
+}
+
 // ParseWithVars parses an expression where multiple variable names are supported.
-// Any identifier not in the vars list that is also not a function name is treated
-// as a variable with its lexed name.
+// If vars is non-empty, it validates that all referenced variables are in the vars list.
 func ParseWithVars(input string, vars []string) (Node, error) {
-	// All identifiers that are not functions are treated as Variable{Name: name}.
-	// The current lexer already returns tokX with the name for any non-function identifier,
-	// and parseBase returns Variable{} — we override that here by post-processing.
-	_ = vars // vars are used to validate; any unknown ident is already a variable.
-	return Parse(input)
+	node, err := Parse(input)
+	if err != nil {
+		return nil, err
+	}
+	if len(vars) > 0 {
+		allowed := make(map[string]bool, len(vars))
+		for _, v := range vars {
+			allowed[v] = true
+		}
+		if err := validateVars(node, allowed); err != nil {
+			return nil, err
+		}
+	}
+	return node, nil
 }
 
 func (p *parser) parseExpr() (Node, error) {

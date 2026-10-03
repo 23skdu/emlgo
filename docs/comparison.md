@@ -8,15 +8,15 @@ This document provides detailed benchmark results comparing `emlgo` (EML-based m
 
 - **Average Ratio (AMD64)**: 1.15x (emlgo vs math)
 - **Average Ratio (ARM64)**: 1.20x (emlgo vs math)
-- **Batch Performance (SIMD)**: **1.2x to 15.0x faster** than standard library loops.
-- **FastMath Peak**: **10% faster** than `math.Sin` using FMA-optimized polynomials.
-- **Parity & Accuracy**: 100% feature parity verified; standard library accuracy matched to within 1 ULP for core functions.
+- **Batch Performance (SIMD)**: mixed. In the recorded runs the CPU SIMD batch paths were **0.31x-0.98x** of the reference loops (i.e. slower); see [nextsteps.md](nextsteps.md) Steps 1-3 for the measured cause.
+- **FastMath**: minimax polynomials for `exp` (~1.5e-6 rel. error) and `log` (~1e-7). `Sin`/`Cos`/`Sqrt` delegate to `math` and are bit-exact — they are not faster.
+- **Parity & Accuracy**: 100% feature parity on the **scalar** path (matched to within 1 ULP). The CPU batch kernels are **not** accuracy-tested today and are measurably worse; see [nextsteps.md](nextsteps.md) Step 4.
 
-**Recent Improvements (v2.0):**
+**Recent Improvements:**
 
-- **Adaptive Parallelization**: Dynamic chunk sizing based on cache topology
+- **Parallel Chunk Sizing**: Dynamic chunk sizing based on slice size and core count
 - **Batch Operation Fusion**: Combined Exp+Mul, Log+Div in single pass
-- **Zero-Allocation APIs**: In-place batch operations (SimDTo functions)
+- **Zero-Allocation APIs**: In-place batch operations (SIMDTo functions)
 - **Fused Operations**: ExpMulBatch, ExpAddBatch, LogDivBatch, LogSubBatch for reduced memory traffic
 
 ## Benchmark Configuration
@@ -35,7 +35,7 @@ This document provides detailed benchmark results comparing `emlgo` (EML-based m
 | **High Speed** | | | |
 | PowInt | **0.19x** | **0.15x** | ✓ 5-6x Faster |
 | Pow | **0.89x** | **0.76x** | ✓ Faster |
-| fastmath.Sin | **0.90x** | **0.89x** | ✓ Faster (New) |
+| fastmath.Sin | **0.90x** | **0.89x** | ≈ parity (delegates to `math.Sin`) |
 | Square | **0.90x** | **0.96x** | ✓ Faster |
 | Add/Sub/Mul | **0.92x** | **1.01x** | ✓ Parity |
 | **Near Parity** | | | |
@@ -60,7 +60,7 @@ This document provides detailed benchmark results comparing `emlgo` (EML-based m
 | ExpMulBatch | 1K+ | **1.3x** | **1.5x** |
 | LogDivBatch | 1K+ | **1.2x** | **1.4x** |
 
-**Fused Operations (v2.0):**
+**Fused Operations:**
 
 - `ExpMulBatch`: Fuses Exp and multiply in single pass (20-30% less memory bandwidth)
 - `ExpAddBatch`: Fuses Exp and add in single pass
@@ -71,7 +71,7 @@ This document provides detailed benchmark results comparing `emlgo` (EML-based m
 
 ---
 
-## Zero-Allocation API (v2.0)
+## Zero-Allocation API
 
 New in-place batch operations avoid allocation overhead:
 
@@ -91,19 +91,17 @@ SqrtSIMDTo(src, dst)    // In-place: no allocation
 
 ---
 
-## Adaptive Parallelization (v2.0)
+## Parallel Chunk Sizing
 
-Dynamic chunk sizing based on CPU cache topology:
+Work is split by slice size and core count:
 
 ```text
-L1 Tile Size:   32 KB
-L2 Tile Size:  256 KB
-L3 Tile Size:    1 MB
-Small Cutoff:   256 elements
-Large Cutoff: 4096 elements
+Small Cutoff:   256 elements   (below this, run inline)
+Large Cutoff: 4096 elements   (max elements per worker chunk)
 ```
 
-Chunk size automatically adjusts based on array size and CPU count for optimal cache utilization.
+`GetParallelChunkSize(n)` divides `n` across `runtime.NumCPU()` workers and caps
+each chunk at `LargeCutoff`. It is not tuned to cache topology.
 
 ---
 
@@ -116,7 +114,7 @@ Chunk size automatically adjusts based on array size and CPU count for optimal c
 | Sin / Cos | 0 | ✓ Exact |
 | Sqrt | 0 | ✓ Exact |
 | Pow | 10 | ✓ Very Close |
-| FastMath Sin | ~1e-7 | ✓ Relaxed (FastPath) |
+| FastMath Sin | 0 | ✓ Exact (delegates to `math.Sin`) |
 
 ---
 
@@ -146,7 +144,7 @@ Chunk size automatically adjusts based on array size and CPU count for optimal c
 - `[x]` **FastMath package**: Relaxed accuracy for maximum throughput.
 - `[x]` **Zero-Allocation APIs**: In-place batch operations.
 - `[x]` **Fused Operations**: ExpMul, LogDiv combined passes.
-- `[x]` **Adaptive Parallelization**: Cache-aware chunk sizing.
+- `[x]` **Parallel Chunk Sizing**: Core-count-aware chunk sizing.
 
 ### Completed (Since Last Update)
 
@@ -155,7 +153,7 @@ Chunk size automatically adjusts based on array size and CPU count for optimal c
 - `[x]` **WASM SIMD**: 8-wide unrolled kernels for browser auto-vectorization.
 - `[x]` **JIT Compiler**: x86-64 SSE2 codegen with register allocation and binary exponentiation.
 - `[x]` **Fused Operations**: ExpMul, ExpAdd, LogDiv, LogSub combined passes.
-- `[x]` **Adaptive Parallelization**: Cache-aware chunk sizing with pre-allocated worker pool.
+- `[x]` **Parallel Chunk Sizing**: Core-count-aware chunk sizing with pre-allocated worker pool.
 - `[x]` **JIT Function Calls**: 16 math functions (sin, cos, exp, log, sqrt, tan, asin, acos, atan, abs, cbrt, log2, log10, ceil, floor, trunc).
 - `[x]` **JIT Negative Exponents**: `x^-n` decomposed as `1.0/x^n`.
 - `[x]` **JIT Non-Integer Exponents**: `x^0.5`, `x^1.5` via `exp(y*log(x))`.
@@ -166,7 +164,7 @@ Chunk size automatically adjusts based on array size and CPU count for optimal c
 - `[x]` **Canonical EML Trees**: Normalize any expression to minimal EML form.
 - `[x]` **Numerical Stability**: Log1p/Expm1 for Pow near x=1, Exp near x=0.
 - `[x]` **Worker Pool Shutdown**: `StopWorkerPool()` for graceful termination.
-- `[x]` **CI/CD Pipeline**: GitHub Actions with Go 1.22/1.23 matrix.
+- `[x]` **CI/CD Pipeline**: GitHub Actions with a Go 1.26/1.27 matrix plus a cross-build job (linux/amd64, linux/arm64, darwin/amd64, darwin/arm64, windows/amd64, js/wasm, wasip1/wasm).
 
 ### Remaining Work
 

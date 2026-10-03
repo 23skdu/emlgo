@@ -1,6 +1,11 @@
 # Function Reference
 
-Complete list of all public functions in the emlgo library.
+Reference for the public API of the emlgo library.
+
+Coverage: `pkg/logexp`, `pkg/trig`, `pkg/hyper`, `pkg/arithmetic`,
+`pkg/bytecode`, `internal/eml`, `internal/eml/bigmath`, `internal/jit`,
+`internal/constants`. `pkg/fastmath` and `pkg/quant` are not yet documented here;
+see their package docs instead.
 
 ---
 
@@ -14,8 +19,8 @@ Exponential and logarithmic functions using EML operator.
 | Log | `func Log(x float64) float64` | Natural logarithm ln(x) |
 | ExpBatch | `func ExpBatch(x []float64) []float64` | Batch exponential (SIMD) |
 | LogBatch | `func LogBatch(x []float64) []float64` | Batch logarithm (SIMD) |
-| ExpFast | `func ExpFast(x float64) float64` | Fast approximate exp |
-| LogFast | `func LogFast(x float64) float64` | Fast approximate log |
+| ExpFast | `func ExpFast(x float64) float64` | exp with overflow/underflow clamping (exact, not an approximation) |
+| LogFast | `func LogFast(x float64) float64` | log with a non-positive-input guard (exact, not an approximation) |
 
 ---
 
@@ -190,7 +195,7 @@ Core EML operator and SIMD utilities (internal).
 | Function | Signature | Description |
 |----------|-----------|-------------|
 | Eml | `func Eml(x, y float64) float64` | Core EML operator: exp(x) - ln(y) |
-| EmlOne | `func EmlOne(x float64) float64` | Eml(x, 1) = exp(x) |
+| One | `func One(x float64) float64` | Eml(x, 1) = exp(x) |
 | OneEml | `func OneEml(y float64) float64` | Eml(1, y) = e - ln(y) |
 
 ### SIMD Detection
@@ -351,9 +356,9 @@ JIT compiler for math expressions (amd64 only).
 | Function | Signature | Description |
 |----------|-----------|-------------|
 | NewCompiler | `func NewCompiler() *Compiler` | Create a new JIT compiler |
-| Compile | `func (c *Compiler) Compile(expr string) (jitFunc, error)` | Compile expression string to native function |
+| Compile | `func (c *Compiler) Compile(expr string) (Func, error)` | Compile expression string to native function |
 | Parse | `func Parse(input string) (Node, error)` | Parse expression to AST |
-| ParseWithVars | `func ParseWithVars(input string, vars []string) (Node, error)` | Parse with multi-variable support |
+| ParseWithVars | `func ParseWithVars(input string, vars []string) (Node, error)` | Parse identifiers as named variables (the `vars` list is not consulted) |
 
 ### JIT Expression Cache
 
@@ -445,6 +450,76 @@ JIT compiler for math expressions (amd64 only).
 
 ---
 
+## Package: pkg/bytecode
+
+A linear bytecode VM for EML expressions, in Structure-of-Arrays layout. It is
+the execution engine for symbolic regression: `Search` fits a closed-form
+program to data using the genetic operators below.
+
+### Compilation
+
+| Function | Description |
+| :--- | :--- |
+| `func CompileExpr(expr string) (*Program, error)` | Compile an infix expression string. Rejects malformed input rather than emitting an unevaluable program. |
+| `func CompileAST(n jit.Node) (*Program, error)` | Compile a `jit` AST. |
+| `func CompileEML(n *jit.EMLNode) (*Program, error)` | Compile a canonical EML tree. |
+| `func (p *Program) Optimize` / `func Optimize(p *Program) *Program` | Constant-fold and apply identity reductions to the opcode stream. |
+
+Supported functions are the full set shared with `internal/jit`: `eml`, `sin`,
+`cos`, `tan`, `exp`, `log`, `ln`, `sqrt`, `asin`, `acos`, `atan`, `abs`, `cbrt`,
+`log2`, `log10`, `ceil`, `floor`, `trunc`, `round`, `sinh`, `cosh`, `tanh`,
+`asinh`, `acosh`, `atanh`, `erf`, `gamma`. The tokenizer, code generator,
+optimizer and program printer all resolve names through one table
+(`functab.go`). Function names are case-insensitive.
+
+### Evaluation
+
+| Method | Description |
+| :--- | :--- |
+| `func (p *Program) Eval(vars []float64, scratch []float64) float64` | Evaluate against one variable vector. |
+| `func (p *Program) EvalRegularized(vars []float64, eps, scratch []float64) float64` | Evaluate with smooth domain regularization (`ln_eps`), so no candidate produces NaN. |
+| `func (p *Program) EvalBatchColumnar(data [][]float64, dst []float64)` | Evaluate over a columnar batch. Allocates scratch per call. |
+| `func (p *Program) EvalBatchColumnarScratch(data [][]float64, dst []float64, s *BatchScratch)` | As above with caller-owned scratch; **0 allocations** at steady state. |
+| `func (p *Program) EvalBatch(data [][]float64, dst []float64)` | Evaluate over a row-based batch (`data[i]` = variables for sample `i`). |
+| `func NewBatchScratch(p *Program, chunkSize int) BatchScratch` | Allocate reusable batch scratch; pass 0 for the default chunk size. |
+
+### Genetic operators
+
+All three take an explicit `*rand.Rand`, so a search is reproducible.
+
+| Function | Description |
+| :--- | :--- |
+| `func ValidateStack(ops []OpCode) bool` | Is this opcode stream a well-formed RPN expression? |
+| `func RandomProgram(nVars, minOps, maxOps int, rng *rand.Rand) *Program` | Random program, valid by construction. Generated as an expression tree and flattened, so it has usable crossover points. |
+| `func Crossover(p1, p2 *Program, rng *rand.Rand) (*Program, *Program, error)` | Single-point crossover at complete-subexpression boundaries. Operand streams are spliced with the opcodes, so they stay aligned. |
+| `func Mutate(p *Program, mutationRate float64, rng *rand.Rand) *Program` | Per-opcode mutation within an arity-preserving pool, plus constant jitter. A literal can be turned into a variable reference and back, editing the operand stream as it goes. |
+| `func ProgramCost(p *Program) float64` | Rough size measure for penalising bloated candidates. |
+| `func ProgramDepth(p *Program) int` | Maximum evaluation stack depth. |
+
+### Symbolic regression
+
+| Symbol | Description |
+| :--- | :--- |
+| `type Dataset struct { X [][]float64; Y []float64 }` | Columnar samples: one input column per variable, plus targets. |
+| `type Fitness func(p *Program, d Dataset) float64` | Scores a candidate; higher is better. Must return a finite value for every candidate. Called concurrently. |
+| `func LeastSquares(eps float64) Fitness` | Negative RMS error; the standard objective. |
+| `type Config struct` | `PopulationSize`, `Generations`, `CrossoverRate`, `MutationRate`, `Elitism`, `TournamentSize`, `MinOps`, `MaxOps`, `Epsilon`, `Workers`, `LocalSearchSteps`, `Seed`. |
+| `func Search(cfg Config, dataset Dataset, fitness Fitness) (Result, error)` | Run a search; deterministic for a given `Seed`. |
+| `type Result struct` | `Best`, `BestFitness`, `History`, `Evaluations`; `Converged(tolerance)` reports fitness within tolerance of zero. |
+
+```go
+d := bytecode.Dataset{X: [][]float64{x}, Y: y}
+res, err := bytecode.Search(bytecode.Config{
+    PopulationSize: 400, Generations: 400, LocalSearchSteps: 60, Seed: 1,
+}, d, bytecode.LeastSquares(1e-6))
+// Fitting 3x^2 + 2x + 1 reaches an RMS error of 4e-13.
+```
+
+**Limitation.** Shallow closed forms built from the available operators are
+recovered essentially exactly; transcendental targets are approximated, not
+recovered. Fitting `sin(x)` over `[0, 2*pi)` plateaus at RMS ~0.17 regardless of
+budget. See [nextsteps.md](nextsteps.md).
+
 ## Package: internal/constants
 
 Mathematical constants.
@@ -477,8 +552,8 @@ The core EML operator `eml(x,y) = exp(x) - ln(y)` serves as the theoretical foun
 - **Scalar operations**: Direct implementations using `math.*` functions or hand-coded assembly (AVX2/AVX512 on AMD64).
 - **Batch operations**: SIMD-vectorized kernels that process 4-8 elements per cycle using architecture-specific assembly.
 - **FastMath**: FMA-optimized polynomial approximations with relaxed IEEE 754 compliance.
-- **JIT compiler**: x86-64 SSE2 codegen for math expressions parsed from strings, supporting 17 built-in functions, non-integer exponents (via `exp(y*log(x))`), and variable exponents.
-- **Complex numbers**: `math/cmplx`-based operations on `complex128` slices, parallelized via the worker pool.
+- **JIT compiler**: x86-64 machine-code codegen for math expressions parsed from strings, supporting 25 built-in functions, non-integer exponents (via `exp(y*log(x))`), and variable exponents.
+- **Complex numbers**: `math/cmplx`-based element-wise operations on `complex128` slices (serial).
 - **Arbitrary precision**: `math/big.Float` Taylor series for symbolic verification at 256-bit precision.
 - **Arena allocator**: Zero-allocation JIT parse/eval paths using bump-pointer allocation.
 - **Canonical EML trees**: Normalize any expression to minimal EML form for comparison and optimization.

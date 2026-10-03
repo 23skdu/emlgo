@@ -4,10 +4,78 @@ import (
 	"fmt"
 	"math"
 	"strconv"
-	"strings"
 )
 
-// Decompile converts an EMLNode tree to a parenthesized infix string.
+func emlOpRune(name string) rune {
+	switch name {
+	case "add":
+		return '+'
+	case "sub":
+		return '-'
+	case "mul":
+		return '*'
+	case "div":
+		return '/'
+	case "pow":
+		return '^'
+	}
+	return 0
+}
+
+func emlPrec(n *EMLNode) int {
+	if n == nil {
+		return 5
+	}
+	if n.Kind == EMLFunc {
+		switch n.Name {
+		case "add", "sub":
+			return 1
+		case "mul", "div":
+			return 2
+		case "pow":
+			return 3
+		case "neg":
+			return 4
+		}
+	}
+	return 5
+}
+
+func wrapDecomp(n *EMLNode, parentOp string, left bool) string {
+	s := Decompile(n)
+	if n == nil {
+		return s
+	}
+	parentRune := emlOpRune(parentOp)
+	childPrec := emlPrec(n)
+	parentPrec := 0
+	switch parentRune {
+	case '+', '-':
+		parentPrec = 1
+	case '*', '/':
+		parentPrec = 2
+	case '^':
+		parentPrec = 3
+	}
+
+	if childPrec < parentPrec {
+		return "(" + s + ")"
+	}
+	if childPrec == parentPrec && !left && (parentRune == '-' || parentRune == '/') {
+		return "(" + s + ")"
+	}
+	if parentRune == '^' {
+		if left && childPrec <= parentPrec {
+			return "(" + s + ")"
+		}
+		if !left && (childPrec < parentPrec || (n.Kind == EMLFunc && n.Name == "neg")) {
+			return "(" + s + ")"
+		}
+	}
+	return s
+}
+
+// Decompile converts an EMLNode tree to a parenthesized infix string with correct operator precedence.
 func Decompile(n *EMLNode) string {
 	if n == nil {
 		return ""
@@ -16,43 +84,43 @@ func Decompile(n *EMLNode) string {
 	case EMLConst:
 		return formatFloat(n.Value)
 	case EMLVar:
+		if n.Name != "" {
+			return n.Name
+		}
 		return "x"
 	case EMLOp:
 		left := Decompile(n.Left)
 		right := Decompile(n.Right)
 		return fmt.Sprintf("eml(%s, %s)", left, right)
 	case EMLFunc:
-		arg := Decompile(n.Left)
 		switch n.Name {
 		case "exp":
-			return fmt.Sprintf("exp(%s)", arg)
+			return fmt.Sprintf("exp(%s)", Decompile(n.Left))
 		case "log":
-			return fmt.Sprintf("log(%s)", arg)
+			return fmt.Sprintf("log(%s)", Decompile(n.Left))
 		case "sin":
-			return fmt.Sprintf("sin(%s)", arg)
+			return fmt.Sprintf("sin(%s)", Decompile(n.Left))
 		case "cos":
-			return fmt.Sprintf("cos(%s)", arg)
+			return fmt.Sprintf("cos(%s)", Decompile(n.Left))
 		case "sqrt":
-			return fmt.Sprintf("sqrt(%s)", arg)
+			return fmt.Sprintf("sqrt(%s)", Decompile(n.Left))
 		case "neg":
-			return fmt.Sprintf("-%s", wrapParenDecomp(n.Left))
+			if emlPrec(n.Left) <= 2 {
+				return fmt.Sprintf("-(%s)", Decompile(n.Left))
+			}
+			return fmt.Sprintf("-%s", wrapDecomp(n.Left, "neg", true))
 		case "add":
-			rightArg := Decompile(n.Right)
-			return fmt.Sprintf("%s + %s", arg, rightArg)
+			return fmt.Sprintf("%s + %s", wrapDecomp(n.Left, "add", true), wrapDecomp(n.Right, "add", false))
 		case "sub":
-			rightArg := Decompile(n.Right)
-			return fmt.Sprintf("%s - %s", arg, rightArg)
+			return fmt.Sprintf("%s - %s", wrapDecomp(n.Left, "sub", true), wrapDecomp(n.Right, "sub", false))
 		case "mul":
-			rightArg := Decompile(n.Right)
-			return fmt.Sprintf("%s * %s", arg, rightArg)
+			return fmt.Sprintf("%s * %s", wrapDecomp(n.Left, "mul", true), wrapDecomp(n.Right, "mul", false))
 		case "div":
-			rightArg := Decompile(n.Right)
-			return fmt.Sprintf("%s / %s", arg, rightArg)
+			return fmt.Sprintf("%s / %s", wrapDecomp(n.Left, "div", true), wrapDecomp(n.Right, "div", false))
 		case "pow":
-			rightArg := Decompile(n.Right)
-			return fmt.Sprintf("%s^%s", arg, rightArg)
+			return fmt.Sprintf("%s^%s", wrapDecomp(n.Left, "pow", true), wrapDecomp(n.Right, "pow", false))
 		default:
-			return fmt.Sprintf("%s(%s)", n.Name, arg)
+			return fmt.Sprintf("%s(%s)", n.Name, Decompile(n.Left))
 		}
 	}
 	return ""
@@ -67,6 +135,9 @@ func DecompileLaTeX(n *EMLNode) string {
 	case EMLConst:
 		return formatFloatLatex(n.Value)
 	case EMLVar:
+		if n.Name != "" {
+			return n.Name
+		}
 		return "x"
 	case EMLOp:
 		left := DecompileLaTeX(n.Left)
@@ -76,7 +147,7 @@ func DecompileLaTeX(n *EMLNode) string {
 		arg := DecompileLaTeX(n.Left)
 		switch n.Name {
 		case "exp":
-			return fmt.Sprintf("e^{%s}", wrapLatex(arg))
+			return fmt.Sprintf("e^{%s}", wrapLatexNode(n.Left, arg))
 		case "log":
 			return fmt.Sprintf("\\ln(%s)", arg)
 		case "sin":
@@ -88,7 +159,7 @@ func DecompileLaTeX(n *EMLNode) string {
 		case "sqrt":
 			return fmt.Sprintf("\\sqrt{%s}", arg)
 		case "neg":
-			return fmt.Sprintf("-%s", wrapLatex(arg))
+			return fmt.Sprintf("-%s", wrapLatexNode(n.Left, arg))
 		case "add":
 			rightArg := DecompileLaTeX(n.Right)
 			return fmt.Sprintf("%s + %s", arg, rightArg)
@@ -97,7 +168,7 @@ func DecompileLaTeX(n *EMLNode) string {
 			return fmt.Sprintf("%s - %s", arg, rightArg)
 		case "mul":
 			rightArg := DecompileLaTeX(n.Right)
-			return fmt.Sprintf("%s \\cdot %s", wrapLatex(arg), wrapLatex(rightArg))
+			return fmt.Sprintf("%s \\cdot %s", wrapLatexNode(n.Left, arg), wrapLatexNode(n.Right, rightArg))
 		case "div":
 			rightArg := DecompileLaTeX(n.Right)
 			return fmt.Sprintf("\\frac{%s}{%s}", arg, rightArg)
@@ -127,15 +198,8 @@ func formatFloatLatex(v float64) string {
 	return s
 }
 
-func wrapParenDecomp(n *EMLNode) string {
-	if n.Kind == EMLFunc && (n.Name == "add" || n.Name == "sub") {
-		return "(" + Decompile(n) + ")"
-	}
-	return Decompile(n)
-}
-
-func wrapLatex(s string) string {
-	if strings.Contains(s, "+") || strings.Contains(s, "-") {
+func wrapLatexNode(n *EMLNode, s string) string {
+	if n != nil && emlPrec(n) <= 2 {
 		return "(" + s + ")"
 	}
 	return s
@@ -143,7 +207,7 @@ func wrapLatex(s string) string {
 
 func wrapLatexPow(n *EMLNode) string {
 	s := DecompileLaTeX(n)
-	if n.Kind == EMLOp || (n.Kind == EMLFunc && n.Name != "pow") {
+	if n != nil && (n.Kind == EMLOp || (n.Kind == EMLFunc && emlPrec(n) < 5)) {
 		return "(" + s + ")"
 	}
 	return s

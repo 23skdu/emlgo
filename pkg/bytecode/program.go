@@ -19,50 +19,67 @@ const (
 	OpEML
 
 	// Native elementary operations (used for collapsed EML identities)
-	OpAdd  // Pop y, Pop x, Push x + y
-	OpSub  // Pop y, Pop x, Push x - y
-	OpMul  // Pop y, Pop x, Push x * y
-	OpDiv  // Pop y, Pop x, Push x / y
-	OpPow  // Pop y, Pop x, Push x ^ y
-	OpNeg  // Pop x, Push -x
-	OpInv  // Pop x, Push 1.0 / x
-	OpSqrt // Pop x, Push sqrt(x)
-	OpExp  // Pop x, Push exp(x)
-	OpLog  // Pop x, Push log(x)
+	OpAdd // Pop y, Pop x, Push x + y
+	OpSub // Pop y, Pop x, Push x - y
+	OpMul // Pop y, Pop x, Push x * y
+	OpDiv // Pop y, Pop x, Push x / y
+	OpPow // Pop y, Pop x, Push x ^ y
+	OpNeg // Pop x, Push -x
+	OpInv // Pop x, Push 1.0 / x
+
+	// Unary elementary functions. The set matches internal/jit/functab.go and
+	// is indexed by the tables in functab.go.
+	OpSqrt  // Pop x, Push sqrt(x)
+	OpExp   // Pop x, Push exp(x)
+	OpLog   // Pop x, Push log(x)
+	OpSin   // Pop x, Push sin(x)
+	OpCos   // Pop x, Push cos(x)
+	OpTan   // Pop x, Push tan(x)
+	OpAsin  // Pop x, Push asin(x)
+	OpAcos  // Pop x, Push acos(x)
+	OpAtan  // Pop x, Push atan(x)
+	OpAbs   // Pop x, Push abs(x)
+	OpCbrt  // Pop x, Push cbrt(x)
+	OpLog2  // Pop x, Push log2(x)
+	OpLog10 // Pop x, Push log10(x)
+	OpCeil  // Pop x, Push ceil(x)
+	OpFloor // Pop x, Push floor(x)
+	OpTrunc // Pop x, Push trunc(x)
+	OpRound // Pop x, Push round(x)
+	OpSinh  // Pop x, Push sinh(x)
+	OpCosh  // Pop x, Push cosh(x)
+	OpTanh  // Pop x, Push tanh(x)
+	OpAsinh // Pop x, Push asinh(x)
+	OpAcosh // Pop x, Push acosh(x)
+	OpAtanh // Pop x, Push atanh(x)
+	OpErf   // Pop x, Push erf(x)
+	OpGamma // Pop x, Push gamma(x)
 )
+
+// opcodeLabels gives the mnemonic for every non-function opcode. Function
+// opcodes get their label from opcodeNames in functab.go.
+var opcodeLabels = map[OpCode]string{
+	OpConst: "CONST",
+	OpVar:   "VAR",
+	OpEML:   "EML",
+	OpAdd:   "ADD",
+	OpSub:   "SUB",
+	OpMul:   "MUL",
+	OpDiv:   "DIV",
+	OpPow:   "POW",
+	OpNeg:   "NEG",
+	OpInv:   "INV",
+}
 
 // String returns a readable representation of the OpCode.
 func (op OpCode) String() string {
-	switch op {
-	case OpConst:
-		return "CONST"
-	case OpVar:
-		return "VAR"
-	case OpEML:
-		return "EML"
-	case OpAdd:
-		return "ADD"
-	case OpSub:
-		return "SUB"
-	case OpMul:
-		return "MUL"
-	case OpDiv:
-		return "DIV"
-	case OpPow:
-		return "POW"
-	case OpNeg:
-		return "NEG"
-	case OpInv:
-		return "INV"
-	case OpSqrt:
-		return "SQRT"
-	case OpExp:
-		return "EXP"
-	case OpLog:
-		return "LOG"
-	default:
-		return fmt.Sprintf("OP(%d)", op)
+	if label, ok := opcodeLabels[op]; ok {
+		return label
 	}
+	if name, ok := funcName(op); ok {
+		return strings.ToUpper(name)
+	}
+	return fmt.Sprintf("OP(%d)", op)
 }
 
 // Arity returns the number of stack operands popped by this opcode.
@@ -70,11 +87,15 @@ func (op OpCode) Arity() int {
 	switch op {
 	case OpConst, OpVar:
 		return 0
-	case OpNeg, OpInv, OpSqrt, OpExp, OpLog:
-		return 1
 	case OpEML, OpAdd, OpSub, OpMul, OpDiv, OpPow:
 		return 2
+	case OpNeg, OpInv:
+		return 1
 	default:
+		// Every remaining opcode is a unary elementary function.
+		if _, ok := funcName(op); ok {
+			return 1
+		}
 		return 0
 	}
 }

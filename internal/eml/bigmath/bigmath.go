@@ -4,16 +4,18 @@
 package bigmath
 
 import (
-	"math"
 	"math/big"
+	"sync"
 )
 
 // Prec defines the default precision in bits for big.Float operations.
 const Prec = 256
 
 var (
-	one  = new(big.Float).SetPrec(Prec).SetInt64(1)
-	half = new(big.Float).SetPrec(Prec).SetFloat64(0.5)
+	one      = new(big.Float).SetPrec(Prec).SetInt64(1)
+	half     = new(big.Float).SetPrec(Prec).SetFloat64(0.5)
+	piCache  sync.Map
+	ln2Cache sync.Map
 )
 
 // Eml computes exp(x) - log(y) at arbitrary precision.
@@ -23,7 +25,7 @@ func Eml(x, y *big.Float) *big.Float {
 	return new(big.Float).Sub(e, l)
 }
 
-// Exp computes exp(x) at arbitrary precision using range reduction + Taylor series.
+// Exp computes e^x at arbitrary precision.
 func Exp(x *big.Float) *big.Float {
 	prec := x.Prec()
 	if prec == 0 {
@@ -34,46 +36,36 @@ func Exp(x *big.Float) *big.Float {
 		return new(big.Float).SetPrec(prec).SetInt64(1)
 	}
 
-	if x.Sign() < 0 {
-		threshold := new(big.Float).SetPrec(prec).SetFloat64(-750)
-		if x.Cmp(threshold) < 0 {
-			return new(big.Float).SetPrec(prec)
-		}
-	}
-
+	neg := x.Sign() < 0
 	absX := new(big.Float).Abs(x)
 	wprec := prec + 64
 
 	// Range reduction: exp(x) = exp(x/2^k)^(2^k)
-	// Choose k so |x/2^k| < 0.5 for fast Taylor convergence
+	// Choose k so |x/2^k| < 0.5 for fast Taylor convergence without converting to float64
 	k := 0
-	{
-		var f64abs float64
-		if absX.IsInf() {
-			f64abs = math.MaxFloat64
-		} else {
-			f64abs, _ = absX.Float64()
-		}
-		if f64abs > 0.5 {
-			k = int(math.Ceil(math.Log2(f64abs))) + 2
-		} else {
-			k = 0
-		}
+	expMant := absX.MantExp(nil)
+	if expMant > -1 {
+		k = expMant + 2
 	}
 
 	shifted := new(big.Float).SetPrec(wprec)
 	if k > 0 {
 		divisor := new(big.Float).SetPrec(wprec).SetMantExp(
 			new(big.Float).SetPrec(wprec).SetInt64(1), k)
-		shifted.Quo(x, divisor)
+		shifted.Quo(absX, divisor)
 	} else {
-		shifted.Copy(x)
+		shifted.Copy(absX)
 	}
 
 	result := expTaylor(shifted, wprec)
 
 	for i := 0; i < k; i++ {
 		result.Mul(result, result)
+	}
+
+	if neg {
+		oneP := new(big.Float).SetPrec(wprec).SetInt64(1)
+		result.Quo(oneP, result)
 	}
 
 	return result.SetPrec(prec)
@@ -157,6 +149,17 @@ func Log(x *big.Float) *big.Float {
 }
 
 func ln2Const(prec uint) *big.Float {
+	if v, ok := ln2Cache.Load(prec); ok {
+		if bf, ok := v.(*big.Float); ok {
+			return new(big.Float).SetPrec(prec).Set(bf)
+		}
+	}
+	res := computeLn2Const(prec)
+	ln2Cache.Store(prec, new(big.Float).SetPrec(prec).Set(res))
+	return res
+}
+
+func computeLn2Const(prec uint) *big.Float {
 	// ln(2) = 2 * sum_{n=0}^{inf} 1/((2n+1) * 3^(2n+1))
 	// Compute 1/3 at full precision
 	three := new(big.Float).SetPrec(prec).SetInt64(3)
@@ -285,7 +288,14 @@ func cosTaylor(x *big.Float, prec uint) *big.Float {
 }
 
 func piConst(prec uint) *big.Float {
-	return machinPi(prec)
+	if v, ok := piCache.Load(prec); ok {
+		if bf, ok := v.(*big.Float); ok {
+			return new(big.Float).SetPrec(prec).Set(bf)
+		}
+	}
+	res := machinPi(prec)
+	piCache.Store(prec, new(big.Float).SetPrec(prec).Set(res))
+	return res
 }
 
 func machinPi(prec uint) *big.Float {
@@ -423,24 +433,24 @@ func Atan(x *big.Float) *big.Float {
 
 	// Work on |x|.
 	ax := new(big.Float).SetPrec(wprec).Abs(x)
-	one := new(big.Float).SetPrec(wprec).SetInt64(1)
+	wone := new(big.Float).SetPrec(wprec).SetInt64(1)
 
 	// Reduce large arguments: atan(x) = π/2 - atan(1/x) for |x| > 1.
 	useRecip := false
-	if ax.Cmp(one) > 0 {
+	if ax.Cmp(wone) > 0 {
 		useRecip = true
-		ax.Quo(one, ax)
+		ax.Quo(wone, ax)
 	}
 
 	// Half-angle reduction: atan(x) = 2*atan(x / (1 + sqrt(1+x²)))
 	// Repeat until |x| < 0.5 for fast series convergence.
 	halvings := 0
-	half := new(big.Float).SetPrec(wprec).SetFloat64(0.5)
-	for ax.Cmp(half) >= 0 {
+	whalf := new(big.Float).SetPrec(wprec).SetFloat64(0.5)
+	for ax.Cmp(whalf) >= 0 {
 		x2 := new(big.Float).SetPrec(wprec).Mul(ax, ax)
-		inner := new(big.Float).SetPrec(wprec).Add(one, x2)
+		inner := new(big.Float).SetPrec(wprec).Add(wone, x2)
 		sq := new(big.Float).SetPrec(wprec).Sqrt(inner)
-		denom := new(big.Float).SetPrec(wprec).Add(one, sq)
+		denom := new(big.Float).SetPrec(wprec).Add(wone, sq)
 		ax.Quo(ax, denom)
 		halvings++
 	}
@@ -477,15 +487,17 @@ func Asin(x *big.Float) *big.Float {
 	}
 	wprec := prec + 64
 
-	f64, _ := x.Float64()
-	if f64 < -1 || f64 > 1 {
-		return new(big.Float).SetPrec(prec) // 0 for out-of-range (analogous to NaN)
+	oneP := new(big.Float).SetPrec(wprec).SetInt64(1)
+	negOneP := new(big.Float).SetPrec(wprec).SetInt64(-1)
+
+	if x.Cmp(oneP) > 0 || x.Cmp(negOneP) < 0 {
+		return new(big.Float).SetPrec(prec) // 0 for out-of-range
 	}
-	if f64 == 1 {
+	if x.Cmp(oneP) == 0 {
 		pi := piConst(prec)
 		return new(big.Float).SetPrec(prec).Quo(pi, new(big.Float).SetPrec(prec).SetInt64(2))
 	}
-	if f64 == -1 {
+	if x.Cmp(negOneP) == 0 {
 		pi := piConst(prec)
 		r := new(big.Float).SetPrec(prec).Quo(pi, new(big.Float).SetPrec(prec).SetInt64(2))
 		return r.Neg(r)
@@ -494,8 +506,8 @@ func Asin(x *big.Float) *big.Float {
 	// asin(x) = atan(x / sqrt(1 - x²))
 	xw := new(big.Float).SetPrec(wprec).Copy(x)
 	x2 := new(big.Float).SetPrec(wprec).Mul(xw, xw)
-	one := new(big.Float).SetPrec(wprec).SetInt64(1)
-	denom := new(big.Float).SetPrec(wprec).Sqrt(new(big.Float).SetPrec(wprec).Sub(one, x2))
+	wone := new(big.Float).SetPrec(wprec).SetInt64(1)
+	denom := new(big.Float).SetPrec(wprec).Sqrt(new(big.Float).SetPrec(wprec).Sub(wone, x2))
 	arg := new(big.Float).SetPrec(wprec).Quo(xw, denom)
 	return Atan(arg.SetPrec(prec))
 }

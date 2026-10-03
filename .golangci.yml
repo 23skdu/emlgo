@@ -1,40 +1,72 @@
 # .golangci.yml
 # Configuration file for golangci-lint
+# Schema: golangci-lint v2 (https://golangci-lint.run/docs/product/configuration-file)
+version: "2"
 
 run:
   timeout: 5m
 
 linters:
+  # v2 ships a standard set (errcheck, govet, ineffassign, staticcheck, unused);
+  # enable the extra linters this project wants on top of it.
+  default: standard
+  enable:
+    - gosec
+    - misspell
+  settings:
+    govet:
+      enable:
+        - shadow
+    errcheck:
+      check-type-assertions: true
+    staticcheck:
+      checks:
+        # QF* are style-only quick fixes; they are not correctness signals.
+        - all
+        - -QF1005
+        - -QF1008
+    gosec:
+      excludes:
+        - G104 # Audit errors not checked
+  exclusions:
+    generated: lax
+    rules:
+      # Many test cases call pure functions purely for smoke coverage and
+      # deliberately discard the result (e.g. GCD(0, 5) to prove it terminates).
+      - path: '_test\.go$'
+        linters: [staticcheck]
+        text: 'SA4017'
+      # Genetic-programming tests need a seeded math/rand so that a search is
+      # reproducible; cryptographic randomness would defeat the point. The
+      # package has no security-sensitive use of randomness.
+      - path: '^pkg/bytecode/.*_test\.go$'
+        linters: [gosec]
+        text: 'G404'
+      # The unrolled Int8/Uint8 kernels index a[i+0..15] inside loops guarded by
+      # `i+15 < n`, which gosec's G602 range analysis cannot follow.
+      - path: '^pkg/arithmetic/'
+        linters: [gosec]
+        text: 'G602'
+      # Without the `cuda` build tag every internal/gpu method is a stub that
+      # unconditionally returns a non-nil error, so `err != nil` looks constant.
+      - path: '^cmd/bench/'
+        linters: [staticcheck]
+        text: 'SA4023'
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+
+formatters:
   enable:
     - gofmt
-    - govet
-    - errcheck
-    - staticcheck
-    - unused
-    - gosimple
-    - ineffassign
-    - typecheck
-    - stylecheck
-    - gosec
-
-linters-settings:
-  gofmt:
-    simplify: true
-  govet:
-    check-shadowing: true
-  errcheck:
-    check-type-assertions: true
-    check-printf: true
-  stylecheck:
-    checks: ["all"]
-  gosec:
-    excludes:
-      - G104 # Audit errors not checked
-
-issues:
-  exclude-use-default: false
-  max-issues-per-linter: 0
-  max-same-issues: 0
+  settings:
+    gofmt:
+      simplify: true
 
 output:
-  format: colored-line-number
+  formats:
+    text:
+      path: stdout
+      colors: true

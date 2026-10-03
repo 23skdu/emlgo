@@ -72,15 +72,24 @@ func TestInt8AndUint8Operations(t *testing.T) {
 	aInt8 := []int8{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
 	bInt8 := []int8{2, 3, 4, 5, 6, 7, 8, 9, 10, 11}
 
+	assertMismatch := func(fn func()) {
+		defer func() {
+			if r := recover(); r == nil {
+				t.Errorf("expected panic on slice length mismatch")
+			}
+		}()
+		fn()
+	}
+
 	// Dot products
 	_ = DotProductInt8(aInt8, bInt8)
-	_ = DotProductInt8([]int8{1}, []int8{2, 3}) // mismatched len
+	assertMismatch(func() { _ = DotProductInt8([]int8{1}, []int8{2, 3}) })
 	_ = DotProductUint8([]uint8{1, 2, 3, 4, 5, 6, 7, 8, 9}, []uint8{2, 3, 4, 5, 6, 7, 8, 9, 10})
-	_ = DotProductUint8([]uint8{1}, []uint8{2, 3})
+	assertMismatch(func() { _ = DotProductUint8([]uint8{1}, []uint8{2, 3}) })
 
 	// L2Squared and Euclidean
 	_ = L2SquaredInt8(aInt8, bInt8)
-	_ = L2SquaredInt8([]int8{1}, []int8{2, 3})
+	assertMismatch(func() { _ = L2SquaredInt8([]int8{1}, []int8{2, 3}) })
 	_ = EuclideanDistanceInt8(aInt8, bInt8)
 
 	// CosineDistanceInt8
@@ -91,7 +100,7 @@ func TestInt8AndUint8Operations(t *testing.T) {
 		t.Errorf("Zero norm should be 1.0")
 	}
 	_ = CosineDistanceInt8(aInt8, bInt8)
-	_ = CosineDistanceInt8([]int8{1}, []int8{2, 3})
+	assertMismatch(func() { _ = CosineDistanceInt8([]int8{1}, []int8{2, 3}) })
 	_ = CosineDistanceInt8([]int8{1, 1}, []int8{-1, -1}) // opposite
 
 	// CosineDistanceUint8
@@ -104,22 +113,25 @@ func TestInt8AndUint8Operations(t *testing.T) {
 	aUint8 := []uint8{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
 	bUint8 := []uint8{2, 3, 4, 5, 6, 7, 8, 9, 10, 11}
 	_ = CosineDistanceUint8(aUint8, bUint8)
-	_ = CosineDistanceUint8([]uint8{1}, []uint8{2, 3})
+	assertMismatch(func() { _ = CosineDistanceUint8([]uint8{1}, []uint8{2, 3}) })
 
 	// AddBatchInt8 saturation and length mismatch
-	addRes := AddBatchInt8([]int8{100, -100, 10}, []int8{50, -50, 20, 99})
+	assertMismatch(func() { _ = AddBatchInt8([]int8{1}, []int8{2, 3}) })
+	addRes := AddBatchInt8([]int8{100, -100, 10}, []int8{50, -50, 20})
 	if addRes[0] != math.MaxInt8 || addRes[1] != math.MinInt8 || addRes[2] != 30 {
 		t.Errorf("AddBatchInt8 saturation failed: %v", addRes)
 	}
 
 	// SubBatchInt8 saturation and length mismatch
-	subRes := SubBatchInt8([]int8{100, -100, 10}, []int8{-50, 50, 5, 99})
+	assertMismatch(func() { _ = SubBatchInt8([]int8{1}, []int8{2, 3}) })
+	subRes := SubBatchInt8([]int8{100, -100, 10}, []int8{-50, 50, 5})
 	if subRes[0] != math.MaxInt8 || subRes[1] != math.MinInt8 || subRes[2] != 5 {
 		t.Errorf("SubBatchInt8 saturation failed: %v", subRes)
 	}
 
 	// MulBatchInt8 saturation and length mismatch
-	mulRes := MulBatchInt8([]int8{20, -20, 2}, []int8{10, 10, 3, 99})
+	assertMismatch(func() { _ = MulBatchInt8([]int8{1}, []int8{2, 3}) })
+	mulRes := MulBatchInt8([]int8{20, -20, 2}, []int8{10, 10, 3})
 	if mulRes[0] != math.MaxInt8 || mulRes[1] != math.MinInt8 || mulRes[2] != 6 {
 		t.Errorf("MulBatchInt8 saturation failed: %v", mulRes)
 	}

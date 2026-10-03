@@ -44,6 +44,19 @@ func nativeLog(x float64) float64 {
 	return math.Log(x)
 }
 
+// logScalar is the scalar logarithm used by the batch dispatchers. It applies
+// the same domain rule as pkg/logexp.Log -- NaN for any non-positive argument --
+// so that Log and LogBatch cannot disagree.
+//
+// The unguarded nativeLog is still used for the EML operator itself and for the
+// fused LogDiv/LogSub kernels, where math.Log semantics are what we want.
+func logScalar(x float64) float64 {
+	if x <= 0 {
+		return NaN()
+	}
+	return nativeLog(x)
+}
+
 func nativeSin(x float64) float64 {
 	return math.Sin(x)
 }

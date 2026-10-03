@@ -166,52 +166,9 @@ func EvalArena(n *ArenaNode, x float64) float64 {
 	return 0
 }
 
+// callMathFunc evaluates name(arg) using the shared math function table.
+// It returns 0 for names that are not built-in math functions.
 func callMathFunc(name []byte, arg float64) float64 {
-	switch {
-	case equalStr(name, "sin"):
-		return math.Sin(arg)
-	case equalStr(name, "cos"):
-		return math.Cos(arg)
-	case equalStr(name, "exp"):
-		return math.Exp(arg)
-	case equalStr(name, "log"):
-		return math.Log(arg)
-	case equalStr(name, "sqrt"):
-		return math.Sqrt(arg)
-	case equalStr(name, "tan"):
-		return math.Tan(arg)
-	case equalStr(name, "asin"):
-		return math.Asin(arg)
-	case equalStr(name, "acos"):
-		return math.Acos(arg)
-	case equalStr(name, "atan"):
-		return math.Atan(arg)
-	case equalStr(name, "abs"):
-		return math.Abs(arg)
-	case equalStr(name, "cbrt"):
-		return math.Cbrt(arg)
-	case equalStr(name, "log2"):
-		return math.Log2(arg)
-	case equalStr(name, "log10"):
-		return math.Log10(arg)
-	case equalStr(name, "ceil"):
-		return math.Ceil(arg)
-	case equalStr(name, "floor"):
-		return math.Floor(arg)
-	case equalStr(name, "trunc"):
-		return math.Trunc(arg)
-	}
-	return 0
-}
-
-func equalStr(b []byte, s string) bool {
-	if len(b) != len(s) {
-		return false
-	}
-	for i := 0; i < len(s); i++ {
-		if b[i] != s[i] {
-			return false
-		}
-	}
-	return true
+	result, _ := callMathFuncByName(string(name), arg)
+	return result
 }

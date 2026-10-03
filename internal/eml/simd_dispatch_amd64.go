@@ -271,71 +271,6 @@ func fmaSIMD(a, b, c, result []float64) {
 	}
 }
 
-func dispatchExpSIMDTo(x, result []float64) {
-	n := len(x)
-	if hasAVX2 {
-		simdLen := (n / 4) * 4
-		expAVX2(x[:simdLen], result[:simdLen])
-		for i := simdLen; i < n; i++ {
-			result[i] = nativeExp(x[i])
-		}
-		return
-	}
-	parallelizeGeneric(x, result, nativeExp)
-}
-
-func dispatchLogSIMDTo(x, result []float64) {
-	n := len(x)
-	if hasAVX2 {
-		simdLen := (n / 4) * 4
-		logAVX2(x[:simdLen], result[:simdLen])
-		for i := simdLen; i < n; i++ {
-			result[i] = nativeLog(x[i])
-		}
-		return
-	}
-	parallelizeGeneric(x, result, nativeLog)
-}
-
-func dispatchSinSIMDTo(x, result []float64) {
-	n := len(x)
-	if hasAVX2 {
-		simdLen := (n / 4) * 4
-		sinAVX2(x[:simdLen], result[:simdLen])
-		for i := simdLen; i < n; i++ {
-			result[i] = nativeSin(x[i])
-		}
-		return
-	}
-	parallelizeGeneric(x, result, nativeSin)
-}
-
-func dispatchCosSIMDTo(x, result []float64) {
-	n := len(x)
-	if hasAVX2 {
-		simdLen := (n / 4) * 4
-		cosAVX2(x[:simdLen], result[:simdLen])
-		for i := simdLen; i < n; i++ {
-			result[i] = nativeCos(x[i])
-		}
-		return
-	}
-	parallelizeGeneric(x, result, nativeCos)
-}
-
-func dispatchTanSIMDTo(x, result []float64) {
-	n := len(x)
-	if hasAVX2 {
-		simdLen := (n / 4) * 4
-		tanAVX2(x[:simdLen], result[:simdLen])
-		for i := simdLen; i < n; i++ {
-			result[i] = nativeTan(x[i])
-		}
-		return
-	}
-	parallelizeGeneric(x, result, nativeTan)
-}
-
 func dispatchSinCosSIMDTo(x, sin, cos []float64) {
 	parallelizeSinCos(x, sin, cos)
 }
@@ -354,4 +289,58 @@ func dispatchAddScalarSIMD(a []float64, b float64, result []float64) {
 
 func dispatchMulScalarSIMD(a []float64, b float64, result []float64) {
 	amd64MulScalarSIMD(a, b, result)
+}
+
+func dispatchAddSatInt8SIMD(a, b, result []int8) {
+	n := len(a)
+	if hasAVX2 && n >= 32 {
+		simdLen := (n / 32) * 32
+		addSatInt8AVX2(a[:simdLen], b[:simdLen], result[:simdLen])
+		for i := simdLen; i < n; i++ {
+			v := int32(a[i]) + int32(b[i])
+			if v > 127 {
+				v = 127
+			} else if v < -128 {
+				v = -128
+			}
+			result[i] = int8(v)
+		}
+		return
+	}
+	for i := 0; i < n; i++ {
+		v := int32(a[i]) + int32(b[i])
+		if v > 127 {
+			v = 127
+		} else if v < -128 {
+			v = -128
+		}
+		result[i] = int8(v)
+	}
+}
+
+func dispatchSubSatInt8SIMD(a, b, result []int8) {
+	n := len(a)
+	if hasAVX2 && n >= 32 {
+		simdLen := (n / 32) * 32
+		subSatInt8AVX2(a[:simdLen], b[:simdLen], result[:simdLen])
+		for i := simdLen; i < n; i++ {
+			v := int32(a[i]) - int32(b[i])
+			if v > 127 {
+				v = 127
+			} else if v < -128 {
+				v = -128
+			}
+			result[i] = int8(v)
+		}
+		return
+	}
+	for i := 0; i < n; i++ {
+		v := int32(a[i]) - int32(b[i])
+		if v > 127 {
+			v = 127
+		} else if v < -128 {
+			v = -128
+		}
+		result[i] = int8(v)
+	}
 }

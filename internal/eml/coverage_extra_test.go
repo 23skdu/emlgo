@@ -111,25 +111,6 @@ func TestNativeWrappersAndStubs(t *testing.T) {
 	nativeMin(5, math.NaN())
 	nativeMin(10, 5)
 
-	// AMD64 stubs
-	addAVX2(nil, nil, nil)
-	subAVX2(nil, nil, nil)
-	mulAVX2(nil, nil, nil)
-	divAVX2(nil, nil, nil)
-	addScalarAVX2(nil, 0, nil)
-	mulScalarAVX2(nil, 0, nil)
-	addAVX512(nil, nil, nil)
-	subAVX512(nil, nil, nil)
-	mulAVX512(nil, nil, nil)
-	divAVX512(nil, nil, nil)
-	addScalarAVX512(nil, 0, nil)
-	mulScalarAVX512(nil, 0, nil)
-	sqrtAVX2(nil, nil)
-	sqrtAVX512(nil, nil)
-	fmaAVX2(nil, nil, nil, nil)
-	fmaAVX512(nil, nil, nil, nil)
-	detectAMD64SIMD()
-
 	// SVE stubs
 	addSVE(nil, nil, nil)
 	detectSVE()

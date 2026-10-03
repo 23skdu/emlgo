@@ -32,13 +32,23 @@ This is isomorphic to Catalan structures and full binary trees.
 
 ## Example Expressions
 
-| Function | EML Expression |
-|----------|-----------------|
-| e^x | eml(x, 1) |
-| ln(x) | eml(1, eml(eml(1, x), 1)) |
-| -x | eml(eml(1, eml(x, 1)), eml(1, 1)) |
-| 1/x | eml(eml(1, x), eml(x, 1)) |
-| x + y | eml(1, eml(eml(y, 1), eml(1, x))) |
+| Function | EML Expression | Verified |
+|----------|-----------------|----------|
+| 1 | `1` (terminal) | yes |
+| e^x | `eml(x, 1)` | exact |
+| ln(x) | `eml(1, eml(eml(1, x), 1))` | to 1 ULP |
+| e | `eml(1, 1)` | exact |
+
+These are the reductions `internal/jit` implements (`CanonicalExp`, `CanonicalLog`
+and the constant-folding rule in `Simplify`); each is covered by a regression test
+that compares the simplified tree against the unfolded EML evaluation.
+
+The paper derives the remaining elementary functions by much longer expansions than
+fit in a table row. Be aware that short, symmetric-looking reductions such as
+`eml(eml(1, eml(x,1)), eml(1,1))` or `eml(eml(1,x), eml(x,1))` are **not**
+identities for `-x` and `1/x` — substituting into `eml(u,v) = exp(u) - ln(v)`
+gives `e^(e-x) - 1` and `e^e/x - x` respectively. Such rules were removed from
+`Simplify`; see `TestSimplifyDoesNotInventNegationOrReciprocal`.
 
 ## Significance
 

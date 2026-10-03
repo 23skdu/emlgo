@@ -257,18 +257,18 @@ func logWasmSIMD(a, result []float64) {
 	n := len(a)
 	i := 0
 	for i <= n-8 {
-		result[i] = nativeLog(a[i])
-		result[i+1] = nativeLog(a[i+1])
-		result[i+2] = nativeLog(a[i+2])
-		result[i+3] = nativeLog(a[i+3])
-		result[i+4] = nativeLog(a[i+4])
-		result[i+5] = nativeLog(a[i+5])
-		result[i+6] = nativeLog(a[i+6])
-		result[i+7] = nativeLog(a[i+7])
+		result[i] = logScalar(a[i])
+		result[i+1] = logScalar(a[i+1])
+		result[i+2] = logScalar(a[i+2])
+		result[i+3] = logScalar(a[i+3])
+		result[i+4] = logScalar(a[i+4])
+		result[i+5] = logScalar(a[i+5])
+		result[i+6] = logScalar(a[i+6])
+		result[i+7] = logScalar(a[i+7])
 		i += 8
 	}
 	for ; i < n; i++ {
-		result[i] = nativeLog(a[i])
+		result[i] = logScalar(a[i])
 	}
 }
 
@@ -419,4 +419,28 @@ func detectWasmSIMD() {
 	hasNeon = false
 	hasNeonDot = false
 	hasSVE = false
+}
+
+func dispatchAddSatInt8SIMD(a, b, result []int8) {
+	for i := range a {
+		v := int32(a[i]) + int32(b[i])
+		if v > 127 {
+			v = 127
+		} else if v < -128 {
+			v = -128
+		}
+		result[i] = int8(v)
+	}
+}
+
+func dispatchSubSatInt8SIMD(a, b, result []int8) {
+	for i := range a {
+		v := int32(a[i]) - int32(b[i])
+		if v > 127 {
+			v = 127
+		} else if v < -128 {
+			v = -128
+		}
+		result[i] = int8(v)
+	}
 }

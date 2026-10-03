@@ -2,15 +2,17 @@ package arithmetic
 
 import (
 	"math"
+
+	"github.com/emlgo/eml/internal/eml"
 )
 
 // DotProductInt8 computes the dot product of two int8 slices.
 // Optimized with 4-way unrolling to maximize CPU instruction-level parallelism.
 func DotProductInt8(a, b []int8) int32 {
-	n := len(a)
-	if len(b) < n {
-		n = len(b)
+	if len(a) != len(b) {
+		panic("slice length mismatch")
 	}
+	n := len(a)
 	var sum0, sum1, sum2, sum3 int32
 	i := 0
 	for ; i+15 < n; i += 16 {
@@ -28,10 +30,10 @@ func DotProductInt8(a, b []int8) int32 {
 
 // DotProductUint8 computes the dot product of two uint8 slices.
 func DotProductUint8(a, b []uint8) uint32 {
-	n := len(a)
-	if len(b) < n {
-		n = len(b)
+	if len(a) != len(b) {
+		panic("slice length mismatch")
 	}
+	n := len(a)
 	var sum0, sum1, sum2, sum3 uint32
 	i := 0
 	for ; i+15 < n; i += 16 {
@@ -49,10 +51,10 @@ func DotProductUint8(a, b []uint8) uint32 {
 
 // L2SquaredInt8 computes the squared Euclidean distance between two int8 slices.
 func L2SquaredInt8(a, b []int8) int32 {
-	n := len(a)
-	if len(b) < n {
-		n = len(b)
+	if len(a) != len(b) {
+		panic("slice length mismatch")
 	}
+	n := len(a)
 	var sum0, sum1, sum2, sum3 int32
 	i := 0
 	for ; i+7 < n; i += 8 {
@@ -83,12 +85,11 @@ func EuclideanDistanceInt8(a, b []int8) float32 {
 }
 
 // CosineDistanceInt8 computes the cosine distance (1 - cos(theta)) between two int8 slices.
-// Fuses dot product and norm accumulation into a single pass and uses intrinsic Sqrt to eliminate call overhead.
 func CosineDistanceInt8(a, b []int8) float32 {
-	n := len(a)
-	if len(b) < n {
-		n = len(b)
+	if len(a) != len(b) {
+		panic("slice length mismatch")
 	}
+	n := len(a)
 	if n == 0 {
 		return 1.0
 	}
@@ -97,7 +98,6 @@ func CosineDistanceInt8(a, b []int8) float32 {
 	for ; i+7 < n; i += 8 {
 		aChunk := a[i : i+8]
 		bChunk := b[i : i+8]
-		// #nosec G602 - bounds verified by loop condition (i+7 < n)
 		a0, a1, a2, a3 := int64(aChunk[0]), int64(aChunk[1]), int64(aChunk[2]), int64(aChunk[3])
 		a4, a5, a6, a7 := int64(aChunk[4]), int64(aChunk[5]), int64(aChunk[6]), int64(aChunk[7])
 		b0, b1, b2, b3 := int64(bChunk[0]), int64(bChunk[1]), int64(bChunk[2]), int64(bChunk[3])
@@ -117,7 +117,6 @@ func CosineDistanceInt8(a, b []int8) float32 {
 	if normA <= 0 || normB <= 0 {
 		return 1.0
 	}
-	// math.Sqrt compiles directly to SQRTSD intrinsic
 	similarity := float64(dot) / (math.Sqrt(float64(normA)) * math.Sqrt(float64(normB)))
 	if similarity > 1.0 {
 		similarity = 1.0
@@ -129,10 +128,10 @@ func CosineDistanceInt8(a, b []int8) float32 {
 
 // CosineDistanceUint8 computes the cosine distance (1 - cos(theta)) between two uint8 slices.
 func CosineDistanceUint8(a, b []uint8) float32 {
-	n := len(a)
-	if len(b) < n {
-		n = len(b)
+	if len(a) != len(b) {
+		panic("slice length mismatch")
 	}
+	n := len(a)
 	if n == 0 {
 		return 1.0
 	}
@@ -169,49 +168,56 @@ func CosineDistanceUint8(a, b []uint8) float32 {
 
 // AddBatchInt8 adds two int8 slices element-wise with saturation.
 func AddBatchInt8(a, b []int8) []int8 {
-	n := len(a)
-	if len(b) < n {
-		n = len(b)
+	if len(a) != len(b) {
+		panic("slice length mismatch")
 	}
-	res := make([]int8, n)
-	for i := 0; i < n; i++ {
-		v := int32(a[i]) + int32(b[i])
-		if v > math.MaxInt8 {
-			v = math.MaxInt8
-		} else if v < math.MinInt8 {
-			v = math.MinInt8
-		}
-		res[i] = int8(v)
-	}
+	res := make([]int8, len(a))
+	AddBatchInt8To(a, b, res)
 	return res
+}
+
+// AddBatchInt8To adds two int8 slices element-wise with saturation into dst.
+func AddBatchInt8To(a, b, dst []int8) {
+	if len(a) != len(b) || len(a) != len(dst) {
+		panic("slice length mismatch")
+	}
+	eml.AddSatInt8SIMDTo(a, b, dst)
 }
 
 // SubBatchInt8 subtracts two int8 slices element-wise with saturation.
 func SubBatchInt8(a, b []int8) []int8 {
-	n := len(a)
-	if len(b) < n {
-		n = len(b)
+	if len(a) != len(b) {
+		panic("slice length mismatch")
 	}
-	res := make([]int8, n)
-	for i := 0; i < n; i++ {
-		v := int32(a[i]) - int32(b[i])
-		if v > math.MaxInt8 {
-			v = math.MaxInt8
-		} else if v < math.MinInt8 {
-			v = math.MinInt8
-		}
-		res[i] = int8(v)
-	}
+	res := make([]int8, len(a))
+	SubBatchInt8To(a, b, res)
 	return res
+}
+
+// SubBatchInt8To subtracts two int8 slices element-wise with saturation into dst.
+func SubBatchInt8To(a, b, dst []int8) {
+	if len(a) != len(b) || len(a) != len(dst) {
+		panic("slice length mismatch")
+	}
+	eml.SubSatInt8SIMDTo(a, b, dst)
 }
 
 // MulBatchInt8 multiplies two int8 slices element-wise with saturation.
 func MulBatchInt8(a, b []int8) []int8 {
-	n := len(a)
-	if len(b) < n {
-		n = len(b)
+	if len(a) != len(b) {
+		panic("slice length mismatch")
 	}
-	res := make([]int8, n)
+	res := make([]int8, len(a))
+	MulBatchInt8To(a, b, res)
+	return res
+}
+
+// MulBatchInt8To multiplies two int8 slices element-wise with saturation into dst.
+func MulBatchInt8To(a, b, dst []int8) {
+	if len(a) != len(b) || len(a) != len(dst) {
+		panic("slice length mismatch")
+	}
+	n := len(a)
 	for i := 0; i < n; i++ {
 		v := int32(a[i]) * int32(b[i])
 		if v > math.MaxInt8 {
@@ -219,7 +225,6 @@ func MulBatchInt8(a, b []int8) []int8 {
 		} else if v < math.MinInt8 {
 			v = math.MinInt8
 		}
-		res[i] = int8(v)
+		dst[i] = int8(v)
 	}
-	return res
 }

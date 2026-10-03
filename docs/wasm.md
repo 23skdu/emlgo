@@ -6,6 +6,8 @@ This document describes emlgo's WebAssembly support, including SIMD-optimized ke
 
 emlgo compiles to WebAssembly via `GOOS=js GOARCH=wasm` (browser/Node.js) or `GOOS=wasip1 GOARCH=wasm` (WASI). All core mathematical functions are available in WASM builds, with SIMD-accelerated batch operations using loop-unrolled kernels designed for WASM JIT auto-vectorization.
 
+The JIT compiler is **not** available on WebAssembly. `js/wasm` falls back to the AST interpreter in `internal/jit/jit_wasm.go`; on `wasip1` `Compile` returns an error, and `AllocateExecutableMemory` reports that executable memory is unsupported. Both targets are covered by the `cross-build` CI job.
+
 ## Building for WASM
 
 Build the full library for WASM:
@@ -88,7 +90,7 @@ The `scripts/wasm_test.sh` script builds WASM binaries and runs them with Node.j
 
 ### Prerequisites
 
-- Go 1.23+ (for WASM target support)
+- Go 1.26+ (for WASM target support)
 - Node.js 16+ (for WASM SIMD support)
 
 ### Usage

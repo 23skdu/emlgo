@@ -1,6 +1,8 @@
 # emlgo
 
-A high-performance mathematical library for Go, implementing all elementary functions using the EML (Exp-Minus-Log) operator with SIMD acceleration, JIT compilation, GPU backends, and arbitrary-precision verification.
+A high-performance mathematical library for Go built around the EML (Exp-Minus-Log) operator, with SIMD acceleration, JIT compilation, GPU backends, and arbitrary-precision verification.
+
+The scalar elementary functions delegate to the Go standard library (`math`, `math/cmplx`) so they stay bit-exact with `math`. EML provides the theoretical foundation and the machinery built on it: canonical EML expression trees, identity reductions, symbolic differentiation, and a JIT compiler that emits x86-64 machine code directly.
 
 Based on the research of **Andrzej Odrzywołek**: [All elementary functions from a single operator](https://arxiv.org/abs/2603.21852v2) (2026).
 
@@ -9,11 +11,12 @@ Based on the research of **Andrzej Odrzywołek**: [All elementary functions from
 - **EML Operator**: `eml(x, y) = exp(x) - ln(y)` — single primitive from which all elementary functions derive
 - **SIMD Batch Operations**: AVX2, AVX-512 (AMD64), NEON, SVE (ARM64), WASM SIMD128
 - **float32 SIMD**: Dedicated `float32` batch operations for memory-constrained workloads
-- **JIT Compiler**: x86-64 machine code generation for math expressions (17 functions, non-integer/variable exponents)
+- **JIT Compiler**: x86-64 machine code generation for math expressions (25 functions, non-integer/variable exponents)
 - **JIT Expression Cache**: LRU cache with `CompileCached` for repeated compilations
 - **GPU Backends**: CUDA (Linux/Windows) and Metal (macOS/ARM64)
 - **Complex Numbers**: First-class `complex128` support via `math/cmplx`
 - **Arbitrary Precision**: `math/big.Float` backend for symbolic verification
+- **Symbolic Regression**: `pkg/bytecode` GA recovers closed forms from data
 - **Zero-Allocation AST**: Arena allocator for JIT parse/eval paths
 - **Canonical EML Trees**: Map any expression to minimal EML form
 - **Symbolic Differentiation**: `Diff()` with chain rule and simplification
@@ -21,7 +24,7 @@ Based on the research of **Andrzej Odrzywołek**: [All elementary functions from
 - **EML Decompiler**: `Decompile()` and `DecompileLaTeX()` for EML tree → infix/LaTeX conversion
 - **Composable Pipeline**: Zero-allocation `Pipeline` API with buffer swapping
 - **Numerically Stable**: Log1p/Expm1 optimization for compound expressions
-- **FastMath**: FMA-optimized polynomial approximations (~10% faster than `math.Sin`)
+- **FastMath**: Minimax polynomial approximations for `exp` and `log` (`Sin`/`Cos`/`Sqrt` delegate to `math`), plus domain guardrails
 
 ## Installation
 
@@ -29,7 +32,7 @@ Based on the research of **Andrzej Odrzywołek**: [All elementary functions from
 go get github.com/emlgo/eml
 ```
 
-Requires **Go 1.23+**.
+Requires **Go 1.26+**.
 
 ## Quick Start
 
@@ -75,8 +78,8 @@ func main() {
 | `pkg/trig` | Sin, Cos, Tan, Cot, Sec, Csc, Asin, Acos, Atan, Atan2, batch ops |
 | `pkg/hyper` | Sinh, Cosh, Tanh, Asinh, Acosh, Atanh, batch ops |
 | `pkg/logexp` | Exp, Log, ExpBatch, LogBatch, ExpFast, LogFast |
-| `pkg/fastmath` | FMA-optimized polynomial approximations for Exp, Sin, Cos, Log |
-| `pkg/bytecode` | Bytecode VM for EML expressions, compiler, optimizer, genetic programming |
+| `pkg/fastmath` | Minimax polynomial approximations for Exp and Log, domain guardrails |
+| `pkg/bytecode` | Bytecode VM (all 27 functions), compiler, optimizer, genetic search for symbolic regression |
 | `pkg/quant` | TurboQuant4: 4-bit polar-quantized vector search and distance |
 | `internal/eml` | Core EML operator, SIMD dispatch, worker pool, complex batch ops, Pipeline |
 | `internal/eml/bigmath` | Arbitrary-precision EML via `math/big.Float`, identity verifier |
@@ -91,7 +94,7 @@ emlgo/
 ├── cmd/
 │   ├── bench/           # Benchmark tool
 │   ├── validate/        # Validation tool
-│   └── emlcli/          # CLI demo (includes --decompile flag)
+│   └── emlcli/          # CLI demo (has a `decompile` subcommand)
 ├── internal/
 │   ├── eml/             # Core EML operator + SIMD dispatch
 │   │   ├── bigmath/     # Arbitrary-precision backend
@@ -101,12 +104,18 @@ emlgo/
 │   └── constants/       # Mathematical constants
 ├── pkg/
 │   ├── arithmetic/      # Basic arithmetic + batch ops
-│   ├── trig/            # Trigonometric + batch ops
+│   ├── bytecode/        # Bytecode VM, compiler, optimizer, genetic programming
+│   ├── fastmath/        # Fast polynomial exp/log + guardrails
 │   ├── hyper/           # Hyperbolic functions + batch ops
 │   ├── logexp/          # Exponential & logarithmic
-│   └── fastmath/        # High-performance scalar ops
+│   ├── quant/           # TurboQuant4 vector quantization
+│   └── trig/            # Trigonometric + batch ops
+├── cuda/                # CUDA sources and C API shim
+├── metal/               # Metal shaders
+├── wasm/                # WebAssembly benchmark page
 ├── docs/                # Documentation
-└── scripts/             # Benchmark & validation scripts
+├── scripts/             # Benchmark & validation scripts
+└── .github/workflows/   # CI and release automation
 ```
 
 ## SIMD Support
@@ -126,28 +135,37 @@ Batch operations automatically dispatch to the fastest available SIMD path.
 ```go
 import "github.com/emlgo/eml/internal/jit"
 
-// Build canonical EML tree
-x := jit.CanonicalExp(jit.Parse("x"))
+// Parse returns (Node, error); Canonicalize turns it into an *EMLNode.
+n, _ := jit.Parse("x")
+v := jit.Canonicalize(n)
+
+// Build the canonical EML tree for exp(x) = eml(x, 1)
+x := jit.CanonicalExp(v)
 
 // Differentiate symbolically
 dx := jit.Diff(x)
-fmt.Println(jit.Decompile(dx)) // d/dx exp(x)
+fmt.Println(jit.Decompile(dx)) // exp(x)
 
 // Evaluate the derivative
 result := jit.DiffEval(x, 2.0) // ≈ exp(2)
 ```
+
+`jit.Parse` returns `(Node, error)`, and `Canonicalize` maps it to the `*EMLNode` form that `Diff`, `Simplify` and `EMLSize` operate on.
 
 ## Expression Simplification
 
 ```go
 import "github.com/emlgo/eml/internal/jit"
 
-// Constant folding and algebraic simplification
-node := jit.Simplify(jit.Canonicalize(jit.Parse("2 + 3")))
-// Result: constNode(5.0)
+// Constant folding: Simplify works on *EMLNode trees, so parse first and
+// canonicalise the result.
+n, _ := jit.Parse("2 + 3")
+node := jit.Simplify(jit.Canonicalize(n))
+// Result: constant 5
 
 // Identity reduction
-node2 := jit.Simplify(jit.Parse("x + 0"))
+n2, _ := jit.Parse("x + 0")
+node2 := jit.Simplify(jit.Canonicalize(n2))
 // Result: x
 ```
 
@@ -156,19 +174,46 @@ node2 := jit.Simplify(jit.Parse("x + 0"))
 ```go
 import "github.com/emlgo/eml/internal/jit"
 
-emlNode := jit.Canonicalize(jit.Parse("sin(x)^2 + cos(x)^2"))
-fmt.Println(jit.Decompile(emlNode))     // infix notation
-fmt.Println(jit.DecompileLaTeX(emlNode)) // LaTeX math mode
+n, _ := jit.Parse("sin(x)^2 + cos(x)^2")
+emlNode := jit.Canonicalize(n)
+fmt.Println(jit.Decompile(emlNode))       // sin(x)^2.0 + cos(x)^2.0
+fmt.Println(jit.DecompileLaTeX(emlNode)) // (\sin(x))^{2.0} + (\cos(x))^{2.0}
 ```
+
+`Decompile` emits infix notation with infix operators (`a + b`, `a * b`, `a^b`); `DecompileLaTeX` emits LaTeX math-mode markup.
+
+## Symbolic Regression
+
+```go
+import "github.com/emlgo/eml/pkg/bytecode"
+
+// Fit a closed form to data. Deterministic for a given Seed.
+d := bytecode.Dataset{X: [][]float64{x}, Y: y}
+res, err := bytecode.Search(bytecode.Config{
+    PopulationSize:   400,
+    Generations:      400,
+    LocalSearchSteps: 60,
+    Seed:             1,
+}, d, bytecode.LeastSquares(1e-6))
+
+fmt.Printf("RMS error %.3g: %s\n", -res.BestFitness, res.Best)
+```
+
+Fitting `3x² + 2x + 1` reaches an RMS error of 4e-13. Transcendental targets are
+approximated rather than recovered — fitting `sin(x)` plateaus around RMS 0.17
+regardless of budget. See [docs/nextsteps.md](docs/nextsteps.md).
 
 ## Composable Pipeline
 
 ```go
 import "github.com/emlgo/eml/internal/eml"
 
-// Zero-allocation composable pipeline with buffer swapping
+// Zero-allocation composable pipeline with buffer swapping.
+// Each builder call appends a step, so either build the chain once and reuse it
+// (as below) or call Reset() before rebuilding.
 p := eml.NewPipeline(len(input))
-p.Exp().MulScalar(2.0).Log().RunTo(input, output)
+p.Exp().MulScalar(2.0).Log()
+p.RunTo(input, output)
 ```
 
 ## JIT Compiler
@@ -182,7 +227,8 @@ c := jit.NewCompiler()
 f, _ := c.Compile("x^0.5")    // sqrt(x)
 g, _ := c.Compile("x^(2*x)")  // variable exponent
 
-// 17 math functions including round
+// 25 math functions: sin cos exp log sqrt tan asin acos atan abs cbrt
+// log2 log10 ceil floor trunc round sinh cosh tanh asinh acosh atanh erf gamma
 h, _ := c.Compile("sin(x)^2 + cos(x)^2") // = 1.0
 
 // Cached compilation
@@ -218,7 +264,11 @@ arithmetic.Log(1.0+1e-15) // accurate to ~1e-25
 ## Arbitrary Precision
 
 ```go
-import "github.com/emlgo/eml/internal/eml/bigmath"
+import (
+    "math/big"
+
+    "github.com/emlgo/eml/internal/eml/bigmath"
+)
 
 x := bigmath.NewFloat(1.0)
 y := bigmath.NewFloat(1.0)
@@ -262,13 +312,22 @@ make gosec                                  # Security scan
 
 ## Performance
 
+Ratio is `emlgo time / reference time`, so **lower is faster**.
+
 | Operation | Scalar | Batch (SIMD) |
 | :--- | :--- | :--- |
-| Add/Sub/Mul | ~parity with `math` | **1.2-15x faster** |
-| Exp/Log/Sin/Cos | ~parity with `math` | **1.1-5x faster** |
-| PowInt | **5-6x faster** than `math.Pow` | parallelized |
-| FastMath Sin | **10% faster** than `math.Sin` | N/A |
-| Fused (ExpMul) | N/A | **20-30% less memory** |
+| Add/Sub/Mul | Bit-exact with `math` | 0.75x - 0.84x |
+| Exp/Log/Sin/Cos | Bit-exact with `math` | 0.31x - 0.98x |
+| PowInt | **0.15x - 0.19x** (5-6x faster than `math.Pow`) | parallelized |
+| FastMath Exp / Log | Minimax polynomials, ~1.5e-6 / ~1e-7 relative error | N/A |
+| Fused (ExpMul) | N/A | One pass instead of two, **20-30% less memory traffic** |
+
+Measured on the two hosts recorded in [docs/performance.md](docs/performance.md)
+(`linux/arm64` NEON and `linux/amd64` AVX2, n=1e6). In those runs the SIMD batch
+paths were **slower** than the naive reference loops — the AVX2/AVX-512 kernels are
+selected by runtime CPU detection and the generic scalar fallback otherwise
+dominates. Integer exponentiation is the clear win. Re-run
+`./scripts/bench-compare.sh` on your own hardware before relying on the batch paths.
 
 ## License
 
