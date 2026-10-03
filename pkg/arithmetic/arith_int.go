@@ -158,12 +158,17 @@ func CosineDistanceUint8(a, b []uint8) float32 {
 		return 1.0
 	}
 	similarity := float64(dot) / (math.Sqrt(float64(normA)) * math.Sqrt(float64(normB)))
-	if similarity > 1.0 {
-		similarity = 1.0
-	} else if similarity < 0.0 {
-		similarity = 0.0
-	}
+	similarity = clampSimilarityUint8(similarity)
 	return float32(1.0 - similarity)
+}
+
+var clampSimilarityUint8 = func(similarity float64) float64 {
+	if similarity > 1.0 {
+		return 1.0
+	} else if similarity < 0.0 {
+		return 0.0
+	}
+	return similarity
 }
 
 // AddBatchInt8 adds two int8 slices element-wise with saturation.

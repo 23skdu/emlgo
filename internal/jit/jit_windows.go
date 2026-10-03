@@ -35,3 +35,11 @@ func AllocateExecutableMemory(code []byte) (unsafe.Pointer, error) {
 
 	return unsafe.Pointer(addr), nil // #nosec G103
 }
+
+// FreeExecutableMemory frees memory allocated by AllocateExecutableMemory on Windows.
+func FreeExecutableMemory(ptr unsafe.Pointer, size int) error {
+	if ptr == nil {
+		return nil
+	}
+	return windows.VirtualFree(uintptr(ptr), 0, windows.MEM_RELEASE)
+}

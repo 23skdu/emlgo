@@ -3,41 +3,15 @@ package eml
 import (
 	"fmt"
 	"math"
-	"runtime"
 )
 
 // parallelizeGenericF32 runs fn(src[lo:hi], dst[lo:hi]) in parallel workers
-// for float32 slices. For short slices it runs inline.
+// for float32 slices using the shared worker pool. For short slices it runs inline.
 func parallelizeGenericF32(src, dst []float32, fn func(src, dst []float32)) {
 	n := len(src)
-	if n < SmallCutoff {
-		fn(src, dst)
-		return
-	}
-	numWorkers := runtime.NumCPU()
-	if numWorkers > n {
-		numWorkers = n
-	}
-	chunkSize := (n + numWorkers - 1) / numWorkers
-	done := make(chan struct{}, numWorkers)
-	for w := 0; w < numWorkers; w++ {
-		lo := w * chunkSize
-		if lo >= n {
-			done <- struct{}{}
-			continue
-		}
-		hi := lo + chunkSize
-		if hi > n {
-			hi = n
-		}
-		go func(lo, hi int) {
-			fn(src[lo:hi], dst[lo:hi])
-			done <- struct{}{}
-		}(lo, hi)
-	}
-	for w := 0; w < numWorkers; w++ {
-		<-done
-	}
+	ForEachChunk(n, func(start, end int) {
+		fn(src[start:end], dst[start:end])
+	})
 }
 
 // ExpSIMDF32 computes element-wise exp(x) for a float32 slice.

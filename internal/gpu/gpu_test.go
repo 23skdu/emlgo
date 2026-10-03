@@ -313,3 +313,28 @@ func TestVerifyBinaryOpLengthMismatch(t *testing.T) {
 		t.Error("expected error for length mismatch, got nil")
 	}
 }
+
+func TestSetGetDevicesForTesting(t *testing.T) {
+	mockDevs := []Device{{ID: 0, Name: "Mock GPU"}}
+	restore := SetGetDevicesForTesting(func() ([]Device, error) {
+		return mockDevs, nil
+	})
+	devs, err := GetDevices()
+	if err != nil || len(devs) != 1 || devs[0].Name != "Mock GPU" {
+		t.Errorf("GetDevices() with mock = %v, %v", devs, err)
+	}
+	restore()
+}
+
+func TestSetExpBatchForTesting(t *testing.T) {
+	d := &Device{ID: 0}
+	restore := SetExpBatchForTesting(func(x []float64) ([]float64, error) {
+		return []float64{42}, nil
+	})
+	res, err := d.ExpBatch([]float64{1})
+	if err != nil || len(res) != 1 || res[0] != 42 {
+		t.Errorf("ExpBatch mock failed: %v, %v", res, err)
+	}
+	restore()
+}
+

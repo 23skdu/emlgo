@@ -80,56 +80,62 @@ var (
 	canonicalNms map[string]string
 )
 
+var defaultUnaryCodes = map[string]OpCode{
+	"sin":   OpSin,
+	"cos":   OpCos,
+	"tan":   OpTan,
+	"exp":   OpExp,
+	"log":   OpLog,
+	"ln":    OpLog,
+	"sqrt":  OpSqrt,
+	"asin":  OpAsin,
+	"acos":  OpAcos,
+	"atan":  OpAtan,
+	"abs":   OpAbs,
+	"cbrt":  OpCbrt,
+	"log2":  OpLog2,
+	"log10": OpLog10,
+	"ceil":  OpCeil,
+	"floor": OpFloor,
+	"trunc": OpTrunc,
+	"round": OpRound,
+	"sinh":  OpSinh,
+	"cosh":  OpCosh,
+	"tanh":  OpTanh,
+	"asinh": OpAsinh,
+	"acosh": OpAcosh,
+	"atanh": OpAtanh,
+	"erf":   OpErf,
+	"gamma": OpGamma,
+}
+
 func init() {
-	unaryCodes = make(map[string]OpCode, len(unaryFuncs))
-	opcodeNames = make(map[OpCode]string, len(unaryFuncs))
-	canonicalNms = make(map[string]string, len(unaryFuncs))
-	for name, op := range map[string]OpCode{
-		"sin":   OpSin,
-		"cos":   OpCos,
-		"tan":   OpTan,
-		"exp":   OpExp,
-		"log":   OpLog,
-		"ln":    OpLog,
-		"sqrt":  OpSqrt,
-		"asin":  OpAsin,
-		"acos":  OpAcos,
-		"atan":  OpAtan,
-		"abs":   OpAbs,
-		"cbrt":  OpCbrt,
-		"log2":  OpLog2,
-		"log10": OpLog10,
-		"ceil":  OpCeil,
-		"floor": OpFloor,
-		"trunc": OpTrunc,
-		"round": OpRound,
-		"sinh":  OpSinh,
-		"cosh":  OpCosh,
-		"tanh":  OpTanh,
-		"asinh": OpAsinh,
-		"acosh": OpAcosh,
-		"atanh": OpAtanh,
-		"erf":   OpErf,
-		"gamma": OpGamma,
-	} {
+	initFuncTables(defaultUnaryCodes, unaryFuncs)
+}
+
+func initFuncTables(codes map[string]OpCode, funcs map[string]mathFunc) {
+	unaryCodes = make(map[string]OpCode, len(funcs))
+	opcodeNames = make(map[OpCode]string, len(funcs))
+	canonicalNms = make(map[string]string, len(funcs))
+	for name, op := range codes {
 		unaryCodes[name] = op
 		if _, seen := opcodeNames[op]; !seen {
 			opcodeNames[op] = name
 			canonicalNms[name] = name
 		}
-		// Every alias must resolve through unaryFuncs too.
-		if _, ok := unaryFuncs[name]; !ok {
+		// Every alias must resolve through funcs too.
+		if _, ok := funcs[name]; !ok {
 			panic("bytecode: opcode table references unknown function " + name)
 		}
 	}
-	if len(unaryCodes) != len(unaryFuncs) {
+	if len(unaryCodes) != len(funcs) {
 		panic("bytecode: unaryFuncs and unaryCodes have drifted apart")
 	}
 
-	opUnaryFns = make(map[OpCode]mathFunc, len(unaryFuncs))
+	opUnaryFns = make(map[OpCode]mathFunc, len(funcs))
 	for name, op := range unaryCodes {
-		opUnaryFns[op] = unaryFuncs[name]
-		opUnaryTable[op] = unaryFuncs[name]
+		opUnaryFns[op] = funcs[name]
+		opUnaryTable[op] = funcs[name]
 	}
 }
 

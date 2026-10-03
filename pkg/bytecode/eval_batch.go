@@ -1,6 +1,7 @@
 package bytecode
 
 import (
+	"fmt"
 	"math"
 
 	"github.com/emlgo/eml/pkg/fastmath"
@@ -130,8 +131,21 @@ func (p *Program) EvalBatchColumnarScratch(data [][]float64, dst []float64, scra
 				varID := p.VarIndices[vIdx]
 				col := stackCols[sp][:currLen]
 				if int(varID) < len(data) {
-					srcCol := data[varID][offset : offset+currLen]
-					copy(col, srcCol)
+					src := data[varID]
+					if offset < len(src) {
+						avail := len(src) - offset
+						if avail > currLen {
+							avail = currLen
+						}
+						copy(col[:avail], src[offset:offset+avail])
+						for i := avail; i < currLen; i++ {
+							col[i] = 0
+						}
+					} else {
+						for i := range col {
+							col[i] = 0
+						}
+					}
 				} else {
 					for i := range col {
 						col[i] = 0
@@ -141,12 +155,18 @@ func (p *Program) EvalBatchColumnarScratch(data [][]float64, dst []float64, scra
 				vIdx++
 
 			case OpEML:
+				if sp < 2 {
+					panic(fmt.Sprintf("bytecode: stack underflow on %s (sp=%d)", op.String(), sp))
+				}
 				sp--
 				yCol := stackCols[sp][:currLen]
 				xCol := stackCols[sp-1][:currLen]
 				fastmath.FastEmlBatchTo(xCol, yCol, xCol)
 
 			case OpAdd:
+				if sp < 2 {
+					panic(fmt.Sprintf("bytecode: stack underflow on %s (sp=%d)", op.String(), sp))
+				}
 				sp--
 				yCol := stackCols[sp][:currLen]
 				xCol := stackCols[sp-1][:currLen]
@@ -155,6 +175,9 @@ func (p *Program) EvalBatchColumnarScratch(data [][]float64, dst []float64, scra
 				}
 
 			case OpSub:
+				if sp < 2 {
+					panic(fmt.Sprintf("bytecode: stack underflow on %s (sp=%d)", op.String(), sp))
+				}
 				sp--
 				yCol := stackCols[sp][:currLen]
 				xCol := stackCols[sp-1][:currLen]
@@ -163,6 +186,9 @@ func (p *Program) EvalBatchColumnarScratch(data [][]float64, dst []float64, scra
 				}
 
 			case OpMul:
+				if sp < 2 {
+					panic(fmt.Sprintf("bytecode: stack underflow on %s (sp=%d)", op.String(), sp))
+				}
 				sp--
 				yCol := stackCols[sp][:currLen]
 				xCol := stackCols[sp-1][:currLen]
@@ -171,6 +197,9 @@ func (p *Program) EvalBatchColumnarScratch(data [][]float64, dst []float64, scra
 				}
 
 			case OpDiv:
+				if sp < 2 {
+					panic(fmt.Sprintf("bytecode: stack underflow on %s (sp=%d)", op.String(), sp))
+				}
 				sp--
 				yCol := stackCols[sp][:currLen]
 				xCol := stackCols[sp-1][:currLen]
@@ -179,6 +208,9 @@ func (p *Program) EvalBatchColumnarScratch(data [][]float64, dst []float64, scra
 				}
 
 			case OpPow:
+				if sp < 2 {
+					panic(fmt.Sprintf("bytecode: stack underflow on %s (sp=%d)", op.String(), sp))
+				}
 				sp--
 				yCol := stackCols[sp][:currLen]
 				xCol := stackCols[sp-1][:currLen]
@@ -187,30 +219,45 @@ func (p *Program) EvalBatchColumnarScratch(data [][]float64, dst []float64, scra
 				}
 
 			case OpNeg:
+				if sp < 1 {
+					panic(fmt.Sprintf("bytecode: stack underflow on %s (sp=%d)", op.String(), sp))
+				}
 				xCol := stackCols[sp-1][:currLen]
 				for i := range xCol {
 					xCol[i] = -xCol[i]
 				}
 
 			case OpInv:
+				if sp < 1 {
+					panic(fmt.Sprintf("bytecode: stack underflow on %s (sp=%d)", op.String(), sp))
+				}
 				xCol := stackCols[sp-1][:currLen]
 				for i := range xCol {
 					xCol[i] = 1.0 / xCol[i]
 				}
 
 			case OpSqrt:
+				if sp < 1 {
+					panic(fmt.Sprintf("bytecode: stack underflow on %s (sp=%d)", op.String(), sp))
+				}
 				xCol := stackCols[sp-1][:currLen]
 				for i := range xCol {
 					xCol[i] = math.Sqrt(xCol[i])
 				}
 
 			case OpExp:
+				if sp < 1 {
+					panic(fmt.Sprintf("bytecode: stack underflow on %s (sp=%d)", op.String(), sp))
+				}
 				xCol := stackCols[sp-1][:currLen]
 				for i := range xCol {
 					xCol[i] = fastmath.FastExp(xCol[i])
 				}
 
 			case OpLog:
+				if sp < 1 {
+					panic(fmt.Sprintf("bytecode: stack underflow on %s (sp=%d)", op.String(), sp))
+				}
 				xCol := stackCols[sp-1][:currLen]
 				for i := range xCol {
 					xCol[i] = fastmath.FastLog(xCol[i])
@@ -220,11 +267,16 @@ func (p *Program) EvalBatchColumnarScratch(data [][]float64, dst []float64, scra
 				// Every remaining opcode is a unary function; the inner loop is
 				// a simple range so Go's auto-vectoriser can widen the ones
 				// that have a vectorisable body.
-				if fn := opUnaryTable[op]; fn != nil {
-					xCol := stackCols[sp-1][:currLen]
-					for i := range xCol {
-						xCol[i] = fn(xCol[i])
-					}
+				fn := opUnaryTable[op]
+				if fn == nil {
+					panic(fmt.Sprintf("bytecode: unresolvable opcode %d (%s)", op, op.String()))
+				}
+				if sp < 1 {
+					panic(fmt.Sprintf("bytecode: stack underflow on %s (sp=%d)", op.String(), sp))
+				}
+				xCol := stackCols[sp-1][:currLen]
+				for i := range xCol {
+					xCol[i] = fn(xCol[i])
 				}
 			}
 		}

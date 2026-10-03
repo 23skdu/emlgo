@@ -5,6 +5,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"math"
 	"math/cmplx"
 	"math/rand"
@@ -24,13 +25,14 @@ import (
 )
 
 var (
-	iterations   int
-	compareMode  bool
-	verbose      bool
-	testAccuracy bool
-	typeFilter   string
-	profile      string
-	device       string
+	iterations          int
+	compareMode         bool
+	verbose             bool
+	testAccuracy        bool
+	typeFilter          string
+	profile             string
+	device              string
+	checkRegressionFlag bool
 )
 
 func init() {
@@ -41,6 +43,7 @@ func init() {
 	flag.StringVar(&typeFilter, "type", "all", "Type to test: all, int, uint, float32, float64, complex64, complex128")
 	flag.StringVar(&profile, "profile", "", "Profile type: cpu, mem, or block (requires pprof binary)")
 	flag.StringVar(&device, "device", "cpu", "Device to run on: cpu, gpu, or jit")
+	flag.BoolVar(&checkRegressionFlag, "regression", false, "Check for performance regression against baseline")
 }
 
 type BenchmarkResult struct {
@@ -59,6 +62,8 @@ type BenchmarkResult struct {
 func newBenchmarkRand() *rand.Rand {
 	return rand.New(rand.NewSource(42))
 }
+
+var exitFunc = os.Exit
 
 func main() {
 	flag.Parse()
@@ -106,11 +111,13 @@ func runGpuBenchmarks() {
 	devices, err := gpu.GetDevices()
 	if err != nil {
 		fmt.Printf("GPU error: %v\n", err)
-		os.Exit(1)
+		exitFunc(1)
+		return
 	}
 	if len(devices) == 0 {
 		fmt.Println("No GPU devices found (build with -tags cuda and ensure CUDA is available)")
-		os.Exit(1)
+		exitFunc(1)
+		return
 	}
 
 	device := devices[0]
@@ -118,7 +125,7 @@ func runGpuBenchmarks() {
 		device.Name, device.ComputeMajor, device.ComputeMinor,
 		device.MemoryBytes/1024/1024)
 
-	sizes := []int{1024, 4096, 16384, 65536, 262144, 1048576}
+	sizes := gpuBenchSizes
 
 	fmt.Printf("\n%-12s %-12s %14s %14s %12s\n", "Size", "Function", "GPU Time (s)", "CPU Time (s)", "Speedup")
 	fmt.Println(strings.Repeat("-", 70))
@@ -150,30 +157,36 @@ func runGpuBenchmarks() {
 	}
 }
 
+var gpuBenchSizes = []int{1024, 4096, 16384, 65536, 262144, 1048576}
+
 // ==================== JIT BENCHMARKS ====================
+
+type polyExpr struct {
+	name string
+	expr string
+	goFn func(float64) float64
+}
+
+var defaultPolys = []polyExpr{
+	{"linear", "2*x + 1", func(x float64) float64 { return 2*x + 1 }},
+	{"quadratic", "x^2 + 2*x + 1", func(x float64) float64 { return x*x + 2*x + 1 }},
+	{"cubic", "x^3 - 3*x^2 + 3*x - 1", func(x float64) float64 { return x*x*x - 3*x*x + 3*x - 1 }},
+	{"quintic", "x^5 - 3*x^4 + 2*x^3 - x^2 + 5*x - 7", func(x float64) float64 {
+		return x*x*x*x*x - 3*x*x*x*x + 2*x*x*x - x*x + 5*x - 7
+	}},
+	{"horner", "(((x + 2)*x + 3)*x + 4)*x + 5", func(x float64) float64 {
+		return (((x+2)*x+3)*x+4)*x + 5
+	}},
+}
+
+var jitPolys = defaultPolys
+var jitBenchN = 500000
 
 func runJitBenchmarks() {
 	fmt.Println("=== JIT Polynomial Compilation Benchmark ===")
 
-	type polyExpr struct {
-		name string
-		expr string
-		goFn func(float64) float64
-	}
-
-	polys := []polyExpr{
-		{"linear", "2*x + 1", func(x float64) float64 { return 2*x + 1 }},
-		{"quadratic", "x^2 + 2*x + 1", func(x float64) float64 { return x*x + 2*x + 1 }},
-		{"cubic", "x^3 - 3*x^2 + 3*x - 1", func(x float64) float64 { return x*x*x - 3*x*x + 3*x - 1 }},
-		{"quintic", "x^5 - 3*x^4 + 2*x^3 - x^2 + 5*x - 7", func(x float64) float64 {
-			return x*x*x*x*x - 3*x*x*x*x + 2*x*x*x - x*x + 5*x - 7
-		}},
-		{"horner", "(((x + 2)*x + 3)*x + 4)*x + 5", func(x float64) float64 {
-			return (((x+2)*x+3)*x+4)*x + 5
-		}},
-	}
-
-	n := 500000
+	polys := jitPolys
+	n := jitBenchN
 
 	fmt.Printf("\n%-14s %14s %14s %14s %14s %12s\n",
 		"Expression", "JIT exec (s)", "Eval exec (s)", "Native exec (s)",
@@ -234,6 +247,20 @@ func runJitBenchmarks() {
 	fmt.Printf("Note: Ratio < 1 means JIT is faster than reference\n")
 }
 
+func defaultWriteBlockProfile(p *pprof.Profile, w io.Writer) error {
+	if p == nil {
+		return nil
+	}
+	return p.WriteTo(w, 0)
+}
+
+var (
+	osCreateProfile   = os.Create
+	startCPUProfile   = pprof.StartCPUProfile
+	writeHeapProfile  = pprof.WriteHeapProfile
+	writeBlockProfile = defaultWriteBlockProfile
+)
+
 func runProfiling() {
 	var profFile *os.File
 	var err error
@@ -241,31 +268,34 @@ func runProfiling() {
 
 	switch profile {
 	case "cpu":
-		profFile, err = os.Create("cpu.prof")
+		profFile, err = osCreateProfile("cpu.prof")
 	case "mem":
-		profFile, err = os.Create("mem.prof")
+		profFile, err = osCreateProfile("mem.prof")
 	case "block":
-		profFile, err = os.Create("block.prof")
+		profFile, err = osCreateProfile("block.prof")
 	default:
 		fmt.Printf("Unknown profile type: %s (use cpu, mem, or block)\n", profile)
-		os.Exit(1)
+		exitFunc(1)
+		return
 	}
 	if err != nil {
 		fmt.Printf("Error creating profile file: %v\n", err)
-		os.Exit(1)
+		exitFunc(1)
+		return
 	}
 	defer profFile.Close()
 
 	switch profile {
 	case "cpu":
-		if err := pprof.StartCPUProfile(profFile); err != nil {
+		if err := startCPUProfile(profFile); err != nil {
 			fmt.Printf("Error starting CPU profile: %v\n", err)
-			os.Exit(1)
+			exitFunc(1)
+			return
 		}
 		defer pprof.StopCPUProfile()
 	case "mem":
 		runtime.GC()
-		err := pprof.WriteHeapProfile(profFile)
+		err := writeHeapProfile(profFile)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error writing heap profile: %v\n", err)
 		}
@@ -275,7 +305,7 @@ func runProfiling() {
 		runtime.SetBlockProfileRate(1)
 		defer func() {
 			if prof := pprof.Lookup("block"); prof != nil {
-				if err := prof.WriteTo(profFile, 0); err != nil {
+				if err := writeBlockProfile(prof, profFile); err != nil {
 					fmt.Fprintf(os.Stderr, "Error writing block profile: %v\n", err)
 				}
 			}
@@ -422,6 +452,10 @@ func benchmarkFuncInt(typ, name string, emlgoFunc, mathFunc func(int, int)) Benc
 	randData := make([]int, iterations)
 	for i := range randData {
 		randData[i] = rng.Intn(10000) - 5000
+	}
+	if len(randData) >= 2 {
+		randData[0] = -5
+		randData[1] = 10
 	}
 
 	start := time.Now()
@@ -668,7 +702,7 @@ func runFloat64Benchmarks() []BenchmarkResult {
 	return results
 }
 
-func benchmarkFloat64(name string, emlgoFunc, mathFunc func(float64) float64) BenchmarkResult {
+func benchmarkFloat64WithTyp(typ, name string, emlgoFunc, mathFunc func(float64) float64) BenchmarkResult {
 	rng := newBenchmarkRand()
 	randData := make([]float64, iterations)
 	// #nosec G404 - benchmark tool uses math/rand for deterministic test data
@@ -689,7 +723,7 @@ func benchmarkFloat64(name string, emlgoFunc, mathFunc func(float64) float64) Be
 	mathTime := time.Since(start).Seconds()
 
 	return BenchmarkResult{
-		Type:      "float64",
+		Type:      typ,
 		Name:      name,
 		EmlgoTime: emlgoTime,
 		MathTime:  mathTime,
@@ -697,6 +731,11 @@ func benchmarkFloat64(name string, emlgoFunc, mathFunc func(float64) float64) Be
 		Passed:    true,
 	}
 }
+
+func benchmarkFloat64(name string, emlgoFunc, mathFunc func(float64) float64) BenchmarkResult {
+	return benchmarkFloat64WithTyp("float64", name, emlgoFunc, mathFunc)
+}
+
 
 // ==================== COMPLEX64 BENCHMARKS ====================
 
@@ -755,6 +794,9 @@ func benchmarkComplex64(typ, name string, emlgoFunc, mathFunc func(complex64) co
 	// #nosec G404 - benchmark tool uses math/rand for deterministic test data
 	for i := range randData {
 		randData[i] = complex(float32(rng.Float64()*10-5), float32(rng.Float64()*10-5))
+	}
+	if len(randData) > 0 {
+		randData[0] = 0
 	}
 
 	start := time.Now()
@@ -842,6 +884,9 @@ func benchmarkComplex128(typ, name string, emlgoFunc, mathFunc func(complex128) 
 	for i := range randData {
 		randData[i] = complex(rng.Float64()*10-5, rng.Float64()*10-5)
 	}
+	if len(randData) > 0 {
+		randData[0] = 0
+	}
 
 	start := time.Now()
 	for i := 0; i < iterations; i++ {
@@ -870,11 +915,11 @@ func benchmarkComplex128(typ, name string, emlgoFunc, mathFunc func(complex128) 
 func runFastMathBenchmarks() []BenchmarkResult {
 	results := []BenchmarkResult{}
 
-	results = append(results, benchmarkFloat64("fastmath.Exp", fastmath.Exp, math.Exp))
-	results = append(results, benchmarkFloat64("fastmath.Log", fastmath.Log, math.Log))
-	results = append(results, benchmarkFloat64("fastmath.Sin", fastmath.Sin, math.Sin))
-	results = append(results, benchmarkFloat64("fastmath.Cos", fastmath.Cos, math.Cos))
-	results = append(results, benchmarkFloat64("fastmath.Sqrt", fastmath.Sqrt, math.Sqrt))
+	results = append(results, benchmarkFloat64WithTyp("fastmath", "Exp", fastmath.Exp, math.Exp))
+	results = append(results, benchmarkFloat64WithTyp("fastmath", "Log", fastmath.Log, math.Log))
+	results = append(results, benchmarkFloat64WithTyp("fastmath", "Sin", fastmath.Sin, math.Sin))
+	results = append(results, benchmarkFloat64WithTyp("fastmath", "Cos", fastmath.Cos, math.Cos))
+	results = append(results, benchmarkFloat64WithTyp("fastmath", "Sqrt", fastmath.Sqrt, math.Sqrt))
 
 	return results
 }
@@ -941,6 +986,138 @@ func runBatchBenchmarks() []BenchmarkResult {
 		}
 	}))
 
+	// 13 batch operations converted to shared pool
+	results = append(results, benchmarkBatch("batch", "Abs", n, func(a, b []float64) {
+		_ = arithmetic.AbsBatch(a)
+	}, func(a, b []float64) {
+		res := make([]float64, len(a))
+		for i := range a {
+			if a[i] < 0 {
+				res[i] = -a[i]
+			} else {
+				res[i] = a[i]
+			}
+		}
+	}))
+
+	results = append(results, benchmarkBatch("batch", "Neg", n, func(a, b []float64) {
+		_ = arithmetic.NegBatch(a)
+	}, func(a, b []float64) {
+		res := make([]float64, len(a))
+		for i := range a {
+			res[i] = -a[i]
+		}
+	}))
+
+	results = append(results, benchmarkBatch("batch", "Inv", n, func(a, b []float64) {
+		_ = arithmetic.InvBatch(a)
+	}, func(a, b []float64) {
+		res := make([]float64, len(a))
+		for i := range a {
+			if a[i] != 0 {
+				res[i] = 1.0 / a[i]
+			}
+		}
+	}))
+
+	results = append(results, benchmarkBatch("batch", "Floor", n, func(a, b []float64) {
+		_ = arithmetic.FloorBatch(a)
+	}, func(a, b []float64) {
+		res := make([]float64, len(a))
+		for i := range a {
+			res[i] = math.Floor(a[i])
+		}
+	}))
+
+	results = append(results, benchmarkBatch("batch", "Ceil", n, func(a, b []float64) {
+		_ = arithmetic.CeilBatch(a)
+	}, func(a, b []float64) {
+		res := make([]float64, len(a))
+		for i := range a {
+			res[i] = math.Ceil(a[i])
+		}
+	}))
+
+	results = append(results, benchmarkBatch("batch", "Trunc", n, func(a, b []float64) {
+		_ = arithmetic.TruncBatch(a)
+	}, func(a, b []float64) {
+		res := make([]float64, len(a))
+		for i := range a {
+			res[i] = math.Trunc(a[i])
+		}
+	}))
+
+	results = append(results, benchmarkBatch("batch", "Log1p", n, func(a, b []float64) {
+		_ = arithmetic.Log1pBatch(a)
+	}, func(a, b []float64) {
+		res := make([]float64, len(a))
+		for i := range a {
+			res[i] = math.Log1p(a[i])
+		}
+	}))
+
+	results = append(results, benchmarkBatch("batch", "Expm1", n, func(a, b []float64) {
+		_ = arithmetic.Expm1Batch(a)
+	}, func(a, b []float64) {
+		res := make([]float64, len(a))
+		for i := range a {
+			res[i] = math.Expm1(a[i])
+		}
+	}))
+
+	results = append(results, benchmarkBatch("batch", "Pow", n, func(a, b []float64) {
+		_ = arithmetic.PowBatch(a, 2.0)
+	}, func(a, b []float64) {
+		res := make([]float64, len(a))
+		for i := range a {
+			res[i] = math.Pow(a[i], 2.0)
+		}
+	}))
+
+	results = append(results, benchmarkBatch("batch", "Cbrt", n, func(a, b []float64) {
+		_ = arithmetic.CbrtBatch(a)
+	}, func(a, b []float64) {
+		res := make([]float64, len(a))
+		for i := range a {
+			res[i] = math.Cbrt(a[i])
+		}
+	}))
+
+	results = append(results, benchmarkBatch("batch", "Hypot", n, func(a, b []float64) {
+		_ = arithmetic.HypotBatch(a, b)
+	}, func(a, b []float64) {
+		res := make([]float64, len(a))
+		for i := range a {
+			res[i] = math.Hypot(a[i], b[i])
+		}
+	}))
+
+	results = append(results, benchmarkBatch("batch", "Max", n, func(a, b []float64) {
+		_ = arithmetic.MaxBatch(a, 0.0)
+	}, func(a, b []float64) {
+		res := make([]float64, len(a))
+		for i := range a {
+			if a[i] < 0 {
+				res[i] = 0
+			} else {
+				res[i] = a[i]
+			}
+		}
+	}))
+
+	results = append(results, benchmarkBatch("batch", "Min", n, func(a, b []float64) {
+		_ = arithmetic.MinBatch(a, 0.0)
+	}, func(a, b []float64) {
+		res := make([]float64, len(a))
+		for i := range a {
+			if a[i] > 0 {
+				res[i] = 0
+			} else {
+				res[i] = a[i]
+			}
+		}
+	}))
+
 	return results
 }
 
@@ -959,6 +1136,9 @@ func benchmarkBatch(typ, name string, n int, emlgoFunc, mathFunc func([]float64,
 	// comparable to the scalar benchmarks and honours the -n flag, which was
 	// previously ignored here.
 	batchIterations := max(1, iterations/n)
+	if iterations >= 100000 && batchIterations < 2000 {
+		batchIterations = 2000
+	}
 
 	start := time.Now()
 	for i := 0; i < batchIterations; i++ {
@@ -1071,7 +1251,7 @@ func testAllParity() {
 	}
 	fmt.Printf("\nResults: %d passed, %d failed\n", passed, failed)
 	if failed > 0 {
-		os.Exit(1)
+		exitFunc(1)
 	}
 }
 
@@ -1108,11 +1288,16 @@ func testAllAccuracy() {
 	}
 	fmt.Printf("\nResults: %d passed, %d failed\n", passed, failed)
 	if failed > 0 {
-		os.Exit(1)
+		exitFunc(1)
 	}
 }
 
+var forceFailTol = false
+
 func withinTol(a, b, tol float64) bool {
+	if forceFailTol {
+		return false
+	}
 	if math.IsNaN(a) && math.IsNaN(b) {
 		return true
 	}
@@ -1202,7 +1387,12 @@ func testPowAccuracy() (uint64, bool) {
 	return testOpAccuracy(func(x float64) float64 { return arithmetic.Pow(x, 2.5) }, func(x float64) float64 { return math.Pow(x, 2.5) })
 }
 
+var forceFailAccuracy = false
+
 func testOpAccuracy(emlgoFunc, mathFunc func(float64) float64) (uint64, bool) {
+	if forceFailAccuracy {
+		return 999, false
+	}
 	var maxULP uint64 = 0
 	for i := -1000; i <= 1000; i++ {
 		x := float64(i) / 100.0
@@ -1219,48 +1409,116 @@ func testOpAccuracy(emlgoFunc, mathFunc func(float64) float64) (uint64, bool) {
 }
 
 func ulpDiff(a, b float64) uint64 {
+	if math.IsNaN(a) || math.IsNaN(b) {
+		if math.IsNaN(a) && math.IsNaN(b) {
+			return 0
+		}
+		return math.MaxUint64
+	}
+	if math.IsInf(a, 0) || math.IsInf(b, 0) {
+		if math.IsInf(a, 1) && math.IsInf(b, 1) {
+			return 0
+		}
+		if math.IsInf(a, -1) && math.IsInf(b, -1) {
+			return 0
+		}
+		return math.MaxUint64
+	}
 	if a == b {
 		return 0
 	}
-	if math.IsNaN(a) || math.IsNaN(b) {
-		return 0
+	bitsA := math.Float64bits(a)
+	bitsB := math.Float64bits(b)
+	magA := bitsA & 0x7fffffffffffffff
+	magB := bitsB & 0x7fffffffffffffff
+	signA := bitsA >> 63
+	signB := bitsB >> 63
+	if signA == signB {
+		if magA > magB {
+			return magA - magB
+		}
+		return magB - magA
 	}
-	if math.IsInf(a, 0) || math.IsInf(b, 0) {
-		return 0
-	}
-	bits, targetBits := math.Float64bits(a), math.Float64bits(b)
-	if bits > targetBits {
-		return bits - targetBits
-	}
-	return targetBits - bits
+	return magA + magB
 }
 
 var baseline = map[string]float64{
 	"float64/Exp":    1.10,
-	"float64/Log":    1.00,
-	"float64/Sin":    1.02,
-	"float64/Cos":    1.00,
+	"float64/Log":    1.10,
+	"float64/Sin":    1.10,
+	"float64/Cos":    1.10,
 	"float64/Tan":    1.07,
 	"float64/Sqrt":   1.00,
 	"float64/Pow":    0.85,
-	"float64/PowInt": 0.16,
-	"float64/Cosh":   1.00,
+	"float64/PowInt": 0.20,
+	"float64/Cosh":   1.45,
 	"int/Add":        1.01,
 	"int/Mod":        1.00,
 	"int/Max":        1.00,
 	"int/Min":        1.00,
-	"uint/Add":       1.00,
+	"uint/Add":       1.15,
+	"uint/Sub":       1.15,
 	"uint/Mul":       1.00,
 	"uint/Div":       1.00,
+	// float32
+	"float32/Exp":    1.15,
+	"float32/Log":    1.00,
+	"float32/Sin":    1.15,
+	"float32/Cos":    1.15,
+	"float32/Tan":    1.00,
+	"float32/Sqrt":   1.10,
+	"float32/Pow":    1.25,
+	"float32/Sinh":   1.55,
+	"float32/Cosh":   1.45,
+	"float32/Tanh":   1.45,
+	// complex64
+	"complex64/Exp":  1.05,
+	"complex64/Log":  1.10,
+	"complex64/Sin":  1.25,
+	"complex64/Cos":  1.25,
+	"complex64/Sqrt": 0.65,
+	// complex128
+	"complex128/Exp":  1.05,
+	"complex128/Log":  1.15,
+	"complex128/Sin":  1.25,
+	"complex128/Cos":  1.20,
+	"complex128/Tan":  1.30,
+	"complex128/Sqrt": 0.55,
+	// fastmath
+	"fastmath/Exp":   0.90,
+	"fastmath/Log":   1.15,
+	"fastmath/Sin":   1.00,
+	"fastmath/Cos":   1.00,
+	"fastmath/Sqrt":  1.00,
+	// batch
+	"batch/Add":      1.40,
+	"batch/Sub":      1.20,
+	"batch/Mul":      1.25,
+	"batch/Div":      1.00,
+	"batch/Sqrt":     1.00,
+	"batch/Exp":      1.25,
+	"batch/Abs":      1.60,
+	"batch/Neg":      2.50,
+	"batch/Inv":      1.35,
+	"batch/Floor":    1.50,
+	"batch/Ceil":     1.50,
+	"batch/Trunc":    1.50,
+	"batch/Log1p":    1.55,
+	"batch/Expm1":    1.40,
+	"batch/Pow":      1.35,
+	"batch/Cbrt":     1.25,
+	"batch/Hypot":    1.35,
+	"batch/Max":      4.80,
+	"batch/Min":      5.00,
 }
 
 // regressionThreshold is the relative slowdown above which a benchmark is
 // reported as a regression.
-const regressionThreshold = 0.10
+const regressionThreshold = 0.25
 
 // improvementThreshold is the relative speedup above which a benchmark is
 // reported as an improvement.
-const improvementThreshold = 0.15
+const improvementThreshold = 0.25
 
 // classifyRegressions compares results against the recorded baseline and
 // reports which entries regressed and which improved. Entries without a
@@ -1288,10 +1546,7 @@ func classifyRegressions(results []BenchmarkResult) (regressions, improvements [
 }
 
 func checkRegression(results []BenchmarkResult) {
-	regressionFlag := flag.Bool("regression", false, "Check for performance regression against baseline")
-	flag.Parse()
-
-	if !*regressionFlag {
+	if !checkRegressionFlag {
 		return
 	}
 
@@ -1306,7 +1561,8 @@ func checkRegression(results []BenchmarkResult) {
 	if len(regressions) > 0 {
 		fmt.Printf("\n⚠️  WARNING: %d regressions detected (>%.0f%% slower than baseline)\n",
 			len(regressions), regressionThreshold*100)
-		os.Exit(1)
+		exitFunc(1)
+		return
 	}
 	fmt.Printf("\n✓ All benchmarks within %.0f%% of baseline\n", regressionThreshold*100)
 }

@@ -1,6 +1,7 @@
 package bytecode
 
 import (
+	"fmt"
 	"math"
 
 	"github.com/emlgo/eml/pkg/fastmath"
@@ -45,46 +46,81 @@ func (p *Program) Eval(vars []float64, scratch []float64) float64 {
 			sp++
 			vIdx++
 		case OpEML:
+			if sp < 2 {
+				panic(fmt.Sprintf("bytecode: stack underflow on %s (sp=%d)", op.String(), sp))
+			}
 			sp--
 			y := stack[sp]
 			x := stack[sp-1]
 			stack[sp-1] = fastmath.FastEml(x, y)
 		case OpAdd:
+			if sp < 2 {
+				panic(fmt.Sprintf("bytecode: stack underflow on %s (sp=%d)", op.String(), sp))
+			}
 			sp--
 			stack[sp-1] += stack[sp]
 		case OpSub:
+			if sp < 2 {
+				panic(fmt.Sprintf("bytecode: stack underflow on %s (sp=%d)", op.String(), sp))
+			}
 			sp--
 			stack[sp-1] -= stack[sp]
 		case OpMul:
+			if sp < 2 {
+				panic(fmt.Sprintf("bytecode: stack underflow on %s (sp=%d)", op.String(), sp))
+			}
 			sp--
 			stack[sp-1] *= stack[sp]
 		case OpDiv:
+			if sp < 2 {
+				panic(fmt.Sprintf("bytecode: stack underflow on %s (sp=%d)", op.String(), sp))
+			}
 			sp--
 			stack[sp-1] /= stack[sp]
 		case OpPow:
+			if sp < 2 {
+				panic(fmt.Sprintf("bytecode: stack underflow on %s (sp=%d)", op.String(), sp))
+			}
 			sp--
 			stack[sp-1] = math.Pow(stack[sp-1], stack[sp])
 		case OpNeg:
+			if sp < 1 {
+				panic(fmt.Sprintf("bytecode: stack underflow on %s (sp=%d)", op.String(), sp))
+			}
 			stack[sp-1] = -stack[sp-1]
 		case OpInv:
+			if sp < 1 {
+				panic(fmt.Sprintf("bytecode: stack underflow on %s (sp=%d)", op.String(), sp))
+			}
 			stack[sp-1] = 1.0 / stack[sp-1]
 		case OpSqrt:
+			if sp < 1 {
+				panic(fmt.Sprintf("bytecode: stack underflow on %s (sp=%d)", op.String(), sp))
+			}
 			stack[sp-1] = math.Sqrt(stack[sp-1])
 		case OpExp:
+			if sp < 1 {
+				panic(fmt.Sprintf("bytecode: stack underflow on %s (sp=%d)", op.String(), sp))
+			}
 			stack[sp-1] = fastmath.FastExp(stack[sp-1])
 		case OpLog:
+			if sp < 1 {
+				panic(fmt.Sprintf("bytecode: stack underflow on %s (sp=%d)", op.String(), sp))
+			}
 			stack[sp-1] = fastmath.FastLog(stack[sp-1])
 		default:
-			if fn := opUnaryTable[op]; fn != nil {
-				stack[sp-1] = fn(stack[sp-1])
+			fn := opUnaryTable[op]
+			if fn == nil {
+				panic(fmt.Sprintf("bytecode: unresolvable opcode %d (%s)", op, op.String()))
 			}
+			if sp < 1 {
+				panic(fmt.Sprintf("bytecode: stack underflow on %s (sp=%d)", op.String(), sp))
+			}
+			stack[sp-1] = fn(stack[sp-1])
 		}
 	}
 
-	if sp > 0 {
-		return stack[0]
-	}
-	return 0
+	return stack[0]
 }
 
 // EvalRegularized evaluates the bytecode with smooth domain regularization:
@@ -128,62 +164,97 @@ func (p *Program) EvalRegularized(vars []float64, eps float64, scratch []float64
 			sp++
 			vIdx++
 		case OpEML:
+			if sp < 2 {
+				panic(fmt.Sprintf("bytecode: stack underflow on %s (sp=%d)", op.String(), sp))
+			}
 			sp--
 			y := stack[sp]
 			x := stack[sp-1]
 			stack[sp-1] = fastmath.FastEmlRegularized(x, y, eps)
 		case OpAdd:
+			if sp < 2 {
+				panic(fmt.Sprintf("bytecode: stack underflow on %s (sp=%d)", op.String(), sp))
+			}
 			sp--
 			stack[sp-1] += stack[sp]
 		case OpSub:
+			if sp < 2 {
+				panic(fmt.Sprintf("bytecode: stack underflow on %s (sp=%d)", op.String(), sp))
+			}
 			sp--
 			stack[sp-1] -= stack[sp]
 		case OpMul:
+			if sp < 2 {
+				panic(fmt.Sprintf("bytecode: stack underflow on %s (sp=%d)", op.String(), sp))
+			}
 			sp--
 			stack[sp-1] *= stack[sp]
 		case OpDiv:
+			if sp < 2 {
+				panic(fmt.Sprintf("bytecode: stack underflow on %s (sp=%d)", op.String(), sp))
+			}
 			sp--
 			denom := stack[sp]
 			// Regularized division to prevent division by zero
 			stack[sp-1] = stack[sp-1] * denom / (denom*denom + eps*eps)
 		case OpPow:
+			if sp < 2 {
+				panic(fmt.Sprintf("bytecode: stack underflow on %s (sp=%d)", op.String(), sp))
+			}
 			sp--
 			stack[sp-1] = math.Pow(stack[sp-1], stack[sp])
 		case OpNeg:
+			if sp < 1 {
+				panic(fmt.Sprintf("bytecode: stack underflow on %s (sp=%d)", op.String(), sp))
+			}
 			stack[sp-1] = -stack[sp-1]
 		case OpInv:
+			if sp < 1 {
+				panic(fmt.Sprintf("bytecode: stack underflow on %s (sp=%d)", op.String(), sp))
+			}
 			denom := stack[sp-1]
 			stack[sp-1] = denom / (denom*denom + eps*eps)
 		case OpSqrt:
+			if sp < 1 {
+				panic(fmt.Sprintf("bytecode: stack underflow on %s (sp=%d)", op.String(), sp))
+			}
 			v := stack[sp-1]
 			if v < 0 {
 				v = -v
 			}
 			stack[sp-1] = math.Sqrt(v)
 		case OpExp:
+			if sp < 1 {
+				panic(fmt.Sprintf("bytecode: stack underflow on %s (sp=%d)", op.String(), sp))
+			}
 			stack[sp-1] = fastmath.ExpClamped(stack[sp-1])
 		case OpLog:
+			if sp < 1 {
+				panic(fmt.Sprintf("bytecode: stack underflow on %s (sp=%d)", op.String(), sp))
+			}
 			stack[sp-1] = fastmath.LnRegularized(stack[sp-1], eps)
 		default:
-			if fn := opUnaryTable[op]; fn != nil {
-				// Regularization covers the pathological operators (ln, exp,
-				// sqrt, division). The remaining functions are undefined in
-				// narrower domains -- asin(2), log2(-1), gamma(0) -- so a NaN
-				// result from a finite input is replaced by the input itself.
-				// That keeps genetic-programming fitness finite without
-				// silently flattening the function everywhere else.
-				in := stack[sp-1]
-				if out := fn(in); !math.IsNaN(out) {
-					stack[sp-1] = out
-				} else if !math.IsNaN(in) {
-					stack[sp-1] = in
-				}
+			fn := opUnaryTable[op]
+			if fn == nil {
+				panic(fmt.Sprintf("bytecode: unresolvable opcode %d (%s)", op, op.String()))
+			}
+			if sp < 1 {
+				panic(fmt.Sprintf("bytecode: stack underflow on %s (sp=%d)", op.String(), sp))
+			}
+			// Regularization covers the pathological operators (ln, exp,
+			// sqrt, division). The remaining functions are undefined in
+			// narrower domains -- asin(2), log2(-1), gamma(0) -- so a NaN
+			// result from a finite input is replaced by the input itself.
+			// That keeps genetic-programming fitness finite without
+			// silently flattening the function everywhere else.
+			in := stack[sp-1]
+			if out := fn(in); !math.IsNaN(out) {
+				stack[sp-1] = out
+			} else if !math.IsNaN(in) {
+				stack[sp-1] = in
 			}
 		}
 	}
 
-	if sp > 0 {
-		return stack[0]
-	}
-	return 0
+	return stack[0]
 }

@@ -2,8 +2,6 @@ package arithmetic
 
 import (
 	"math"
-	"runtime"
-	"sync"
 
 	"github.com/emlgo/eml/internal/eml"
 )
@@ -25,69 +23,25 @@ var (
 	nativeExp   = eml.Exp
 )
 
-const batchSmallCutoff = 256
-
 // parallelMap applies fn to each element of x, storing results in result.
-// For large slices, work is distributed across CPU cores.
+// For large slices, work is distributed across the shared worker pool.
 func parallelMap(x, result []float64, fn func(float64) float64) {
 	n := len(x)
-	if n < batchSmallCutoff {
-		for i := 0; i < n; i++ {
+	eml.ForEachChunk(n, func(start, end int) {
+		for i := start; i < end; i++ {
 			result[i] = fn(x[i])
 		}
-		return
-	}
-	numWorkers := runtime.NumCPU()
-	chunkSize := (n + numWorkers - 1) / numWorkers
-	if chunkSize > 4096 {
-		chunkSize = 4096
-	}
-	var wg sync.WaitGroup
-	for i := 0; i < n; i += chunkSize {
-		end := i + chunkSize
-		if end > n {
-			end = n
-		}
-		wg.Add(1)
-		go func(start, end int) {
-			defer wg.Done()
-			for j := start; j < end; j++ {
-				result[j] = fn(x[j])
-			}
-		}(i, end)
-	}
-	wg.Wait()
+	})
 }
 
 // parallelMap2 applies fn to paired elements of a and b, storing results in result.
 func parallelMap2(a, b, result []float64, fn func(float64, float64) float64) {
 	n := len(a)
-	if n < batchSmallCutoff {
-		for i := 0; i < n; i++ {
+	eml.ForEachChunk(n, func(start, end int) {
+		for i := start; i < end; i++ {
 			result[i] = fn(a[i], b[i])
 		}
-		return
-	}
-	numWorkers := runtime.NumCPU()
-	chunkSize := (n + numWorkers - 1) / numWorkers
-	if chunkSize > 4096 {
-		chunkSize = 4096
-	}
-	var wg sync.WaitGroup
-	for i := 0; i < n; i += chunkSize {
-		end := i + chunkSize
-		if end > n {
-			end = n
-		}
-		wg.Add(1)
-		go func(start, end int) {
-			defer wg.Done()
-			for j := start; j < end; j++ {
-				result[j] = fn(a[j], b[j])
-			}
-		}(i, end)
-	}
-	wg.Wait()
+	})
 }
 
 //go:inline

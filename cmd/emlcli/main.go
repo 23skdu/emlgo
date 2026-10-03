@@ -16,10 +16,13 @@ import (
 	"github.com/emlgo/eml/pkg/trig"
 )
 
+var exitFunc = os.Exit
+
 func main() {
 	if len(os.Args) < 2 {
 		printUsage()
-		os.Exit(1)
+		exitFunc(1)
+		return
 	}
 
 	command := os.Args[1]
@@ -39,7 +42,8 @@ func main() {
 	default:
 		fmt.Printf("Unknown command: %s\n", command)
 		printUsage()
-		os.Exit(1)
+		exitFunc(1)
+		return
 	}
 }
 
@@ -281,10 +285,12 @@ func runGpuVerify() {
 	}
 }
 
+var jitTestExpr = "x^2 + 2*x + 1"
+
 func runJitTest() {
 	fmt.Println("JIT Polynomial Compilation Test")
 	c := jit.NewCompiler()
-	f, err := c.Compile("x^2 + 2x + 1")
+	f, err := c.Compile(jitTestExpr)
 	if err != nil {
 		fmt.Printf("JIT Error: %v\n", err)
 		return

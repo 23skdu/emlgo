@@ -30,11 +30,11 @@ type Dataset struct {
 
 // Samples reports the number of samples in the dataset.
 func (d Dataset) Samples() int {
+	if len(d.X) > 0 && len(d.X[0]) > 0 {
+		return len(d.X[0])
+	}
 	if len(d.Y) > 0 {
 		return len(d.Y)
-	}
-	if len(d.X) > 0 {
-		return len(d.X[0])
 	}
 	return 0
 }
@@ -141,6 +141,21 @@ type Config struct {
 	//
 	// Defaults to 30. Set it to a negative value to disable local search.
 	LocalSearchSteps int
+	// Parsimony is the weight lambda for ProgramCost penalty:
+	// fitness = data_fit - Parsimony * ProgramCost.
+	// Penalizes bloated trees to preserve compact formulas. Defaults to 0 (disabled).
+	Parsimony float64
+	// AdaptiveMutation enables self-adaptive mutation rate adjustment:
+	// decreases rate on improvement and increases rate on stagnation. Defaults to false.
+	AdaptiveMutation bool
+	// StopTolerance is the error target for early termination.
+	// When best RMS error <= StopTolerance, the search terminates early. Defaults to 0 (disabled).
+	StopTolerance float64
+	// PlateauGenerations is the count of consecutive generations without improvement before terminating early.
+	// Defaults to 0 (disabled).
+	PlateauGenerations int
+	// Optimize runs algebraic optimization and constant folding in the generational loop. Defaults to false.
+	Optimize bool
 	// Seed makes the whole search reproducible. Zero picks a seed from the
 	// system entropy source.
 	Seed int64
@@ -259,21 +274,69 @@ func Search(cfg Config, dataset Dataset, fitness Fitness) (Result, error) {
 	history := make([]float64, 0, cfg.Generations)
 	evaluations := 0
 
+	mutRate := cfg.MutationRate
+	stagnantGens := 0
+	lastBest := math.Inf(-1)
+
 	for gen := 0; gen < cfg.Generations; gen++ {
 		evaluations += scorePopulation(cfg, population, dataset, fitness, scores)
 
 		order := sortedIndices(scores)
-		history = append(history, scores[order[0]])
+		bestScore := scores[order[0]]
+		history = append(history, bestScore)
+
+		if cfg.StopTolerance > 0 && math.Abs(bestScore) <= cfg.StopTolerance {
+			break
+		}
+
+		if bestScore > lastBest+1e-9 {
+			lastBest = bestScore
+			stagnantGens = 0
+			if cfg.AdaptiveMutation {
+				mutRate = max(0.02, mutRate*0.95)
+			}
+		} else {
+			stagnantGens++
+			if cfg.AdaptiveMutation {
+				mutRate = min(0.60, mutRate*1.05)
+			}
+			if cfg.PlateauGenerations > 0 && stagnantGens >= cfg.PlateauGenerations {
+				break
+			}
+		}
 
 		next := make([]*Program, 0, len(population))
 		// Elitism: carry the best candidates over, polishing their constants
 		// with a short local search first.
-		for i := 0; i < cfg.Elitism; i++ {
-			elite := population[order[i]].Clone()
-			if cfg.LocalSearchSteps > 0 {
-				tuneConstants(elite, dataset, fitness, rng, cfg.LocalSearchSteps)
+		if cfg.Workers > 1 && cfg.Elitism > 1 && cfg.LocalSearchSteps > 0 {
+			elites := make([]*Program, cfg.Elitism)
+			for i := 0; i < cfg.Elitism; i++ {
+				elites[i] = population[order[i]].Clone()
 			}
-			next = append(next, elite)
+			var wg sync.WaitGroup
+			for i := 0; i < cfg.Elitism; i++ {
+				wg.Add(1)
+				go func(idx int) {
+					defer wg.Done()
+					tuneConstants(elites[idx], dataset, fitness, nil, cfg.LocalSearchSteps)
+					if cfg.Optimize {
+						elites[idx] = Optimize(elites[idx])
+					}
+				}(i)
+			}
+			wg.Wait()
+			next = append(next, elites...)
+		} else {
+			for i := 0; i < cfg.Elitism; i++ {
+				elite := population[order[i]].Clone()
+				if cfg.LocalSearchSteps > 0 {
+					tuneConstants(elite, dataset, fitness, rng, cfg.LocalSearchSteps)
+				}
+				if cfg.Optimize {
+					elite = Optimize(elite)
+				}
+				next = append(next, elite)
+			}
 		}
 
 		for len(next) < len(population) {
@@ -282,12 +345,15 @@ func Search(cfg Config, dataset Dataset, fitness Fitness) (Result, error) {
 			if rng.Float64() < cfg.CrossoverRate {
 				other := tournament(rng, scores, order, cfg.TournamentSize)
 				if other != order[0] {
-					if c1, _, err := Crossover(child, population[other], rng); err == nil && c1 != nil {
+					if c1, err := CrossoverOne(child, population[other], rng); err == nil && c1 != nil {
 						child = c1
 					}
 				}
 			}
-			child = Mutate(child, cfg.MutationRate, rng)
+			child = Mutate(child, mutRate, rng)
+			if cfg.Optimize {
+				child = Optimize(child)
+			}
 
 			if cfg.MaxOps > 0 && len(child.Ops) > cfg.MaxOps {
 				child.Ops = child.Ops[:cfg.MaxOps]
@@ -385,12 +451,20 @@ func tournament(rng *rand.Rand, scores []float64, order []int, k int) int {
 
 // scorePopulation evaluates every candidate, fanning out across workers.
 func scorePopulation(cfg Config, pop []*Program, d Dataset, fitness Fitness, scores []float64) int {
+	calcScore := func(p *Program) float64 {
+		s := fitness(p, d)
+		if cfg.Parsimony > 0 && !math.IsNaN(s) && !math.IsInf(s, -1) {
+			s -= cfg.Parsimony * ProgramCost(p)
+		}
+		return s
+	}
+
 	// Below this many candidates per worker the goroutine hand-off costs more
 	// than the work it saves.
 	const minPerWorker = 8
 	if cfg.Workers <= 1 || len(pop) < cfg.Workers*minPerWorker {
 		for i, p := range pop {
-			scores[i] = fitness(p, d)
+			scores[i] = calcScore(p)
 		}
 		return len(pop)
 	}
@@ -408,7 +482,7 @@ func scorePopulation(cfg Config, pop []*Program, d Dataset, fitness Fitness, sco
 		go func(lo, hi int) {
 			defer wg.Done()
 			for i := lo; i < hi; i++ {
-				scores[i] = fitness(pop[i], d)
+				scores[i] = calcScore(pop[i])
 			}
 		}(lo, hi)
 	}

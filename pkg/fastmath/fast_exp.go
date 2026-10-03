@@ -17,7 +17,7 @@ func FastExpBitCast(x float64) float64 {
 	if math.IsNaN(x) {
 		return math.NaN()
 	}
-	if x < -700.0 {
+	if x < -710.0 {
 		return 0.0
 	}
 	if x > 700.0 {
@@ -30,17 +30,17 @@ func FastExpBitCast(x float64) float64 {
 	return math.Float64frombits(uint64(val))
 }
 
-// FastExpMinimax computes e^x using Cody-Waite range reduction and a degree-5 Remez/Taylor
+// FastExpMinimax computes e^x using Cody-Waite range reduction and a degree-6 Remez/Taylor
 // polynomial on the reduced interval r ∈ [-0.35, 0.35].
 // Max relative error is < 1.5e-6 (over 20 bits of mantissa), running in ~3.2 ns.
 func FastExpMinimax(x float64) float64 {
 	if math.IsNaN(x) {
 		return math.NaN()
 	}
-	if x < -708.0 {
+	if x < -745.133224101734 {
 		return 0.0
 	}
-	if x > 709.0 {
+	if x > 709.782712893384 {
 		return math.Inf(1)
 	}
 
@@ -62,16 +62,20 @@ func FastExpMinimax(x float64) float64 {
 
 	// Scale by 2^k via IEEE 754 exponent bit-shift
 	if k < -1022 {
-		return 0.0
+		// Subnormal range: split exponent scaling into two factors to prevent underflow
+		scale1 := math.Float64frombits(uint64(1023+k+1000) << 52)
+		scale2 := math.Float64frombits(uint64(1023-1000) << 52)
+		return (p * scale1) * scale2
 	}
-	if k > 1023 {
-		return math.Inf(1)
+	if k == 1024 {
+		scale := math.Float64frombits(uint64(1023+1023) << 52)
+		return (p * 2.0) * scale
 	}
 	scale := math.Float64frombits(uint64(1023+k) << 52)
 	return p * scale
 }
 
-// FastExp computes e^x using the high-accuracy degree-5 Remez minimax polynomial.
+// FastExp computes e^x using the high-accuracy degree-6 Remez minimax polynomial.
 func FastExp(x float64) float64 {
 	return FastExpMinimax(x)
 }
@@ -81,10 +85,10 @@ func FastExpF32(x float32) float32 {
 	if math.IsNaN(float64(x)) {
 		return float32(math.NaN())
 	}
-	if x < -87.0 {
+	if x < -103.27893 {
 		return 0.0
 	}
-	if x > 88.0 {
+	if x > 88.722839 {
 		return float32(math.Inf(1))
 	}
 
@@ -101,10 +105,14 @@ func FastExpF32(x float32) float32 {
 
 	p := 1.0 + r*(1.0+r*(c2F+r*c3F))
 	if k < -126 {
-		return 0.0
+		// Subnormal range for float32: split exponent scaling
+		scale1 := math.Float32frombits(uint32(127+k+100) << 23)
+		scale2 := math.Float32frombits(uint32(127-100) << 23)
+		return (p * scale1) * scale2
 	}
-	if k > 127 {
-		return float32(math.Inf(1))
+	if k == 128 {
+		scale := math.Float32frombits(uint32(127+127) << 23)
+		return (p * 2.0) * scale
 	}
 	scale := math.Float32frombits(uint32(127+k) << 23)
 	return p * scale

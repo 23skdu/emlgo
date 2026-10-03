@@ -356,7 +356,7 @@ func FormatExpr(n Node) string {
 			s = strings.TrimRight(s, "0")
 			s = strings.TrimRight(s, ".")
 		}
-		if s == "" || s == "-" {
+		if s == "" || s == "-" || s == "-0" {
 			s = "0"
 		}
 		return s

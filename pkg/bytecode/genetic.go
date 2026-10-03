@@ -195,12 +195,38 @@ func Crossover(p1, p2 *Program, rng *rand.Rand) (*Program, *Program, error) {
 	c1 := splice(p1, p2, pa, pb)
 	c2 := splice(p2, p1, pb, pa)
 
-	if !ValidateStack(c1.Ops) || !ValidateStack(c2.Ops) {
+	if !validateStackFn(c1.Ops) || !validateStackFn(c2.Ops) {
 		// Should be unreachable given stack-balanced cut points, but never
 		// hand back a program that would panic during evaluation.
 		return p1.Clone(), p2.Clone(), nil
 	}
 	return c1, c2, nil
+}
+
+// CrossoverOne produces a single offspring by splicing a subtree from p2 into p1.
+// Unlike Crossover, it avoids allocating and constructing the unused second child.
+func CrossoverOne(p1, p2 *Program, rng *rand.Rand) (*Program, error) {
+	if p1 == nil || p2 == nil || len(p1.Ops) == 0 || len(p2.Ops) == 0 {
+		return nil, fmt.Errorf("invalid inputs to crossover")
+	}
+	if rng == nil {
+		return nil, fmt.Errorf("crossover requires a random source")
+	}
+
+	points1 := splitPoints(p1)
+	points2 := splitPoints(p2)
+	if len(points1) == 0 || len(points2) == 0 {
+		return p1.Clone(), nil
+	}
+
+	pa := points1[rng.Intn(len(points1))]
+	pb := points2[rng.Intn(len(points2))]
+
+	c1 := splice(p1, p2, pa, pb)
+	if !validateStackFn(c1.Ops) {
+		return p1.Clone(), nil
+	}
+	return c1, nil
 }
 
 // Mutate performs random point mutation on a program with probability

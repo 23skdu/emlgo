@@ -100,8 +100,11 @@ func TestULPDiffNaN(t *testing.T) {
 	if d := ulpDiff(math.NaN(), math.NaN()); d != 0 {
 		t.Errorf("ulpDiff(NaN, NaN) = %d, want 0", d)
 	}
-	if d := ulpDiff(math.NaN(), 1.0); d != 0 {
-		t.Errorf("ulpDiff(NaN, 1.0) = %d, want 0", d)
+	if d := ulpDiff(math.NaN(), 1.0); d != math.MaxUint64 {
+		t.Errorf("ulpDiff(NaN, 1.0) = %d, want MaxUint64", d)
+	}
+	if d := ulpDiff(1.0, math.NaN()); d != math.MaxUint64 {
+		t.Errorf("ulpDiff(1.0, NaN) = %d, want MaxUint64", d)
 	}
 }
 
@@ -112,11 +115,23 @@ func TestULPDiffInf(t *testing.T) {
 	if d := ulpDiff(math.Inf(-1), math.Inf(-1)); d != 0 {
 		t.Errorf("ulpDiff(-Inf, -Inf) = %d, want 0", d)
 	}
-	if d := ulpDiff(math.Inf(1), math.Inf(-1)); d != 0 {
-		t.Errorf("ulpDiff(+Inf, -Inf) = %d, want 0", d)
+	if d := ulpDiff(math.Inf(1), math.Inf(-1)); d != math.MaxUint64 {
+		t.Errorf("ulpDiff(+Inf, -Inf) = %d, want MaxUint64", d)
 	}
-	if d := ulpDiff(math.Inf(1), 1.0); d != 0 {
-		t.Errorf("ulpDiff(+Inf, 1.0) = %d, want 0", d)
+	if d := ulpDiff(math.Inf(-1), math.Inf(1)); d != math.MaxUint64 {
+		t.Errorf("ulpDiff(-Inf, +Inf) = %d, want MaxUint64", d)
+	}
+	if d := ulpDiff(math.Inf(1), 1.0); d != math.MaxUint64 {
+		t.Errorf("ulpDiff(+Inf, 1.0) = %d, want MaxUint64", d)
+	}
+	if d := ulpDiff(1.0, math.Inf(1)); d != math.MaxUint64 {
+		t.Errorf("ulpDiff(1.0, +Inf) = %d, want MaxUint64", d)
+	}
+	if d := ulpDiff(math.Inf(-1), 1.0); d != math.MaxUint64 {
+		t.Errorf("ulpDiff(-Inf, 1.0) = %d, want MaxUint64", d)
+	}
+	if d := ulpDiff(1.0, -1.0); d == 0 {
+		t.Errorf("ulpDiff(1.0, -1.0) = 0, want non-zero")
 	}
 }
 

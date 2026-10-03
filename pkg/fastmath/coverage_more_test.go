@@ -175,4 +175,23 @@ func TestFastmathComprehensive(t *testing.T) {
 	_ = TanBatchC128(c128)
 	TanBatchToC128(c128, dstC128)
 	_ = cmplx.Abs(1 + 1i)
+
+	// FastExp edge cases
+	_ = FastExpBitCast(-709.5)
+	_ = FastExpBitCast(-720.0)
+	_ = FastExpBitCast(710.0)
+	_ = FastExpBitCast(math.NaN())
+
+	_ = FastExpMinimax(-709.8)
+	_ = FastExpMinimax(709.8)
+	_ = FastExpMinimax(-720.0)
+	_ = FastExpMinimax(720.0)
+	_ = FastExpMinimax(math.NaN())
+
+	_ = FastExpF32(-89.5)
+	_ = FastExpF32(89.5)
+	_ = FastExpF32(-95.0)
+	_ = FastExpF32(95.0)
+	_ = FastExpF32(float32(math.NaN()))
 }
+

@@ -42,23 +42,40 @@ func (v *BatchVerifier) VerifyOp(name string, input, gpuResult []float64, cpuRef
 }
 
 // ulpDiff returns the ULP distance between two float64 values.
-// If either value is NaN or Inf, returns 0.
+// NaN matches only NaN (returning 0); NaN vs non-NaN returns math.MaxUint64.
+// Matching infinities (+Inf/+Inf or -Inf/-Inf) return 0; mismatched infinities or Inf vs finite return math.MaxUint64.
 func ulpDiff(a, b float64) uint64 {
+	if math.IsNaN(a) || math.IsNaN(b) {
+		if math.IsNaN(a) && math.IsNaN(b) {
+			return 0
+		}
+		return math.MaxUint64
+	}
+	if math.IsInf(a, 0) || math.IsInf(b, 0) {
+		if math.IsInf(a, 1) && math.IsInf(b, 1) {
+			return 0
+		}
+		if math.IsInf(a, -1) && math.IsInf(b, -1) {
+			return 0
+		}
+		return math.MaxUint64
+	}
 	if a == b {
 		return 0
 	}
-	if math.IsNaN(a) || math.IsNaN(b) {
-		return 0
+	bitsA := math.Float64bits(a)
+	bitsB := math.Float64bits(b)
+	magA := bitsA & 0x7fffffffffffffff
+	magB := bitsB & 0x7fffffffffffffff
+	signA := bitsA >> 63
+	signB := bitsB >> 63
+	if signA == signB {
+		if magA > magB {
+			return magA - magB
+		}
+		return magB - magA
 	}
-	if math.IsInf(a, 0) || math.IsInf(b, 0) {
-		return 0
-	}
-	bits := math.Float64bits(a)
-	targetBits := math.Float64bits(b)
-	if bits > targetBits {
-		return bits - targetBits
-	}
-	return targetBits - bits
+	return magA + magB
 }
 
 // CPU reference functions for all GPU batch operations.

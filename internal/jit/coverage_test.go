@@ -44,8 +44,8 @@ func TestEncoderLoadConstantREX(t *testing.T) {
 	if len(e.code) < 9 {
 		t.Fatalf("loadConstant REX emitted %d bytes, want >= 9", len(e.code))
 	}
-	if e.code[0] != 0x44 {
-		t.Fatalf("expected REX.W prefix 0x44, got %02x", e.code[0])
+	if e.code[0] != 0xF2 || e.code[1] != 0x44 {
+		t.Fatalf("expected prefix 0xF2 and REX.W prefix 0x44, got %02x %02x", e.code[0], e.code[1])
 	}
 }
 
@@ -55,8 +55,8 @@ func TestEncoderMovsdStoreREX(t *testing.T) {
 	if len(e.code) < 6 {
 		t.Fatalf("movsdStore REX emitted %d bytes, want >= 6", len(e.code))
 	}
-	if e.code[0] != 0x44 {
-		t.Fatalf("expected REX.R prefix 0x44, got %02x", e.code[0])
+	if e.code[0] != 0xF2 || e.code[1] != 0x44 {
+		t.Fatalf("expected prefix 0xF2 and REX.R prefix 0x44, got %02x %02x", e.code[0], e.code[1])
 	}
 }
 
@@ -66,8 +66,8 @@ func TestEncoderMovsdLoadREX(t *testing.T) {
 	if len(e.code) < 6 {
 		t.Fatalf("movsdLoad REX emitted %d bytes, want >= 6", len(e.code))
 	}
-	if e.code[0] != 0x44 {
-		t.Fatalf("expected REX.W prefix 0x44, got %02x", e.code[0])
+	if e.code[0] != 0xF2 || e.code[1] != 0x44 {
+		t.Fatalf("expected prefix 0xF2 and REX.W prefix 0x44, got %02x %02x", e.code[0], e.code[1])
 	}
 }
 
@@ -105,8 +105,8 @@ func TestEncoderSse2REX(t *testing.T) {
 	if len(e.code) < 5 {
 		t.Fatalf("sse2 REX emitted %d bytes, want >= 5", len(e.code))
 	}
-	if e.code[0] != 0x44 && e.code[0] != 0x41 {
-		t.Fatalf("expected REX prefix, got %02x", e.code[0])
+	if e.code[0] != 0xF2 || (e.code[1] != 0x44 && e.code[1] != 0x41) {
+		t.Fatalf("expected prefix 0xF2 and REX prefix, got %02x %02x", e.code[0], e.code[1])
 	}
 }
 

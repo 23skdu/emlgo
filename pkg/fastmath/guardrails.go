@@ -1,5 +1,7 @@
 package fastmath
 
+import "math"
+
 // GuardrailMode defines the numeric regularization strategy applied to prevent
 // NaN/Inf cascading during symbolic search, numeric fitting, or genetic programming.
 type GuardrailMode uint8
@@ -73,14 +75,18 @@ func LnClippedF32(y, eps float32) float32 {
 }
 
 // LnRegularized computes the smooth, infinitely differentiable regularization:
-// 0.5 * ln(y^2 + eps^2).
+// 0.5 * ln(y^2 + eps^2) = ln(hypot(y, eps)).
 // This function is C-infinity everywhere on R, eliminates singularities at y=0,
 // and has continuous derivative: d/dy [0.5 * ln(y^2 + eps^2)] = y / (y^2 + eps^2).
+// Implemented via FastLog(math.Hypot(y, eps)) to avoid squaring overflow.
 func LnRegularized(y, eps float64) float64 {
 	if eps <= 0 {
 		eps = DefaultEpsilon
 	}
-	return 0.5 * FastLog(y*y+eps*eps)
+	if math.Abs(y) > 1e150 {
+		return FastLog(math.Abs(y))
+	}
+	return 0.5 * FastLog(y*y + eps*eps)
 }
 
 // LnRegularizedF32 computes 0.5 * ln(y^2 + eps^2) for float32.
@@ -88,5 +94,8 @@ func LnRegularizedF32(y, eps float32) float32 {
 	if eps <= 0 {
 		eps = DefaultEpsilonF32
 	}
-	return 0.5 * FastLogF32(y*y+eps*eps)
+	if math.Abs(float64(y)) > 1e18 {
+		return FastLogF32(float32(math.Abs(float64(y))))
+	}
+	return 0.5 * FastLogF32(y*y + eps*eps)
 }

@@ -1,6 +1,7 @@
 package bigmath
 
 import (
+	"math"
 	"math/big"
 	"testing"
 )
@@ -13,7 +14,6 @@ func TestBigmathCoverageEdgeCases(t *testing.T) {
 
 	// Tan with prec == 0
 	_ = Tan(zeroPrec)
-
 	_ = Tan(NewFloat(1.0))
 
 	// Asin edge cases
@@ -53,4 +53,26 @@ func TestBigmathCoverageEdgeCases(t *testing.T) {
 	if failed {
 		t.Errorf("VerifyIdentity should fail for mismatched expressions")
 	}
+
+	// Exp, Atan with prec == 0
+	_ = Exp(new(big.Float))
+	_ = Atan(new(big.Float))
+
+	// Log with prec == 0 and Log non-positive panic
+	func() {
+		defer func() { _ = recover() }()
+		_ = Log(new(big.Float))
+	}()
+
+	// Tan when cos == 0
+	prevCos := cosFn
+	cosFn = func(x *big.Float) *big.Float { return new(big.Float).SetPrec(x.Prec()).SetInt64(0) }
+	tanInf := Tan(NewFloat(1.0))
+	if !tanInf.IsInf() {
+		t.Errorf("Tan with cos==0 should be Inf, got %v", tanInf)
+	}
+	cosFn = prevCos
+
+	// reduceTrig negative loop with x = -3.5 * pi
+	_ = Sin(NewFloat(-3.5 * math.Pi))
 }

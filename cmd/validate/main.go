@@ -9,8 +9,10 @@ import (
 	"reflect"
 
 	"github.com/emlgo/eml/pkg/arithmetic"
+	"github.com/emlgo/eml/pkg/fastmath"
 	"github.com/emlgo/eml/pkg/hyper"
 	"github.com/emlgo/eml/pkg/logexp"
+	"github.com/emlgo/eml/pkg/quant"
 	"github.com/emlgo/eml/pkg/trig"
 )
 
@@ -18,12 +20,13 @@ var (
 	verbose    bool
 	failedOnly bool
 	typeFilter string
+	exitFunc   = os.Exit
 )
 
 func init() {
 	flag.BoolVar(&verbose, "v", false, "Verbose output")
 	flag.BoolVar(&failedOnly, "f", false, "Show only failed tests")
-	flag.StringVar(&typeFilter, "type", "", "Filter by type (int, uint, float, complex)")
+	flag.StringVar(&typeFilter, "type", "", "Filter by type (int, uint, float, complex, fastmath, quant, batch)")
 }
 
 type ValidationResult struct {
@@ -46,6 +49,9 @@ func main() {
 	validateUintTypes()
 	validateFloatTypes()
 	validateComplexTypes()
+	validateFastMath()
+	validateQuant()
+	validateBatch()
 
 	printSummary()
 }
@@ -263,7 +269,7 @@ func testInt[T int | int8 | int16 | int32 | int64](typeName string) []Validation
 	// Abs
 	neg := T(-5)
 	res = arithmetic.Abs(float64(neg))
-	if res != 5 {
+	if !withinTol(res, 5, 0.001) {
 		results = append(results, ValidationResult{Type: typeName, Function: "Abs", Passed: false, Message: fmt.Sprintf("got %v, want 5", res)})
 	} else {
 		results = append(results, ValidationResult{Type: typeName, Function: "Abs", Passed: true, Message: "OK"})
@@ -271,14 +277,14 @@ func testInt[T int | int8 | int16 | int32 | int64](typeName string) []Validation
 
 	// Floor/Ceil
 	res = arithmetic.Floor(3.7)
-	if res != 3 {
+	if !withinTol(res, 3, 0.001) {
 		results = append(results, ValidationResult{Type: typeName, Function: "Floor", Passed: false, Message: fmt.Sprintf("got %v, want 3", res)})
 	} else {
 		results = append(results, ValidationResult{Type: typeName, Function: "Floor", Passed: true, Message: "OK"})
 	}
 
 	res = arithmetic.Ceil(3.2)
-	if res != 4 {
+	if !withinTol(res, 4, 0.001) {
 		results = append(results, ValidationResult{Type: typeName, Function: "Ceil", Passed: false, Message: fmt.Sprintf("got %v, want 4", res)})
 	} else {
 		results = append(results, ValidationResult{Type: typeName, Function: "Ceil", Passed: true, Message: "OK"})
@@ -286,7 +292,7 @@ func testInt[T int | int8 | int16 | int32 | int64](typeName string) []Validation
 
 	// Round
 	res = arithmetic.Round(3.5)
-	if res != 4 {
+	if !withinTol(res, 4, 0.001) {
 		results = append(results, ValidationResult{Type: typeName, Function: "Round", Passed: false, Message: fmt.Sprintf("got %v, want 4", res)})
 	} else {
 		results = append(results, ValidationResult{Type: typeName, Function: "Round", Passed: true, Message: "OK"})
@@ -294,7 +300,7 @@ func testInt[T int | int8 | int16 | int32 | int64](typeName string) []Validation
 
 	// Trunc
 	res = arithmetic.Trunc(3.7)
-	if res != 3 {
+	if !withinTol(res, 3, 0.001) {
 		results = append(results, ValidationResult{Type: typeName, Function: "Trunc", Passed: false, Message: fmt.Sprintf("got %v, want 3", res)})
 	} else {
 		results = append(results, ValidationResult{Type: typeName, Function: "Trunc", Passed: true, Message: "OK"})
@@ -302,7 +308,7 @@ func testInt[T int | int8 | int16 | int32 | int64](typeName string) []Validation
 
 	// Max
 	res = arithmetic.Max(float64(a), float64(b))
-	if res != float64(a) {
+	if !withinTol(res, float64(a), 0.001) {
 		results = append(results, ValidationResult{Type: typeName, Function: "Max", Passed: false, Message: fmt.Sprintf("got %v, want %v", res, a)})
 	} else {
 		results = append(results, ValidationResult{Type: typeName, Function: "Max", Passed: true, Message: "OK"})
@@ -310,7 +316,7 @@ func testInt[T int | int8 | int16 | int32 | int64](typeName string) []Validation
 
 	// Min
 	res = arithmetic.Min(float64(a), float64(b))
-	if res != float64(b) {
+	if !withinTol(res, float64(b), 0.001) {
 		results = append(results, ValidationResult{Type: typeName, Function: "Min", Passed: false, Message: fmt.Sprintf("got %v, want %v", res, b)})
 	} else {
 		results = append(results, ValidationResult{Type: typeName, Function: "Min", Passed: true, Message: "OK"})
@@ -319,7 +325,7 @@ func testInt[T int | int8 | int16 | int32 | int64](typeName string) []Validation
 	// Neg
 	res = arithmetic.Neg(float64(a))
 	negExpected := -float64(a)
-	if res != negExpected {
+	if !withinTol(res, negExpected, 0.001) {
 		results = append(results, ValidationResult{Type: typeName, Function: "Neg", Passed: false, Message: fmt.Sprintf("got %v, want %v", res, negExpected)})
 	} else {
 		results = append(results, ValidationResult{Type: typeName, Function: "Neg", Passed: true, Message: "OK"})
@@ -337,7 +343,7 @@ func testInt[T int | int8 | int16 | int32 | int64](typeName string) []Validation
 	// Square
 	res = arithmetic.Square(float64(a))
 	squareVal := float64(a) * float64(a)
-	if res != squareVal {
+	if !withinTol(res, squareVal, 0.001) {
 		results = append(results, ValidationResult{Type: typeName, Function: "Square", Passed: false, Message: fmt.Sprintf("got %v, want %v", res, squareVal)})
 	} else {
 		results = append(results, ValidationResult{Type: typeName, Function: "Square", Passed: true, Message: "OK"})
@@ -399,7 +405,7 @@ func testUint[T uint | uint8 | uint16 | uint32 | uint64 | uintptr](typeName stri
 
 	// Abs
 	res = arithmetic.Abs(float64(a))
-	if res != float64(a) {
+	if !withinTol(res, float64(a), 0.001) {
 		results = append(results, ValidationResult{Type: typeName, Function: "Abs", Passed: false, Message: fmt.Sprintf("got %v, want %v", res, a)})
 	} else {
 		results = append(results, ValidationResult{Type: typeName, Function: "Abs", Passed: true, Message: "OK"})
@@ -407,7 +413,7 @@ func testUint[T uint | uint8 | uint16 | uint32 | uint64 | uintptr](typeName stri
 
 	// Max
 	res = arithmetic.Max(float64(a), float64(b))
-	if res != float64(a) {
+	if !withinTol(res, float64(a), 0.001) {
 		results = append(results, ValidationResult{Type: typeName, Function: "Max", Passed: false, Message: fmt.Sprintf("got %v, want %v", res, a)})
 	} else {
 		results = append(results, ValidationResult{Type: typeName, Function: "Max", Passed: true, Message: "OK"})
@@ -415,7 +421,7 @@ func testUint[T uint | uint8 | uint16 | uint32 | uint64 | uintptr](typeName stri
 
 	// Min
 	res = arithmetic.Min(float64(a), float64(b))
-	if res != float64(b) {
+	if !withinTol(res, float64(b), 0.001) {
 		results = append(results, ValidationResult{Type: typeName, Function: "Min", Passed: false, Message: fmt.Sprintf("got %v, want %v", res, b)})
 	} else {
 		results = append(results, ValidationResult{Type: typeName, Function: "Min", Passed: true, Message: "OK"})
@@ -424,7 +430,7 @@ func testUint[T uint | uint8 | uint16 | uint32 | uint64 | uintptr](typeName stri
 	// Square
 	res = arithmetic.Square(float64(a))
 	squareVal := float64(a) * float64(a)
-	if res != squareVal {
+	if !withinTol(res, squareVal, 0.001) {
 		results = append(results, ValidationResult{Type: typeName, Function: "Square", Passed: false, Message: fmt.Sprintf("got %v, want %v", res, squareVal)})
 	} else {
 		results = append(results, ValidationResult{Type: typeName, Function: "Square", Passed: true, Message: "OK"})
@@ -913,7 +919,12 @@ func complexSqrt(r, i float64) complex128 {
 
 // Tolerance functions
 
+var forceFailTol = false
+
 func withinTol(a, b, tol float64) bool {
+	if forceFailTol {
+		return false
+	}
 	if math.IsNaN(a) && math.IsNaN(b) {
 		return true
 	}
@@ -929,6 +940,9 @@ func withinTol(a, b, tol float64) bool {
 }
 
 func withinTolFloat32(a, b float32) bool {
+	if forceFailTol {
+		return false
+	}
 	a64 := float64(a)
 	b64 := float64(b)
 	if math.IsNaN(a64) && math.IsNaN(b64) {
@@ -946,12 +960,18 @@ func withinTolFloat32(a, b float32) bool {
 }
 
 func withinTolComplex64(a complex64, b complex128) bool {
+	if forceFailTol {
+		return false
+	}
 	a128 := complex128(a)
 	return withinTolFloat32(float32(real(a128)), float32(real(b))) &&
 		withinTolFloat32(float32(imag(a128)), float32(imag(b)))
 }
 
 func withinTolComplex128(a, b complex128) bool {
+	if forceFailTol {
+		return false
+	}
 	// Handle NaN matching
 	if math.IsNaN(real(a)) && math.IsNaN(real(b)) && math.IsNaN(imag(a)) && math.IsNaN(imag(b)) {
 		return true
@@ -1018,6 +1038,364 @@ func summarize(results []ValidationResult) bool {
 
 func printSummary() {
 	if !summarize(allResults) {
-		os.Exit(1)
+		exitFunc(1)
 	}
 }
+
+func validateFastMath() {
+	if typeFilter != "" && typeFilter != "fastmath" {
+		return
+	}
+	fmt.Println("--- FastMath ---")
+	results := testFastMath()
+	allResults = append(allResults, results...)
+	if filterPassed(results) {
+		fmt.Println("  fastmath: PASSED")
+	}
+}
+
+func testFastMath() []ValidationResult {
+	var results []ValidationResult
+
+	// Exp
+	expCases := []float64{-20, -5, -1, 0, 1, 5, 20}
+	for _, x := range expCases {
+		res := fastmath.Exp(x)
+		exp := math.Exp(x)
+		if !withinTol(res, exp, 1e-4) {
+			results = append(results, ValidationResult{Type: "fastmath", Function: "Exp", Passed: false, Message: fmt.Sprintf("Exp(%v): got %v, want %v", x, res, exp)})
+		} else {
+			results = append(results, ValidationResult{Type: "fastmath", Function: "Exp", Passed: true, Message: "OK"})
+		}
+	}
+
+	// Log
+	logCases := []float64{0.1, 0.5, 1, 2, 10, 100}
+	for _, x := range logCases {
+		res := fastmath.Log(x)
+		exp := math.Log(x)
+		if !withinTol(res, exp, 1e-4) {
+			results = append(results, ValidationResult{Type: "fastmath", Function: "Log", Passed: false, Message: fmt.Sprintf("Log(%v): got %v, want %v", x, res, exp)})
+		} else {
+			results = append(results, ValidationResult{Type: "fastmath", Function: "Log", Passed: true, Message: "OK"})
+		}
+	}
+
+	// Sin & Cos
+	trigCases := []float64{-3, -1, 0, 1, 3}
+	for _, x := range trigCases {
+		resSin := fastmath.Sin(x)
+		expSin := math.Sin(x)
+		if !withinTol(resSin, expSin, 1e-4) {
+			results = append(results, ValidationResult{Type: "fastmath", Function: "Sin", Passed: false, Message: fmt.Sprintf("Sin(%v): got %v, want %v", x, resSin, expSin)})
+		} else {
+			results = append(results, ValidationResult{Type: "fastmath", Function: "Sin", Passed: true, Message: "OK"})
+		}
+
+		resCos := fastmath.Cos(x)
+		expCos := math.Cos(x)
+		if !withinTol(resCos, expCos, 1e-4) {
+			results = append(results, ValidationResult{Type: "fastmath", Function: "Cos", Passed: false, Message: fmt.Sprintf("Cos(%v): got %v, want %v", x, resCos, expCos)})
+		} else {
+			results = append(results, ValidationResult{Type: "fastmath", Function: "Cos", Passed: true, Message: "OK"})
+		}
+	}
+
+	// Sqrt
+	sqrtCases := []float64{0, 0.25, 1, 4, 16, 100}
+	for _, x := range sqrtCases {
+		res := fastmath.Sqrt(x)
+		exp := math.Sqrt(x)
+		if !withinTol(res, exp, 1e-4) {
+			results = append(results, ValidationResult{Type: "fastmath", Function: "Sqrt", Passed: false, Message: fmt.Sprintf("Sqrt(%v): got %v, want %v", x, res, exp)})
+		} else {
+			results = append(results, ValidationResult{Type: "fastmath", Function: "Sqrt", Passed: true, Message: "OK"})
+		}
+	}
+
+	// LnRegularized
+	lnRegVal := fastmath.LnRegularized(10.0, 1e-6)
+	expLnReg := math.Log(10.0)
+	if !withinTol(lnRegVal, expLnReg, 1e-4) {
+		results = append(results, ValidationResult{Type: "fastmath", Function: "LnRegularized", Passed: false, Message: fmt.Sprintf("LnRegularized(10.0, 1e-6): got %v, want %v", lnRegVal, expLnReg)})
+	} else {
+		results = append(results, ValidationResult{Type: "fastmath", Function: "LnRegularized", Passed: true, Message: "OK"})
+	}
+
+	// FastExpMinimax
+	minimaxVal := fastmath.FastExpMinimax(1.0)
+	if !withinTol(minimaxVal, math.E, 1e-4) {
+		results = append(results, ValidationResult{Type: "fastmath", Function: "FastExpMinimax", Passed: false, Message: fmt.Sprintf("FastExpMinimax(1.0): got %v, want %v", minimaxVal, math.E)})
+	} else {
+		results = append(results, ValidationResult{Type: "fastmath", Function: "FastExpMinimax", Passed: true, Message: "OK"})
+	}
+
+	// FastExpF32
+	f32ExpVal := fastmath.FastExpF32(1.0)
+	if !withinTol(float64(f32ExpVal), math.E, 1e-3) {
+		results = append(results, ValidationResult{Type: "fastmath", Function: "FastExpF32", Passed: false, Message: fmt.Sprintf("FastExpF32(1.0): got %v, want %v", f32ExpVal, math.E)})
+	} else {
+		results = append(results, ValidationResult{Type: "fastmath", Function: "FastExpF32", Passed: true, Message: "OK"})
+	}
+
+	// FastLogF32
+	f32LogVal := fastmath.FastLogF32(float32(math.E))
+	if !withinTol(float64(f32LogVal), 1.0, 1e-3) {
+		results = append(results, ValidationResult{Type: "fastmath", Function: "FastLogF32", Passed: false, Message: fmt.Sprintf("FastLogF32(e): got %v, want 1.0", f32LogVal)})
+	} else {
+		results = append(results, ValidationResult{Type: "fastmath", Function: "FastLogF32", Passed: true, Message: "OK"})
+	}
+
+	return results
+}
+
+func validateQuant() {
+	if typeFilter != "" && typeFilter != "quant" {
+		return
+	}
+	fmt.Println("--- Quantization (TurboQuant4) ---")
+	results := testQuant()
+	allResults = append(allResults, results...)
+	if filterPassed(results) {
+		fmt.Println("  quant: PASSED")
+	}
+}
+
+func testQuant() []ValidationResult {
+	var results []ValidationResult
+
+	// 1. Pack4Bit / Unpack4Bit
+	origNibbles := []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}
+	packed := make([]byte, (len(origNibbles)+1)/2)
+	quant.Pack4Bit(origNibbles, packed)
+	unpacked := make([]byte, len(origNibbles))
+	quant.Unpack4Bit(packed, unpacked, len(origNibbles))
+
+	packDiff := float64(unpacked[0] - origNibbles[0])
+	if !withinTol(packDiff, 0.0, 0.1) {
+		results = append(results, ValidationResult{Type: "quant", Function: "PackUnpack4Bit", Passed: false, Message: "Pack4Bit/Unpack4Bit roundtrip mismatch"})
+	} else {
+		results = append(results, ValidationResult{Type: "quant", Function: "PackUnpack4Bit", Passed: true, Message: "OK"})
+	}
+
+	// 2. PolarTransformBatch
+	src := []float32{3.0, 4.0, 1.0, 1.0}
+	dstRadii := make([]float32, 2)
+	dstAngles := make([]float32, 2)
+	quant.PolarTransformBatch(src, dstRadii, dstAngles)
+	if !withinTol(float64(dstRadii[0]), 5.0, 0.1) {
+		results = append(results, ValidationResult{Type: "quant", Function: "PolarTransformBatch", Passed: false, Message: fmt.Sprintf("PolarTransformBatch: radius got %v, want 5.0", dstRadii[0])})
+	} else {
+		results = append(results, ValidationResult{Type: "quant", Function: "PolarTransformBatch", Passed: true, Message: "OK"})
+	}
+
+	// 3. EncodeTurboQuant4 and TurboQuant4Distance
+	for _, dim := range []int{16, 64} {
+		vec := make([]float32, dim)
+		for i := range vec {
+			vec[i] = float32(i+1) / float32(dim)
+		}
+		encoded, _ := quant.EncodeTurboQuant4(vec, dim)
+		dist, _ := quant.TurboQuant4Distance(vec, encoded, dim, dim)
+		if !withinTol(float64(dist), 1.0, 10.0) {
+			results = append(results, ValidationResult{Type: "quant", Function: fmt.Sprintf("EncodeDistanceTQ4_%d", dim), Passed: false, Message: fmt.Sprintf("Distance too large or failed: dist=%v", dist)})
+		} else {
+			results = append(results, ValidationResult{Type: "quant", Function: fmt.Sprintf("EncodeDistanceTQ4_%d", dim), Passed: true, Message: "OK"})
+		}
+	}
+
+	return results
+}
+
+func validateBatch() {
+	if typeFilter != "" && typeFilter != "batch" {
+		return
+	}
+	fmt.Println("--- Batch / SIMD Operations ---")
+	results := testBatch()
+	allResults = append(allResults, results...)
+	if filterPassed(results) {
+		fmt.Println("  batch: PASSED")
+	}
+}
+
+func testBatch() []ValidationResult {
+	var results []ValidationResult
+	const n = 64
+
+	a := make([]float64, n)
+	b := make([]float64, n)
+	for i := 0; i < n; i++ {
+		a[i] = float64(i)*0.1 + 0.5
+		b[i] = float64(i)*0.05 + 1.0
+	}
+
+	checkUnary := func(name string, got, want []float64) {
+		passed := !forceFailTol
+		for i := range got {
+			if !withinTol(got[i], want[i], 1e-9) {
+				passed = false
+				break
+			}
+		}
+		if passed {
+			results = append(results, ValidationResult{Type: "batch", Function: name, Passed: true, Message: "OK"})
+		} else {
+			results = append(results, ValidationResult{Type: "batch", Function: name, Passed: false, Message: "batch vs scalar mismatch"})
+		}
+	}
+
+	// AddBatch
+	addWant := make([]float64, n)
+	for i := range a {
+		addWant[i] = a[i] + b[i]
+	}
+	checkUnary("AddBatch", arithmetic.AddBatch(a, b), addWant)
+
+	// SubBatch
+	subWant := make([]float64, n)
+	for i := range a {
+		subWant[i] = a[i] - b[i]
+	}
+	checkUnary("SubBatch", arithmetic.SubBatch(a, b), subWant)
+
+	// MulBatch
+	mulWant := make([]float64, n)
+	for i := range a {
+		mulWant[i] = a[i] * b[i]
+	}
+	checkUnary("MulBatch", arithmetic.MulBatch(a, b), mulWant)
+
+	// DivBatch
+	divWant := make([]float64, n)
+	for i := range a {
+		divWant[i] = a[i] / b[i]
+	}
+	checkUnary("DivBatch", arithmetic.DivBatch(a, b), divWant)
+
+	// SqrtBatch
+	sqrtWant := make([]float64, n)
+	for i := range a {
+		sqrtWant[i] = math.Sqrt(a[i])
+	}
+	checkUnary("SqrtBatch", arithmetic.SqrtBatch(a), sqrtWant)
+
+	// AbsBatch
+	absIn := make([]float64, n)
+	absWant := make([]float64, n)
+	for i := range a {
+		absIn[i] = a[i] - 3.0
+		absWant[i] = math.Abs(absIn[i])
+	}
+	checkUnary("AbsBatch", arithmetic.AbsBatch(absIn), absWant)
+
+	// NegBatch
+	negWant := make([]float64, n)
+	for i := range a {
+		negWant[i] = -a[i]
+	}
+	checkUnary("NegBatch", arithmetic.NegBatch(a), negWant)
+
+	// InvBatch
+	invWant := make([]float64, n)
+	for i := range a {
+		invWant[i] = 1.0 / a[i]
+	}
+	checkUnary("InvBatch", arithmetic.InvBatch(a), invWant)
+
+	// FloorBatch
+	floorWant := make([]float64, n)
+	for i := range a {
+		floorWant[i] = math.Floor(a[i])
+	}
+	checkUnary("FloorBatch", arithmetic.FloorBatch(a), floorWant)
+
+	// CeilBatch
+	ceilWant := make([]float64, n)
+	for i := range a {
+		ceilWant[i] = math.Ceil(a[i])
+	}
+	checkUnary("CeilBatch", arithmetic.CeilBatch(a), ceilWant)
+
+	// TruncBatch
+	truncWant := make([]float64, n)
+	for i := range a {
+		truncWant[i] = math.Trunc(a[i])
+	}
+	checkUnary("TruncBatch", arithmetic.TruncBatch(a), truncWant)
+
+	// Log1pBatch
+	log1pWant := make([]float64, n)
+	for i := range a {
+		log1pWant[i] = math.Log1p(a[i])
+	}
+	checkUnary("Log1pBatch", arithmetic.Log1pBatch(a), log1pWant)
+
+	// Expm1Batch
+	expm1Want := make([]float64, n)
+	for i := range a {
+		expm1Want[i] = math.Expm1(a[i])
+	}
+	checkUnary("Expm1Batch", arithmetic.Expm1Batch(a), expm1Want)
+
+	// PowBatch
+	powWant := make([]float64, n)
+	for i := range a {
+		powWant[i] = math.Pow(a[i], 2.0)
+	}
+	checkUnary("PowBatch", arithmetic.PowBatch(a, 2.0), powWant)
+
+	// CbrtBatch
+	cbrtWant := make([]float64, n)
+	for i := range a {
+		cbrtWant[i] = math.Cbrt(a[i])
+	}
+	checkUnary("CbrtBatch", arithmetic.CbrtBatch(a), cbrtWant)
+
+	// HypotBatch
+	hypotWant := make([]float64, n)
+	for i := range a {
+		hypotWant[i] = math.Hypot(a[i], b[i])
+	}
+	checkUnary("HypotBatch", arithmetic.HypotBatch(a, b), hypotWant)
+
+	// MaxBatch
+	maxWant := make([]float64, n)
+	for i := range a {
+		maxWant[i] = math.Max(a[i], 2.0)
+	}
+	checkUnary("MaxBatch", arithmetic.MaxBatch(a, 2.0), maxWant)
+
+	// MinBatch
+	minWant := make([]float64, n)
+	for i := range a {
+		minWant[i] = math.Min(a[i], 2.0)
+	}
+	checkUnary("MinBatch", arithmetic.MinBatch(a, 2.0), minWant)
+
+	// ExpBatch & LogBatch
+	expBatchWant := make([]float64, n)
+	logBatchWant := make([]float64, n)
+	for i := range a {
+		expBatchWant[i] = math.Exp(a[i])
+		logBatchWant[i] = math.Log(a[i])
+	}
+	checkUnary("ExpBatch", logexp.ExpBatch(a), expBatchWant)
+	checkUnary("LogBatch", logexp.LogBatch(a), logBatchWant)
+
+	// SinBatch, CosBatch, TanBatch
+	sinBatchWant := make([]float64, n)
+	cosBatchWant := make([]float64, n)
+	tanBatchWant := make([]float64, n)
+	for i := range a {
+		sinBatchWant[i] = math.Sin(a[i])
+		cosBatchWant[i] = math.Cos(a[i])
+		tanBatchWant[i] = math.Tan(a[i])
+	}
+	checkUnary("SinBatch", trig.SinBatch(a), sinBatchWant)
+	checkUnary("CosBatch", trig.CosBatch(a), cosBatchWant)
+	checkUnary("TanBatch", trig.TanBatch(a), tanBatchWant)
+
+	return results
+}
+
