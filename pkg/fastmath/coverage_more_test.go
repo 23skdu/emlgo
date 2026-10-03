@@ -103,7 +103,7 @@ func TestFastmathComprehensive(t *testing.T) {
 		t.Errorf("FastLogMinimax(0) should be -Inf")
 	}
 	_ = FastLogMinimax(1e-315) // subnormal path
-	_ = FastLogMinimax(1.5)   // m > sqrt2 branch
+	_ = FastLogMinimax(1.5)    // m > sqrt2 branch
 	_ = FastLogChebyshev(math.NaN())
 	_ = FastLogChebyshev(math.Inf(1))
 	_ = FastLogChebyshev(1.0)

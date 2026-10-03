@@ -200,7 +200,10 @@ func TurboQuant4Distance(query []float32, tqData []byte, dim int, pow2 int) (flo
 	if len(tqData) < 4 {
 		return 0, fmt.Errorf("quant: invalid tqData length %d", len(tqData))
 	}
-	buf := tqScratchPool.Get().(*tqScratch)
+	buf, ok := tqScratchPool.Get().(*tqScratch)
+	if !ok {
+		return 0, fmt.Errorf("quant: scratch pool returned an unexpected type")
+	}
 	defer tqScratchPool.Put(buf)
 
 	return TurboQuant4DistanceScratch(query, tqData, dim, pow2, buf.recon, buf.indices)

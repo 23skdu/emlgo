@@ -21,9 +21,9 @@ The dispatch layer automatically detects the host architecture and selects the m
 
 ### Optimization Strategy
 
-- **Batch Processing**: Operations on slices are chunked and processed using SIMD assembly kernels.
+- **Batch Processing**: Operations on slices are chunked across cores. Real-valued work runs through a worker pool that fans out once a slice is large enough to pay for the hand-off (`SmallCutoff` = 512 elements per core, measured; see docs/nextsteps.md Step 2).
 - **Scalar Kernels**: Latency-sensitive operations use direct assembly for instructions like `Sqrt` and `FMA`.
-- **Parallelization**: For very large slices, the library automatically distributes work across multiple CPU cores via a worker pool.
+- **Transcendentals**: `exp`/`log`/`sin`/`cos`/`tan` batches run on the generic parallel path, which delegates to `math`. The hand-written AVX2 kernels are available behind `-tags emlasm` but are strictly dominated: they re-broadcast their polynomial coefficients inside the loop and measured up to 190x slower *and* less accurate. See docs/nextsteps.md Step 3.
 - **float32 SIMD**: Dedicated `float32` batch operations for memory-constrained workloads.
 
 ## 3. Composable Pipeline (`internal/eml/pipeline.go`)
@@ -41,14 +41,14 @@ The library provides first-class `complex128` support via `internal/eml/complex_
 - **Fast path (float64)**: All scalar `float64` operations use native EML+SIMD paths.
 - **Complex path (complex128)**: Uses `math/cmplx` for `Exp`, `Log`, `Sin`, `Cos`, `Tan` on complex arguments. The complex EML operator is defined as `Complex(x, y) = cmplx.Exp(x) - cmplx.Log(y)`.
 
-Batch operations (`ComplexBatch`, `ComplexExpBatch`, etc.) process slices of `complex128` in parallel using the worker pool.
+Batch operations (`ComplexBatch`, `ComplexExpBatch`, etc.) apply `math/cmplx` element-wise in a single serial loop. The worker pool is used by the real-valued fused and parallel batch paths, not by the complex ones.
 
 ## 5. Arbitrary Precision Backend (`internal/eml/bigmath`)
 
 The `bigmath` package provides a `math/big.Float`-based backend for symbolic verification:
 
 - **Taylor series** implementations of Exp, Log, Sin, Cos, Tan, Atan, Asin, Acos with range reduction
-- **Machin's formula** for computing π at arbitrary precision
+- π is generated as `4·atan(1)` via the complex EML operator in `internal/constants.GeneratePi`
 - **IdentityVerifier**: Tests symbolic identities (e.g., sin²(x) + cos²(x) = 1) by evaluating at random high-precision points
 
 Default precision: 256 bits. All functions accept and return `*big.Float`.
@@ -74,7 +74,7 @@ Canonical EML trees map any mathematical expression to a normalized form based o
 - **`Equiv`**: Structural equivalence check for two EMLNode trees
 - **`EMLSize`**: Count nodes in a canonical tree
 
-## 8. Symbolic Differentiation (`internal/jit/canonical.go:303-390`)
+## 8. Symbolic Differentiation (`internal/jit/canonical.go`, `Diff`)
 
 The `Diff(n *EMLNode) *EMLNode` function performs symbolic differentiation using the chain rule:
 
@@ -83,7 +83,7 @@ The `Diff(n *EMLNode) *EMLNode` function performs symbolic differentiation using
 - Includes `Simplify()` integration for optimized derivative expressions
 - `DiffEval(n, x)` evaluates the derivative at a point
 
-## 9. Expression Simplification (`internal/jit/canonical.go:205-301`)
+## 9. Expression Simplification (`internal/jit/canonical.go`, `Simplify`)
 
 The `Simplify(n *EMLNode) *EMLNode` function performs:
 
@@ -124,18 +124,44 @@ The parallel batch processing system uses a fixed-size worker pool:
 - Pre-spawned goroutines consume from a buffered job channel
 - `StopWorkerPool()` closes the channel (protected by `sync.Once`)
 - After shutdown, no further parallel operations should be submitted
+- Work is fanned out only above `SmallCutoff` (= `SmallWorkloadFactor` × `runtime.NumCPU()`); below it the operation runs inline. Measured, the pool loses to a plain serial loop by up to 4.4x at small sizes, which is why the threshold is derived from the core count rather than fixed.
+
+The pool is also used to score a generation of genetic-programming candidates in
+parallel (`pkg/bytecode.Search`), since fitness evaluation is embarrassingly
+parallel and was previously serial.
 
 ## 14. JIT Compiler (`internal/jit`)
 
 The JIT compiler generates x86-64 machine code from string expressions:
 
-- **17 supported functions**: sin, cos, exp, log, sqrt, tan, asin, acos, atan, abs, cbrt, log2, log10, ceil, floor, trunc, round
+- **25 supported functions**: sin, cos, exp, log, sqrt, tan, asin, acos, atan, abs, cbrt, log2, log10, ceil, floor, trunc, round, sinh, cosh, tanh, asinh, acosh, atanh, erf, gamma
+- All three dispatch paths (codegen, tree evaluator, arena interpreter) share the single table in `internal/jit/functab.go`
 - **Non-integer exponents**: `x^0.5` compiled as `exp(0.5 * log(x))`
 - **Variable exponents**: `x^x` compiled as `exp(x * log(x))`
 - **Binary exponentiation**: Integer powers use squaring for O(log n) multiplications
 - **Register allocation**: 15 XMM registers (xmm15 reserved for input variable x)
 
-## 15. Package Structure
+## 15. Symbolic Regression (`pkg/bytecode`)
+
+A linear bytecode VM with a genetic search on top:
+
+- **Program** is a flat `Structure of Arrays` buffer (`Ops`, `Consts`,
+  `VarIndices`) plus a precomputed `MaxStackDepth`.
+- **All 27 function names** the JIT supports are available, resolved through one
+  shared table (`functab.go`) so the tokenizer, code generator, optimizer and
+  printer cannot drift apart.
+- **Operators**: `ValidateStack`, `RandomProgram`, `Crossover`, `Mutate`, all
+  taking an explicit `*rand.Rand` so searches are reproducible.
+- **Search**: `Search(Config, Dataset, Fitness)` with tournament selection,
+  elitism, crossover/mutation and coordinate descent over constant operands
+  (`LocalSearchSteps`).
+- **Batch evaluation** is allocation-free at steady state via `BatchScratch`.
+
+Fitting `3x² + 2x + 1` from 24 samples reaches an RMS error of 4e-13.
+Transcendental targets are approximated rather than recovered; see
+docs/nextsteps.md for the measured limit.
+
+## 16. Package Structure
 
 - **`pkg/arithmetic`**: Basic operations (Add, Sub, Mul, Div, Sqrt, Pow, FMA).
 - **`pkg/logexp`**: Exponential and Logarithmic functions.
@@ -147,7 +173,7 @@ The JIT compiler generates x86-64 machine code from string expressions:
 - **`internal/gpu`**: CUDA and Metal GPU backends.
 - **`internal/constants`**: Mathematical constants (e, π, ln2, √2, φ, etc.).
 
-## 16. Design Principles
+## 17. Design Principles
 
 1. **Zero Allocations**: Hot paths avoid heap allocations to ensure predictable performance.
 2. **Minimal Dependencies**: The library depends only on the Go standard library and `golang.org/x/sys`.

@@ -58,7 +58,7 @@ func FuzzParse(f *testing.F) {
 			if math.IsNaN(result) || math.IsInf(result, 0) {
 				continue
 			}
-			if _, err := strconv.ParseFloat(strconv.FormatFloat(result, 'g', -1, 64), 64); err != nil {
+			if _, parseErr := strconv.ParseFloat(strconv.FormatFloat(result, 'g', -1, 64), 64); parseErr != nil {
 				t.Errorf("Eval(%q, %v) = %v (unrepresentable)", input, x, result)
 			}
 		}

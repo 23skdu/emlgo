@@ -14,36 +14,9 @@ const (
 )
 
 // jitFunc is a Go function that takes a float64 and returns a float64.
-type jitFunc func(float64) float64
-
-// funcTable maps function names to their Go implementations for JIT codegen.
-var funcTable = map[string]jitFunc{
-	"sin":   math.Sin,
-	"cos":   math.Cos,
-	"exp":   math.Exp,
-	"log":   math.Log,
-	"sqrt":  math.Sqrt,
-	"tan":   math.Tan,
-	"asin":  math.Asin,
-	"acos":  math.Acos,
-	"atan":  math.Atan,
-	"abs":   math.Abs,
-	"cbrt":  math.Cbrt,
-	"log2":  math.Log2,
-	"log10": math.Log10,
-	"ceil":  math.Ceil,
-	"floor": math.Floor,
-	"trunc": math.Trunc,
-	"round": math.Round,
-	"sinh":  math.Sinh,
-	"cosh":  math.Cosh,
-	"tanh":  math.Tanh,
-	"asinh": math.Asinh,
-	"acosh": math.Acosh,
-	"atanh": math.Atanh,
-	"erf":   math.Erf,
-	"gamma": math.Gamma,
-}
+// It is an alias of mathFunc so codegen shares the single dispatch table
+// declared in functab.go.
+type jitFunc = mathFunc
 
 type encoder struct {
 	code      []byte
@@ -204,6 +177,58 @@ func (e *encoder) subsd(dst, src byte)  { e.sse2(0xF2, 0x5C, dst, src) }
 func (e *encoder) mulsd(dst, src byte)  { e.sse2(0xF2, 0x59, dst, src) }
 func (e *encoder) divsd(dst, src byte)  { e.sse2(0xF2, 0x5E, dst, src) }
 func (e *encoder) sqrtsd(dst, src byte) { e.sse2(0xF2, 0x51, dst, src) }
+func (e *encoder) xorpd(dst, src byte)  { e.sse2(0x66, 0x57, dst, src) }
+
+type jitFunc2 func(float64, float64) float64
+
+// callFunc2 emits code to call a two-argument Go function through an indirect call.
+// Uses ABIInternal calling convention: arg0 in xmm0, arg1 in xmm1, result in xmm0.
+// Saves xmm0-xmm7 before the call and restores xmm1-xmm7 after.
+func (e *encoder) callFunc2(fn jitFunc2, arg0, arg1 byte) {
+	funcAddr := reflect.ValueOf(fn).Pointer()
+	idx := e.addUint64Pool(uint64(funcAddr)) // #nosec G115
+
+	// On entry: sub 72 aligns stack to 16 bytes
+	e.emit(0x48, 0x83, 0xEC, 72) // sub rsp, 72
+
+	// Save xmm0-xmm7 to [rsp+0]..[rsp+56]
+	for i := byte(0); i < 8; i++ {
+		xmmReg := i & 7
+		e.emit(0xF2, 0x0F, 0x11, e.modrm(1, xmmReg, rsp), e.sib(0, 4, rsp), i*8)
+	}
+
+	// Move arguments: arg0 -> xmm0, arg1 -> xmm1.
+	// Since original xmm0..xmm7 were saved on the stack at [rsp + i*8],
+	// load from their saved stack slots or move from register.
+	if arg0 < 8 {
+		e.emit(0xF2, 0x0F, 0x10, e.modrm(1, 0, rsp), e.sib(0, 4, rsp), arg0*8)
+	} else {
+		e.movsdXmmXmm(0, arg0)
+	}
+	if arg1 < 8 {
+		e.emit(0xF2, 0x0F, 0x10, e.modrm(1, 1, rsp), e.sib(0, 4, rsp), arg1*8)
+	} else {
+		e.movsdXmmXmm(1, arg1)
+	}
+
+	// Load function pointer into R8
+	off := len(e.code)
+	e.emit(0x4C, 0x8B, 0x05)
+	e.emit32(0)
+	e.ptrFixups = append(e.ptrFixups, poolFixup{poolIdx: idx, codeOff: off, insLen: 7, dispOff: 3})
+
+	// CALL R8 — result in xmm0
+	e.emit(0x41, 0xFF, 0xD0)
+
+	// Restore xmm1-xmm7
+	for i := byte(1); i < 8; i++ {
+		xmmReg := i & 7
+		e.emit(0xF2, 0x0F, 0x10, e.modrm(1, xmmReg, rsp), e.sib(0, 4, rsp), i*8)
+	}
+
+	// add rsp, 72
+	e.emit(0x48, 0x83, 0xC4, 72)
+}
 
 // callFunc emits code to call a Go function through an indirect call.
 // Uses ABIInternal calling convention: argument in xmm0, result in xmm0.
@@ -278,6 +303,9 @@ func (g *generator) gen(n Node, dst byte) error {
 		idx := g.enc.addPool(v.Value)
 		g.enc.loadConstant(dst, idx)
 	case Variable:
+		if v.Name != "" && v.Name != "x" {
+			return fmt.Errorf("JIT codegen only supports variable 'x', got %q", v.Name)
+		}
 		g.enc.movsdXmmXmm(dst, xReg)
 	case UnaryOp:
 		if err := g.gen(v.Operand, dst); err != nil {
@@ -288,9 +316,10 @@ func (g *generator) gen(n Node, dst byte) error {
 			return err
 		}
 		defer g.free(tmp)
-		idx := g.enc.addPool(-1)
+		// Bitwise negation: flip sign bit via XORPD with 0x8000000000000000 (-0.0)
+		idx := g.enc.addPool(math.Float64frombits(0x8000000000000000))
 		g.enc.loadConstant(tmp, idx)
-		g.enc.mulsd(dst, tmp)
+		g.enc.xorpd(dst, tmp)
 	case BinaryOp:
 		if v.Op == '^' {
 			return g.genPow(v.Left, v.Right, dst)
@@ -336,7 +365,7 @@ func (g *generator) gen(n Node, dst byte) error {
 }
 
 func (g *generator) genFuncCall(name string, arg Node, dst byte) error {
-	fn, ok := funcTable[name]
+	fn, ok := mathFuncs[name]
 	if !ok {
 		return fmt.Errorf("unsupported function in JIT codegen: %s", name)
 	}
@@ -355,7 +384,7 @@ func (g *generator) genFuncCall(name string, arg Node, dst byte) error {
 }
 
 func (g *generator) genPow(base, exp Node, dst byte) error {
-	// Handle unary minus: x^(-n) where n is a constant
+	// Handle unary minus on constant integer: x^(-n)
 	if u, ok := exp.(UnaryOp); ok && u.Op == '-' {
 		if n, ok := u.Operand.(Number); ok {
 			return g.genPowWithSign(base, n.Value, true, dst)
@@ -364,24 +393,29 @@ func (g *generator) genPow(base, exp Node, dst byte) error {
 
 	num, ok := exp.(Number)
 	if !ok {
-		// Variable or complex exponent: x^y = exp(y * log(x))
-		return g.genPowExpLog(base, exp, 0, false, dst)
+		// Variable or complex expression exponent: call math.Pow(base, exp)
+		return g.genPowCall(base, exp, dst)
 	}
 	return g.genPowWithSign(base, num.Value, false, dst)
 }
 
 func (g *generator) genPowWithSign(base Node, value float64, negate bool, dst byte) error {
-	// Non-integer exponent: x^y = exp(y * log(x))
+	// Non-integer exponent: call math.Pow directly to correctly handle negative bases and 0^0
 	if value != float64(int(value)) {
 		expVal := value
 		if negate {
 			expVal = -expVal
 		}
-		return g.genPowExpLog(base, nil, expVal, false, dst)
+		return g.genPowCall(base, Number{Value: expVal}, dst)
 	}
 	n := int(value)
 	if negate {
 		n = -n
+	}
+
+	// For large integer powers, math.Pow is faster/more accurate
+	if n < -16 || n > 16 {
+		return g.genPowCall(base, Number{Value: float64(n)}, dst)
 	}
 
 	// Handle negative exponents: x^n = 1.0 / x^|n|
@@ -402,55 +436,26 @@ func (g *generator) genPowWithSign(base Node, value float64, negate bool, dst by
 	return g.genPowUint(base, n, dst)
 }
 
-// genPowExpLog implements x^y via exp(y * log(x)).
-// If expNode is non-nil, it is a variable/complex expression exponent evaluated into a register.
-// If expNode is nil, constVal is used as a compile-time constant exponent.
-func (g *generator) genPowExpLog(base Node, expNode Node, constVal float64, negate bool, dst byte) error {
-	// 1. Generate base into dst
-	if err := g.gen(base, dst); err != nil {
+func (g *generator) genPowCall(base, exp Node, dst byte) error {
+	baseReg, err := g.alloc()
+	if err != nil {
+		return err
+	}
+	defer g.free(baseReg)
+	if err = g.gen(base, baseReg); err != nil {
 		return err
 	}
 
-	if expNode != nil {
-		// Variable/complex exponent path: x^y = exp(y * log(x))
-		tmp, err := g.alloc()
-		if err != nil {
-			return err
-		}
-		defer g.free(tmp)
-		if err := g.gen(expNode, tmp); err != nil {
-			return err
-		}
-		// dst = log(base) — callFunc saves/restores xmm1-xmm7 so tmp is safe
-		g.enc.callFunc(math.Log, dst)
-		if dst != 0 {
-			g.enc.movsdXmmXmm(dst, 0)
-		}
-		// dst = y * log(base)
-		g.enc.mulsd(dst, tmp)
-	} else {
-		// Constant exponent path: x^c = exp(c * log(x))
-		if negate {
-			constVal = -constVal
-		}
-		// dst = log(base)
-		g.enc.callFunc(math.Log, dst)
-		if dst != 0 {
-			g.enc.movsdXmmXmm(dst, 0)
-		}
-		// Load constant into a temp and multiply
-		tmp, err := g.alloc()
-		if err != nil {
-			return err
-		}
-		defer g.free(tmp)
-		idx := g.enc.addPool(constVal)
-		g.enc.loadConstant(tmp, idx)
-		g.enc.mulsd(dst, tmp)
+	expReg, allocErr := g.alloc()
+	if allocErr != nil {
+		return allocErr
+	}
+	defer g.free(expReg)
+	if err = g.gen(exp, expReg); err != nil {
+		return err
 	}
 
-	// dst = exp(y * log(x))
-	g.enc.callFunc(math.Exp, dst)
+	g.enc.callFunc2(math.Pow, baseReg, expReg)
 	if dst != 0 {
 		g.enc.movsdXmmXmm(dst, 0)
 	}

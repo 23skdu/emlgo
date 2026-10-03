@@ -54,7 +54,7 @@ func TestLogAll(t *testing.T) {
 		{"ten", 10, math.Ln10},
 		{"half", 0.5, -math.Ln2},
 		{"pos_small", 0.001, math.Log(0.001)},
-		{"zero", 0, math.NaN()},
+		{"zero", 0, math.Inf(-1)},
 		{"neg", -1, math.NaN()},
 		{"nan", math.NaN(), math.NaN()},
 		{"inf", math.Inf(1), math.Inf(1)},
@@ -152,7 +152,7 @@ func TestFastFunctions(t *testing.T) {
 		{"one", 1, 0},
 		{"e", math.E, 1},
 		{"half", 0.5, math.Log(0.5)},
-		{"zero", 0, math.NaN()},
+		{"zero", 0, math.Inf(-1)},
 		{"neg", -1, math.NaN()},
 	}
 	for _, tt := range testsLog {

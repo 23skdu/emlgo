@@ -1294,3 +1294,54 @@ done_tan_avx2:
 	VZEROUPPER
 	RET
 
+// func addSatInt8AVX2(a, b, result []int8)
+TEXT ·addSatInt8AVX2(SB), NOSPLIT, $0-72
+	MOVQ a_base+0(FP), SI
+	MOVQ b_base+24(FP), DI
+	MOVQ result_base+48(FP), DX
+	MOVQ a_len+8(FP), CX
+
+	SHRQ $5, CX // n / 32
+	JZ done_add_sat
+
+loop_add_sat:
+	VMOVDQU (SI), Y0
+	VMOVDQU (DI), Y1
+	VPADDSB Y1, Y0, Y2
+	VMOVDQU Y2, (DX)
+
+	ADDQ $32, SI
+	ADDQ $32, DI
+	ADDQ $32, DX
+	DECQ CX
+	JNZ loop_add_sat
+
+done_add_sat:
+	VZEROUPPER
+	RET
+
+// func subSatInt8AVX2(a, b, result []int8)
+TEXT ·subSatInt8AVX2(SB), NOSPLIT, $0-72
+	MOVQ a_base+0(FP), SI
+	MOVQ b_base+24(FP), DI
+	MOVQ result_base+48(FP), DX
+	MOVQ a_len+8(FP), CX
+
+	SHRQ $5, CX // n / 32
+	JZ done_sub_sat
+
+loop_sub_sat:
+	VMOVDQU (SI), Y0
+	VMOVDQU (DI), Y1
+	VPSUBSB Y1, Y0, Y2
+	VMOVDQU Y2, (DX)
+
+	ADDQ $32, SI
+	ADDQ $32, DI
+	ADDQ $32, DX
+	DECQ CX
+	JNZ loop_sub_sat
+
+done_sub_sat:
+	VZEROUPPER
+	RET

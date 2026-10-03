@@ -8,11 +8,84 @@ import (
 
 const defaultBatchChunkSize = 1024
 
+// BatchScratch holds the reusable working memory for columnar batch evaluation.
+//
+// EvalBatchColumnar used to build its depth x chunkSize stack, and the
+// slice-of-slices indexing into it, on every call: 24,656 B and 2 allocations
+// per invocation at the default chunk size. In a genetic-programming inner loop
+// that is pure GC pressure.
+//
+// Hold a Scratch across calls to make a steady-state batch loop allocation
+// free. A Scratch is not safe for concurrent use; give each goroutine its own,
+// which is what the parallel fitness evaluation in ga.go does.
+type BatchScratch struct {
+	// stack is the flat depth*chunkSize backing array.
+	stack []float64
+	// cols are stack slices into it, one per stack level.
+	cols [][]float64
+	// chunkSize is the chunk length the current slices were built for.
+	chunkSize int
+	// depth is the stack depth they were built for.
+	depth int
+}
+
+// cap returns a BatchScratch sized for a given stack depth and chunk length.
+func newBatchScratch(depth, chunkSize int) BatchScratch {
+	return BatchScratch{
+		stack:     make([]float64, depth*chunkSize),
+		cols:      make([][]float64, depth),
+		chunkSize: chunkSize,
+		depth:     depth,
+	}
+}
+
+// ensure resizes the scratch if the program or chunk size grew, and returns the
+// per-level column slices.
+func (b *BatchScratch) ensure(depth, chunkSize int) [][]float64 {
+	needed := depth * chunkSize
+	if cap(b.stack) < needed || cap(b.cols) < depth {
+		*b = newBatchScratch(depth, chunkSize)
+	} else {
+		b.depth = depth
+		b.chunkSize = chunkSize
+		b.stack = b.stack[:needed]
+		b.cols = b.cols[:depth]
+	}
+	for i := 0; i < depth; i++ {
+		b.cols[i] = b.stack[i*chunkSize : (i+1)*chunkSize]
+	}
+	return b.cols
+}
+
+// NewBatchScratch allocates scratch for a program evaluated in chunks of the
+// given size. Passing 0 selects defaultBatchChunkSize.
+func NewBatchScratch(p *Program, chunkSize int) BatchScratch {
+	if chunkSize <= 0 {
+		chunkSize = defaultBatchChunkSize
+	}
+	depth := 1
+	if p != nil && p.MaxStackDepth > 0 {
+		depth = p.MaxStackDepth
+	}
+	return newBatchScratch(depth, chunkSize)
+}
+
 // EvalBatchColumnar evaluates the bytecode program over an N-element batch of data
 // where variables are structured in columnar format (data[varIdx] is []float64 of length N).
 // Results are stored in dst.
 // Interpretation overhead is amortized across vector chunks of size up to 1024.
+//
+// This form allocates the columnar stack on every call; use
+// EvalBatchColumnarScratch in a hot loop.
 func (p *Program) EvalBatchColumnar(data [][]float64, dst []float64) {
+	s := NewBatchScratch(p, 0)
+	p.EvalBatchColumnarScratch(data, dst, &s)
+}
+
+// EvalBatchColumnarScratch is EvalBatchColumnar with caller-supplied scratch.
+// After the first call the scratch is reused and the call performs no heap
+// allocations.
+func (p *Program) EvalBatchColumnarScratch(data [][]float64, dst []float64, scratch *BatchScratch) {
 	if p == nil || len(p.Ops) == 0 {
 		return
 	}
@@ -26,16 +99,11 @@ func (p *Program) EvalBatchColumnar(data [][]float64, dst []float64) {
 		chunkSize = n
 	}
 
-	// Pre-allocate columnar stack buffer: depth x chunkSize
 	depth := p.MaxStackDepth
 	if depth < 1 {
 		depth = p.CalculateMaxStackDepth()
 	}
-	stackBuf := make([]float64, depth*chunkSize)
-	stackCols := make([][]float64, depth)
-	for i := 0; i < depth; i++ {
-		stackCols[i] = stackBuf[i*chunkSize : (i+1)*chunkSize]
-	}
+	stackCols := scratch.ensure(depth, chunkSize)
 
 	for offset := 0; offset < n; offset += chunkSize {
 		currLen := chunkSize
@@ -82,7 +150,7 @@ func (p *Program) EvalBatchColumnar(data [][]float64, dst []float64) {
 				sp--
 				yCol := stackCols[sp][:currLen]
 				xCol := stackCols[sp-1][:currLen]
-				for i := 0; i < currLen; i++ {
+				for i := range xCol {
 					xCol[i] += yCol[i]
 				}
 
@@ -90,7 +158,7 @@ func (p *Program) EvalBatchColumnar(data [][]float64, dst []float64) {
 				sp--
 				yCol := stackCols[sp][:currLen]
 				xCol := stackCols[sp-1][:currLen]
-				for i := 0; i < currLen; i++ {
+				for i := range xCol {
 					xCol[i] -= yCol[i]
 				}
 
@@ -98,7 +166,7 @@ func (p *Program) EvalBatchColumnar(data [][]float64, dst []float64) {
 				sp--
 				yCol := stackCols[sp][:currLen]
 				xCol := stackCols[sp-1][:currLen]
-				for i := 0; i < currLen; i++ {
+				for i := range xCol {
 					xCol[i] *= yCol[i]
 				}
 
@@ -106,7 +174,7 @@ func (p *Program) EvalBatchColumnar(data [][]float64, dst []float64) {
 				sp--
 				yCol := stackCols[sp][:currLen]
 				xCol := stackCols[sp-1][:currLen]
-				for i := 0; i < currLen; i++ {
+				for i := range xCol {
 					xCol[i] /= yCol[i]
 				}
 
@@ -114,38 +182,49 @@ func (p *Program) EvalBatchColumnar(data [][]float64, dst []float64) {
 				sp--
 				yCol := stackCols[sp][:currLen]
 				xCol := stackCols[sp-1][:currLen]
-				for i := 0; i < currLen; i++ {
+				for i := range xCol {
 					xCol[i] = math.Pow(xCol[i], yCol[i])
 				}
 
 			case OpNeg:
 				xCol := stackCols[sp-1][:currLen]
-				for i := 0; i < currLen; i++ {
+				for i := range xCol {
 					xCol[i] = -xCol[i]
 				}
 
 			case OpInv:
 				xCol := stackCols[sp-1][:currLen]
-				for i := 0; i < currLen; i++ {
+				for i := range xCol {
 					xCol[i] = 1.0 / xCol[i]
 				}
 
 			case OpSqrt:
 				xCol := stackCols[sp-1][:currLen]
-				for i := 0; i < currLen; i++ {
+				for i := range xCol {
 					xCol[i] = math.Sqrt(xCol[i])
 				}
 
 			case OpExp:
 				xCol := stackCols[sp-1][:currLen]
-				for i := 0; i < currLen; i++ {
+				for i := range xCol {
 					xCol[i] = fastmath.FastExp(xCol[i])
 				}
 
 			case OpLog:
 				xCol := stackCols[sp-1][:currLen]
-				for i := 0; i < currLen; i++ {
+				for i := range xCol {
 					xCol[i] = fastmath.FastLog(xCol[i])
+				}
+
+			default:
+				// Every remaining opcode is a unary function; the inner loop is
+				// a simple range so Go's auto-vectoriser can widen the ones
+				// that have a vectorisable body.
+				if fn := opUnaryTable[op]; fn != nil {
+					xCol := stackCols[sp-1][:currLen]
+					for i := range xCol {
+						xCol[i] = fn(xCol[i])
+					}
 				}
 			}
 		}

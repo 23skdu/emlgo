@@ -174,7 +174,7 @@ func dispatchExpSIMDTo(x, result []float64) {
 }
 
 func dispatchLogSIMDTo(x, result []float64) {
-	parallelizeGeneric(x, result, nativeLog)
+	parallelizeGeneric(x, result, logScalar)
 }
 
 func dispatchSinSIMDTo(x, result []float64) {
@@ -231,4 +231,28 @@ func dispatchAddScalarSIMD(a []float64, b float64, result []float64) {
 
 func dispatchMulScalarSIMD(a []float64, b float64, result []float64) {
 	arm64MulScalarSIMD(a, b, result)
+}
+
+func dispatchAddSatInt8SIMD(a, b, result []int8) {
+	for i := range a {
+		v := int32(a[i]) + int32(b[i])
+		if v > 127 {
+			v = 127
+		} else if v < -128 {
+			v = -128
+		}
+		result[i] = int8(v)
+	}
+}
+
+func dispatchSubSatInt8SIMD(a, b, result []int8) {
+	for i := range a {
+		v := int32(a[i]) - int32(b[i])
+		if v > 127 {
+			v = 127
+		} else if v < -128 {
+			v = -128
+		}
+		result[i] = int8(v)
+	}
 }

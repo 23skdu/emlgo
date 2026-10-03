@@ -287,4 +287,3 @@ func TestJITHyperbolicAndSpecial(t *testing.T) {
 		}
 	}
 }
-

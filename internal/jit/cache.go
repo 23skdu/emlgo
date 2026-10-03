@@ -37,7 +37,13 @@ func (c *jitCache) get(key string) (Func, bool) {
 	defer c.mu.Unlock()
 	if elem, ok := c.items[key]; ok {
 		c.order.MoveToFront(elem)
-		return elem.Value.(*jitCacheEntry).fn, true
+		entry, ok := elem.Value.(*jitCacheEntry)
+		if !ok {
+			// Only CompileCached inserts into the cache, so this cannot
+			// happen; treat it as a miss rather than panicking.
+			return nil, false
+		}
+		return entry.fn, true
 	}
 	return nil, false
 }
@@ -53,7 +59,9 @@ func (c *jitCache) put(key string, fn Func) {
 		oldest := c.order.Back()
 		if oldest != nil {
 			c.order.Remove(oldest)
-			delete(c.items, oldest.Value.(*jitCacheEntry).key)
+			if entry, ok := oldest.Value.(*jitCacheEntry); ok {
+				delete(c.items, entry.key)
+			}
 		}
 	}
 	entry := &jitCacheEntry{key: key, fn: fn}

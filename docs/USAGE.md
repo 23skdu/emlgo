@@ -150,6 +150,7 @@ func main() {
     }
 
     // Euler's identity: e^(iπ) + 1 = 0
+    // requires "math" in the import block
     euler := eml.ComplexExpBatch([]complex128{complex(0, math.Pi)})
     fmt.Printf("\ne^(iπ) = %v (should be ≈ -1)\n", euler[0])
     fmt.Printf("e^(iπ) + 1 = %v (should be ≈ 0)\n", euler[0]+1)
@@ -194,13 +195,13 @@ func main() {
     m, _ := c.Compile("x^(x-1)")
     fmt.Printf("x^(x-1) at x=3: %.6f\n", m(3)) // 9.0
 
-    // Complex expressions with 17 supported functions
+    // Complex expressions with 25 supported functions
     n, _ := c.Compile("sin(x)^2 + cos(x)^2")
     fmt.Printf("sin²(x) + cos²(x) = %.6f\n", n(1.23)) // 1.0
 
-    // All 17 functions work
+    // All 25 functions work
     o, _ := c.Compile("sqrt(abs(x)) + cbrt(x)")
-    fmt.Printf("sqrt(|-8|) + cbrt(-8) = %.6f\n", o(-8)) // 2.0 + (-2.0) = 0.0
+    fmt.Printf("sqrt(|-8|) + cbrt(-8) = %.6f\n", o(-8)) // sqrt(8) + cbrt(-8) = 2.828427 - 2 = 0.828427
 
     // round function
     r, _ := c.Compile("round(x)")
@@ -226,9 +227,11 @@ func main() {
     }
     fmt.Printf("f(1.23) = %.6f\n", fn(1.23)) // 1.0
 
-    // Subsequent calls return cached result (no recompilation)
+    // Subsequent calls return cached result (no recompilation). Func values
+    // cannot be compared with == in Go; compare their code pointers instead.
     fn2, _ := jit.CompileCached("sin(x)^2 + cos(x)^2")
-    fmt.Printf("Same function: %v\n", fn == fn2) // true
+    same := reflect.ValueOf(fn).Pointer() == reflect.ValueOf(fn2).Pointer()
+    fmt.Printf("Same function: %v\n", same) // true
 
     // Clear cache for long-running programs
     jit.ClearJITCache()
@@ -247,18 +250,20 @@ import (
 
 func main() {
     // Parse and canonicalize
-    node := jit.Canonicalize(jit.Parse("x^2"))
+    ast, _ := jit.Parse("x^2")
+node := jit.Canonicalize(ast)
 
     // Differentiate: d/dx x² = 2x
     dx := jit.Diff(node)
-    fmt.Printf("d/dx x² = %s\n", jit.Decompile(dx)) // mul(2.0, x)
+    fmt.Printf("d/dx x² = %s\n", jit.Decompile(dx)) // 2.0 * x
 
     // Evaluate derivative at a point
     result := jit.DiffEval(node, 3.0) // 2*3 = 6.0
     fmt.Printf("d/dx x² at x=3: %.6f\n", result)
 
     // More complex: d/dx sin(x) = cos(x)
-    sinNode := jit.Canonicalize(jit.Parse("sin(x")))
+    sinAst, _ := jit.Parse("sin(x)")
+    sinNode := jit.Canonicalize(sinAst))
     dsin := jit.Diff(sinNode)
     fmt.Printf("d/dx sin(x) = %s\n", jit.Decompile(dsin)) // cos(x)
 }
@@ -276,22 +281,27 @@ import (
 
 func main() {
     // Constant folding
-    node := jit.Simplify(jit.Canonicalize(jit.Parse("2 + 3")))
+    sumAst, _ := jit.Parse("2 + 3")
+node := jit.Simplify(jit.Canonicalize(sumAst))
     fmt.Printf("2 + 3 = %s\n", jit.Decompile(node)) // 5.0
 
     // Identity reduction
-    node2 := jit.Simplify(jit.Canonicalize(jit.Parse("x + 0")))
+    zeroAst, _ := jit.Parse("x + 0")
+node2 := jit.Simplify(jit.Canonicalize(zeroAst))
     fmt.Printf("x + 0 = %s\n", jit.Decompile(node2)) // x
 
     // Double negation
-    node3 := jit.Simplify(jit.Canonicalize(jit.Parse("-(-x)")))
+    negAst, _ := jit.Parse("-(-x)")
+node3 := jit.Simplify(jit.Canonicalize(negAst))
     fmt.Printf("-(-x) = %s\n", jit.Decompile(node3)) // x
 
     // Multiplication identities
-    node4 := jit.Simplify(jit.Canonicalize(jit.Parse("x * 1")))
+    mulOneAst, _ := jit.Parse("x * 1")
+node4 := jit.Simplify(jit.Canonicalize(mulOneAst))
     fmt.Printf("x * 1 = %s\n", jit.Decompile(node4)) // x
 
-    node5 := jit.Simplify(jit.Canonicalize(jit.Parse("x * 0")))
+    mulZeroAst, _ := jit.Parse("x * 0")
+node5 := jit.Simplify(jit.Canonicalize(mulZeroAst))
     fmt.Printf("x * 0 = %s\n", jit.Decompile(node5)) // 0.0
 }
 ```
@@ -308,7 +318,8 @@ import (
 
 func main() {
     // Parse and canonicalize
-    emlNode := jit.Canonicalize(jit.Parse("sin(x)^2 + cos(x)^2"))
+    emlAst, _ := jit.Parse("sin(x)^2 + cos(x)^2")
+emlNode := jit.Canonicalize(emlAst)
 
     // Infix notation
     fmt.Println("Infix:", jit.Decompile(emlNode))
@@ -361,7 +372,7 @@ func main() {
 
     // Parse an expression and convert to arena nodes
     c := jit.NewCompiler()
-    ast, _ := c.Parse("sin(x)^2 + cos(x)^2")
+    ast, _ := jit.Parse("sin(x)^2 + cos(x)^2")
 
     // Convert AST to arena-allocated nodes (zero heap allocation)
     arenaNode := arena.FromInterface(ast)
@@ -391,28 +402,28 @@ func main() {
     c := jit.NewCompiler()
 
     // Parse and canonicalize
-    ast, _ := c.Parse("exp(x)")
+    ast, _ := jit.Parse("exp(x)")
     canonical := jit.Canonicalize(ast)
     fmt.Printf("exp(x) canonical: %v\n", canonical)
     // eml(x, 1)
 
     // All exp/log/sqrt map to canonical EML form
-    ast2, _ := c.Parse("log(x)")
+    ast2, _ := jit.Parse("log(x)")
     canonical2 := jit.Canonicalize(ast2)
     fmt.Printf("log(x) canonical: %v\n", canonical2)
     // eml(1, eml(eml(1, x), 1))
 
     // Structural equivalence
-    ast3, _ := c.Parse("exp(x)")
+    ast3, _ := jit.Parse("exp(x)")
     canonical3 := jit.Canonicalize(ast3)
     fmt.Printf("exp(x) ≡ exp(x): %v\n", jit.Equiv(canonical, canonical3)) // true
 
     // Tree size
-    fmt.Printf("Canonical exp(x) size: %d nodes\n", jit.EMLSize(canonical)) // 2
-    fmt.Printf("Canonical log(x) size: %d nodes\n", jit.EMLSize(canonical2)) // 5
+    fmt.Printf("Canonical exp(x) size: %d nodes\n", jit.EMLSize(canonical)) // 3: eml(x, 1)
+    fmt.Printf("Canonical log(x) size: %d nodes\n", jit.EMLSize(canonical2)) // 7: eml(1, eml(eml(1, x), 1))
 
     // Canonical sqrt(x) = exp(0.5 * log(x))
-    ast4, _ := c.Parse("sqrt(x)")
+    ast4, _ := jit.Parse("sqrt(x)")
     canonical4 := jit.Canonicalize(ast4)
     fmt.Printf("sqrt(x) canonical: %v\n", canonical4)
     fmt.Printf("sqrt(x) size: %d nodes\n", jit.EMLSize(canonical4))

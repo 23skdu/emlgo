@@ -488,12 +488,20 @@ func TestFunctionCallString(t *testing.T) {
 	}
 }
 
-// -- edge case: format expr with empty node --
+// -- edge case: format expr with a node type FormatExpr does not know --
 type emptyNode struct{}
 
 func (emptyNode) nodeSigil()       {}
 func (emptyNode) String() string   { return "?" }
 func (emptyNode) GoString() string { return "?" }
+
+// TestFormatExprUnknownNode documents that a Node implementation the formatter
+// does not recognise still yields valid output rather than panicking.
+func TestFormatExprUnknownNode(t *testing.T) {
+	if got := FormatExpr(emptyNode{}); got == "" {
+		t.Error("FormatExpr(emptyNode{}) returned an empty string")
+	}
+}
 func TestFormatExprEdgeCases(t *testing.T) {
 	n := BinaryOp{Left: Variable{}, Op: '+', Right: Variable{}}
 	got := FormatExpr(n)
@@ -531,7 +539,6 @@ func TestWrapBinOpPrecDefault(t *testing.T) {
 		t.Fatalf("wrapBinOp prec default = %q, want (1 %% 2)", got)
 	}
 }
-
 
 // Test AllocateExecutableMemory happy path
 func TestAllocateExecMemory(t *testing.T) {

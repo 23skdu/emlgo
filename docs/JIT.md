@@ -6,7 +6,7 @@ emlgo includes a JIT (Just-In-Time) compiler that generates x86-64 machine code 
 
 The JIT compiler (`internal/jit`) parses a mathematical expression string, builds an AST, and emits native x86-64 SSE2 machine code that can be called as a regular Go function. This provides near-native performance for compiled expressions without interpretation overhead.
 
-**Platform**: AMD64 only (non-amd64 builds use the interpreter fallback in `arena.go`).
+**Platform**: `amd64` uses codegen; `js/wasm` falls back to the AST interpreter (`jit_wasm.go`); all other targets return an error from `Compile`.
 
 ## Supported Expressions
 
@@ -21,7 +21,7 @@ The JIT compiler (`internal/jit`) parses a mathematical expression string, build
 | `^` | `x ^ n` | Power (see Exponent Support below) |
 | unary `-` | `-x` | Negation |
 
-### Functions (17 total)
+### Functions (25 total)
 
 | Function | Example | Description |
 |----------|---------|-------------|
@@ -42,6 +42,19 @@ The JIT compiler (`internal/jit`) parses a mathematical expression string, build
 | `floor` | `floor(x)` | Floor |
 | `trunc` | `trunc(x)` | Truncate |
 | `round` | `round(x)` | Round to nearest integer |
+| `sinh` | `sinh(x)` | Hyperbolic sine |
+| `cosh` | `cosh(x)` | Hyperbolic cosine |
+| `tanh` | `tanh(x)` | Hyperbolic tangent |
+| `asinh` | `asinh(x)` | Inverse hyperbolic sine |
+| `acosh` | `acosh(x)` | Inverse hyperbolic cosine |
+| `atanh` | `atanh(x)` | Inverse hyperbolic tangent |
+| `erf` | `erf(x)` | Error function |
+| `gamma` | `gamma(x)` | Gamma function |
+
+All three dispatch paths — the codegen function table, the tree evaluator
+(`EvalVars`) and the arena interpreter (`EvalArena`) — resolve names through the
+single table in `internal/jit/functab.go`, so every function listed above is
+available on all of them.
 
 ## Exponent Support
 
@@ -149,7 +162,7 @@ nested, _ := c.Compile("sqrt(sin(x)^2 + cos(x)^2)")
 // Multiple operations
 expr, _ := c.Compile("(x + 1) / (x - 1)")
 
-// All 17 functions work
+// All 25 functions work
 allFuncs, _ := c.Compile("log2(abs(x)) + log10(abs(x))")
 ```
 
@@ -182,7 +195,7 @@ node := jit.Canonicalize(jit.Parse("x^2"))
 
 // Differentiate: d/dx x² = 2x
 dx := jit.Diff(node)
-fmt.Println(jit.Decompile(dx)) // mul(2.0, x)
+fmt.Println(jit.Decompile(dx)) // 2.0 * x
 
 // Evaluate derivative at a point
 result := jit.DiffEval(node, 3.0) // 2*3 = 6.0
@@ -242,11 +255,11 @@ emlNode := jit.Canonicalize(jit.Parse("sin(x)^2 + cos(x)^2"))
 
 // Infix notation
 fmt.Println(jit.Decompile(emlNode))
-// Output: add(mul(sin(x), sin(x)), mul(cos(x), cos(x)))
+// Output: sin(x)^2.0 + cos(x)^2.0
 
 // LaTeX math mode
 fmt.Println(jit.DecompileLaTeX(emlNode))
-// Output: \sin^{2}\left(x\right) + \cos^{2}\left(x\right)
+// Output: (\sin(x))^{2.0} + (\cos(x))^{2.0}
 
 // JIT formatter
 fmt.Println(jit.DecompileNodeToExpr(emlNode))
@@ -298,13 +311,16 @@ arena.Reset() // All previously allocated nodes become available for reuse
 
 ### Node Size
 
-Each `ArenaNode` is exactly 86 bytes:
-- `Kind` (1 byte)
-- `Op` (8 bytes)
-- `Value` (8 bytes)
-- `Name` (16 bytes)
-- `Left`, `Right` (16 bytes each)
-- Padding (7 bytes)
+Each `ArenaNode` is exactly 56 bytes (`unsafe.Sizeof`):
+- `Kind nodeKind` (1 byte) + 3 bytes padding
+- `Op rune` (4 bytes, `int32`)
+- `Value float64` (8 bytes)
+- `Name [16]byte` (16 bytes)
+- `Left`, `Right` (8 bytes each)
+- 7 bytes trailing padding to reach 8-byte alignment
+
+`FromInterface` copies at most 15 name bytes plus a NUL terminator, so every
+built-in function name fits.
 
 ## Canonical EML Trees
 
@@ -361,7 +377,7 @@ The JIT compiler uses 15 XMM registers:
 - **xmm1-xmm14**: General purpose temporaries
 - **xmm15**: Reserved for the input variable x
 
-Expressions that require more than 14 live temporaries will return an error.
+Expressions that require more than 14 live temporaries (xmm1-xmm14; xmm0 and xmm15 are reserved) will return an error.
 
 ## Function Call Mechanism
 
@@ -382,6 +398,6 @@ JIT-compiled functions are called through indirect calls using ABIInternal calli
 ## Limitations
 
 - Only available on AMD64 (uses SSE2 instruction set)
-- Maximum 15 live temporaries (expressions with more will fail to compile)
+- Maximum 14 allocatable live temporaries (expressions with more will fail to compile)
 - Function names limited to 15 characters
 - No support for user-defined functions

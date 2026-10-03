@@ -830,62 +830,41 @@ func complexExp(r, i float64) complex128 {
 	return complex(expR*cosI, expR*sinI)
 }
 
+// logMagnitude returns log(sqrt(r*r + i*i)) for the complex number r + i*i.
+//
+// It never overflows: instead of forming r*r + i*i, it factors out the larger
+// component and only ever squares a ratio whose magnitude is at most 1,
+// log|z| = log(max) + 0.5*log1p((min/max)^2).
+// It returns -Inf when both components are zero, matching math/cmplx.Log.
+func logMagnitude(r, i float64) float64 {
+	absR, absI := math.Abs(r), math.Abs(i)
+	if absR == 0 && absI == 0 {
+		return math.Inf(-1)
+	}
+	if absR >= absI {
+		q := absI / absR
+		return logexp.Log(absR) + 0.5*math.Log1p(q*q)
+	}
+	q := absR / absI
+	return logexp.Log(absI) + 0.5*math.Log1p(q*q)
+}
+
 func complexLog(r, i float64) complex128 {
 	// Handle infinity cases
 	if math.IsInf(r, 0) && math.IsInf(i, 0) {
 		return complex(math.Inf(1), math.Atan2(-math.Inf(1), math.Inf(1)))
 	}
-	if math.IsInf(r, 1) && !math.IsInf(i, 0) {
-		mag := arithmetic.Sqrt(r*r + i*i)
-		if math.IsInf(mag, 1) {
-			arg := trig.Atan2(i, r)
-			return complex(logexp.Log(2*math.Abs(r)), arg)
+	if math.IsInf(r, 0) || math.IsInf(i, 0) {
+		// One infinite component dominates the magnitude; only its magnitude
+		// contributes to the real part.
+		dom := math.Abs(r)
+		if !math.IsInf(dom, 0) {
+			dom = math.Abs(i)
 		}
-	}
-	if math.IsInf(r, 0) && !math.IsInf(i, 0) {
-		mag := arithmetic.Sqrt(r*r + i*i)
-		if math.IsInf(mag, 1) {
-			arg := trig.Atan2(i, r)
-			return complex(logexp.Log(2*math.Abs(r)), arg)
-		}
+		return complex(logexp.Log(dom), trig.Atan2(i, r))
 	}
 	// log(z) = log(|z|) + i*arg(z)
-	absR := math.Abs(r)
-	absI := math.Abs(i)
-
-	// Handle extremely large real part with small imaginary - avoid overflow
-	// log(|z|) = 0.5 * log(r^2 + i^2) = 0.5 * log(r^2 * (1 + (i/r)^2))
-	// = log(|r|) + 0.5 * log(1 + (i/r)^2)
-	// For small i/r, this ≈ log(|r|) + 0.5 * (i/r)^2
-	if absR > 1e150 && absI < 1e-100 {
-		arg := trig.Atan2(i, r)
-		// Use log10 to avoid overflow
-		log10absR := math.Log10(absR)
-		logVal := math.Ln10 * log10absR
-		return complex(logVal, arg)
-	}
-
-	magnitude := arithmetic.Sqrt(r*r + i*i)
-	if math.IsInf(magnitude, 1) {
-		// For very large magnitude, use approximation
-		if absR > 1e150 {
-			arg := trig.Atan2(i, r)
-			// Use log10 to avoid overflow
-			log10absR := math.Log10(absR)
-			logVal := math.Ln10 * log10absR
-			return complex(logVal, arg)
-		}
-	}
-	arg := trig.Atan2(i, r)
-	logMag := logexp.Log(magnitude)
-	if math.IsInf(logMag, 1) {
-		absR := math.Abs(r)
-		if absR > 1e150 {
-			log10absR := math.Log10(absR)
-			return complex(math.Ln10*log10absR, arg)
-		}
-	}
-	return complex(logMag, arg)
+	return complex(logMagnitude(r, i), trig.Atan2(i, r))
 }
 
 func complexSqrt(r, i float64) complex128 {
@@ -896,56 +875,40 @@ func complexSqrt(r, i float64) complex128 {
 		}
 		return complex(math.Inf(1), math.Inf(1))
 	}
-	if math.IsInf(r, 1) {
+	if math.IsInf(r, 0) || math.IsInf(i, 0) {
 		if i == 0 {
-			return complex(math.Inf(1), 0)
+			return complex(0, math.Inf(1))
 		}
-		// For large real part with finite imaginary
+		// One infinite component dominates the argument; the magnitude of the
+		// result is infinite and its direction is half the argument of z.
 		arg := trig.Atan2(i, r) / 2
-		mag := math.Inf(1)
-		return complex(mag*math.Cos(arg), mag*math.Sin(arg))
-	}
-	if math.IsInf(r, -1) {
-		arg := trig.Atan2(i, r) / 2
-		mag := math.Inf(1)
-		return complex(mag*math.Cos(arg), mag*math.Sin(arg))
-	}
-	// sqrt(z) = sqrt((|z|+r)/2) + i*sign(y)*sqrt((|z|-r)/2)
-	absR := math.Abs(r)
-	absI := math.Abs(i)
-
-	// Handle extremely large real part with small imaginary - avoid overflow
-	if absR > 1e150 && absI < 1e-100 {
-		// sqrt(x + iy) ≈ sqrt(x) + iy/(2*sqrt(x))
-		sqrtR := arithmetic.Sqrt(absR)
-		return complex(sqrtR, i/(2*sqrtR))
+		return complex(math.Inf(1)*math.Cos(arg), math.Inf(1)*math.Sin(arg))
 	}
 
-	magnitude := arithmetic.Sqrt(r*r + i*i)
-	if math.IsInf(magnitude, 1) {
-		// For very large values
-		absR := math.Abs(r)
-		if absR > 1e150 {
-			// sqrt(x + iy) ≈ sqrt(x) + iy/(2*sqrt(x))
-			sqrtR := arithmetic.Sqrt(absR)
-			return complex(sqrtR, i/(2*sqrtR))
-		}
+	// sqrt(z) = sqrt((|z|+r)/2) + i*sign(i)*sqrt((|z|-r)/2).
+	//
+	// Factoring out the larger component keeps every intermediate value
+	// bounded: with M = max(|r|,|i|) and (a,b) = (r,i)/M we have |a+bi| <= sqrt(2),
+	// so sqrt(z) = sqrt(M) * sqrt(a + bi) never forms r*r or i*i and therefore
+	// cannot overflow for any finite input.
+	absR, absI := math.Abs(r), math.Abs(i)
+	m := max(absR, absI)
+	if m == 0 {
+		return complex(0, 0)
 	}
-	rPlus := (magnitude + r) / 2
-	rMinus := (magnitude - r) / 2
-
-	if rMinus < 0 {
-		rMinus = 0
-	}
-
-	var signI float64
-	if i >= 0 {
-		signI = 1
-	} else {
+	a, b := r/m, i/m
+	hyp := math.Hypot(a, b)
+	scale := arithmetic.Sqrt(m)
+	signI := 1.0
+	if b < 0 {
 		signI = -1
 	}
-
-	return complex(arithmetic.Sqrt(rPlus), signI*arithmetic.Sqrt(rMinus))
+	// hyp >= |a|, so both halves are non-negative; clamp guards rounding.
+	re := (hyp + a) / 2
+	im := (hyp - a) / 2
+	re = math.Max(re, 0)
+	im = math.Max(im, 0)
+	return complex(scale*arithmetic.Sqrt(re), signI*scale*arithmetic.Sqrt(im))
 }
 
 // Tolerance functions
@@ -1019,11 +982,13 @@ func withinTolComplex128(a, b complex128) bool {
 		withinTol(imag(a), imag(b), 1e-10)
 }
 
-func printSummary() {
+// summarize reports the pass/fail counts for results and returns true when
+// every result passed. It does not terminate the process.
+func summarize(results []ValidationResult) bool {
 	passed := 0
 	failed := 0
 
-	for _, r := range allResults {
+	for _, r := range results {
 		if r.Passed {
 			passed++
 		} else {
@@ -1033,19 +998,26 @@ func printSummary() {
 
 	fmt.Println()
 	fmt.Println("=== Summary ===")
-	fmt.Printf("Total: %d\n", len(allResults))
+	fmt.Printf("Total: %d\n", len(results))
 	fmt.Printf("Passed: %d\n", passed)
 	fmt.Printf("Failed: %d\n", failed)
 
 	if failed > 0 {
 		fmt.Println("\nFailed tests:")
-		for _, r := range allResults {
+		for _, r := range results {
 			if !r.Passed {
 				fmt.Printf("  - %s.%s: %s\n", r.Type, r.Function, r.Message)
 			}
 		}
-		os.Exit(1)
+		return false
 	}
 
 	fmt.Println("\n✓ All validation tests passed!")
+	return true
+}
+
+func printSummary() {
+	if !summarize(allResults) {
+		os.Exit(1)
+	}
 }

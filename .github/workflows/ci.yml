@@ -11,10 +11,10 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go-version: ['1.24', '1.25']
+        go-version: ['1.26', '1.27']
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version: ${{ matrix.go-version }}
       - name: Build
@@ -24,33 +24,58 @@ jobs:
       - name: Test
         run: go test -race -count=1 ./...
       - name: Test with coverage
-        if: matrix.go-version == '1.25'
+        if: matrix.go-version == '1.27'
         run: go test -coverprofile=coverage.out -covermode=atomic ./...
       - name: Upload coverage
-        if: matrix.go-version == '1.25'
-        uses: codecov/codecov-action@v4
+        if: matrix.go-version == '1.27'
+        uses: codecov/codecov-action@v7
         with:
           files: coverage.out
           fail_ci_if_error: false
       - name: Fuzz (short burst)
-        if: matrix.go-version == '1.25'
+        if: matrix.go-version == '1.27'
         run: |
-          go test -run='^$' -fuzz=FuzzParse -fuzztime=10s ./internal/jit/...
-          go test -run='^$' -fuzz=FuzzEml -fuzztime=10s ./internal/eml/...
-          go test -run='^$' -fuzz=FuzzArithmetic -fuzztime=10s ./pkg/arithmetic/...
+          go test -run='^$' -fuzz='^FuzzParseNoPanic$' -fuzztime=10s ./internal/jit/...
+          go test -run='^$' -fuzz='^FuzzEval$' -fuzztime=10s ./internal/jit/...
+          go test -run='^$' -fuzz='^FuzzExpSIMD$' -fuzztime=10s ./internal/eml
+          go test -run='^$' -fuzz='^FuzzSinSIMD$' -fuzztime=10s ./internal/eml
+          go test -run='^$' -fuzz='^FuzzPow$' -fuzztime=10s ./pkg/arithmetic
       - name: Gosec
         run: |
-          go install github.com/securego/gosec/v2/cmd/gosec@latest
+          go install github.com/securego/gosec/v2/cmd/gosec@v2.29.0
           gosec -exclude-generated -tags purego ./...
+
+  cross-build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target:
+          - linux/amd64
+          - linux/arm64
+          - darwin/arm64
+          - darwin/amd64
+          - windows/amd64
+          - js/wasm
+          - wasip1/wasm
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.27'
+      - name: Build ${{ matrix.target }}
+        env:
+          GOOS: ${{ matrix.target.split('/')[0] }}
+          GOARCH: ${{ matrix.target.split('/')[1] }}
+        run: go build ./...
 
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: '1.25'
+          go-version: '1.27'
       - name: Golangci-lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v9
         with:
-          version: latest
+          version: v2.14.0

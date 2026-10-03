@@ -27,12 +27,6 @@ func stubDivSIMD(a, b, result []float64) {
 	}
 }
 
-func stubSqrtSIMD(a, result []float64) {
-	for i := range result {
-		result[i] = nativeSqrt(a[i])
-	}
-}
-
 func stubAbsSIMD(a, result []float64) {
 	for i := range a {
 		result[i] = nativeAbs(a[i])
@@ -72,7 +66,7 @@ func scalarEml(x, y, result []float64) {
 }
 
 func dispatchExpSIMDTo(x, result []float64)      { parallelizeGeneric(x, result, nativeExp) }
-func dispatchLogSIMDTo(x, result []float64)      { parallelizeGeneric(x, result, nativeLog) }
+func dispatchLogSIMDTo(x, result []float64)      { parallelizeGeneric(x, result, logScalar) }
 func dispatchSinSIMDTo(x, result []float64)      { parallelizeGeneric(x, result, nativeSin) }
 func dispatchCosSIMDTo(x, result []float64)      { parallelizeGeneric(x, result, nativeCos) }
 func dispatchTanSIMDTo(x, result []float64)      { parallelizeGeneric(x, result, nativeTan) }
@@ -95,5 +89,29 @@ func dispatchAddScalarSIMD(a []float64, b float64, result []float64) {
 func dispatchMulScalarSIMD(a []float64, b float64, result []float64) {
 	for i := range a {
 		result[i] = a[i] * b
+	}
+}
+
+func dispatchAddSatInt8SIMD(a, b, result []int8) {
+	for i := range a {
+		v := int32(a[i]) + int32(b[i])
+		if v > 127 {
+			v = 127
+		} else if v < -128 {
+			v = -128
+		}
+		result[i] = int8(v)
+	}
+}
+
+func dispatchSubSatInt8SIMD(a, b, result []int8) {
+	for i := range a {
+		v := int32(a[i]) - int32(b[i])
+		if v > 127 {
+			v = 127
+		} else if v < -128 {
+			v = -128
+		}
+		result[i] = int8(v)
 	}
 }

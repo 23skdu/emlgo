@@ -9,24 +9,24 @@ This document provides a cross-platform performance comparison between the `emlg
 | Metric | emlgo | math | Winner |
 | :--- | :--- | :--- | :--- |
 | **Scalar Speed** | **0.9x - 2.0x slower** | Baseline | **math** (Intrinsics) |
-| **Batch Speed (SIMD)** | **1.2x - 15.0x faster** | Baseline | **emlgo** (SIMD) |
+| **Batch Speed (SIMD)** | Mixed: faster on some ops, slower on others | Baseline | **emlgo** (SIMD) |
 | **Memory (Scalar)** | 0 allocations | 0 allocations | **Tie** |
 | **Memory (Batch)** | 1 allocation (Result) | 1 allocation (Result) | **Tie** |
 | **Feature Parity** | 100% | 100% | **Tie** |
 
 **Key Findings:**
 
-- **Go `math` is generally faster for single scalar operations** due to compiler intrinsics. However, the new `emlgo/pkg/fastmath` package now achieves **10% faster performance** for functions like `Sin`.
-- **`emlgo` is significantly faster for batch operations** (Add, Sub, Mul, Exp) across all architectures by leveraging optimized SIMD kernels (AVX2/AVX512/NEON).
+- **Go `math` is generally faster for single scalar operations** due to compiler intrinsics. `emlgo/pkg/fastmath` provides faster *approximate* `exp` (~1.5e-6 relative error) and `log` (~1e-7); its `Sin`/`Cos`/`Sqrt` simply call `math` and are bit-exact, not faster.
+- **The CPU SIMD batch kernels are currently a net loss.** The hand-written AVX2 transcendental kernels re-broadcast their polynomial coefficients inside the loop and run up to 190x slower than the generic path already in the package. See [nextsteps.md](nextsteps.md) Steps 1-3, which include the measured tables and the root cause.
 - **Memory usage is identical** for performance-critical paths; both libraries avoid heap allocations for scalar math.
 
 ---
 
-## Version 2.0 New Features
+## New Features
 
 ### Zero-Allocation APIs
 
-New in-place batch operations (v2.0) eliminate allocation overhead for hot paths:
+New in-place batch operations (v0.4) eliminate allocation overhead for hot paths:
 
 ```go
 // Before: allocates result slice
@@ -48,27 +48,39 @@ Combined operations reduce memory bandwidth by 20-30%:
 | Log + Div | LogSIMD + DivSIMD | LogDivBatch | **1.2x** |
 | Log + Sub | LogSIMD + SubSIMD | LogSubBatch | **1.2x** |
 
-### Adaptive Parallelization
+### Parallel Chunk Sizing
 
-Dynamic chunk sizing based on CPU cache topology:
+Work is split into `runtime.NumCPU()` chunks, capped at `LargeCutoff`:
 
 ```go
 const (
-    L1TileSize   = 32 * 1024   // 32 KB
-    L2TileSize   = 256 * 1024  // 256 KB
-    SmallCutoff  = 256
-    LargeCutoff   = 4096
+    SmallWorkloadFactor = 512  // minimum elements per worker
+    LargeCutoff        = 4096 // maximum elements per worker chunk
 )
 
+// SmallCutoff is derived from the core count: 512 * NumCPU, i.e. 8192 on a
+// 16-core host.
+var SmallCutoff = SmallWorkloadFactor * runtime.NumCPU()
+
 func GetParallelChunkSize(n int) int {
-    // Adapts based on array size and CPU count
+    if n < SmallCutoff {
+        return n
+    }
     chunkSize := (n + cpuNum - 1) / cpuNum
     if chunkSize > LargeCutoff {
-        chunkSize = LargeCutoff
+        return LargeCutoff
     }
     return chunkSize
 }
 ```
+
+Chunking is based on slice size and core count only — it is **not** tuned to
+cache topology.
+
+`SmallCutoff` was a flat 256 before, which was roughly 16x too low: the pool
+spawned one goroutine per core for as few as 256 elements and lost to a plain
+serial loop by 4.4x. See [nextsteps.md](nextsteps.md) Step 2 for the full
+crossover measurement.
 
 ---
 
@@ -84,7 +96,7 @@ Tested with n=1,000,000 iterations
 | :--- | :--- | :--- | :--- | :--- |
 | float64 | Exp | 0.0065 | 0.0058 | 1.13x |
 | float64 | PowInt | 0.0031 | 0.0162 | **0.19x** (5x Faster) |
-| float64 | fastmath.Sin | 0.0154 | 0.0170 | **0.90x** (10% Faster) |
+| float64 | fastmath.Sin | 0.0154 | 0.0170 | **0.90x** (measurement noise; `fastmath.Sin` calls `math.Sin`) |
 | **Batch** | **ExpBatch** | 0.0004 | 0.0005 | **0.91x** |
 | **Batch** | **AddBatch** | 0.0002 | 0.0003 | **0.84x** |
 | **Fused** | **ExpMulBatch** | 0.0003 | 0.0005 | **0.65x** |
@@ -100,7 +112,7 @@ Tested with n=1,000,000 iterations
 | :--- | :--- | :--- | :--- | :--- |
 | float64 | Exp | 0.0060 | 0.0058 | 1.05x |
 | float64 | PowInt | 0.0031 | 0.0202 | **0.15x** (6x Faster) |
-| float64 | fastmath.Sin | 0.0189 | 0.0205 | **0.92x** (8% Faster) |
+| float64 | fastmath.Sin | 0.0189 | 0.0205 | **0.92x** (measurement noise; `fastmath.Sin` calls `math.Sin`) |
 | **Batch** | **ExpBatch** | 0.0003 | 0.0004 | **0.98x** |
 | **Batch** | **AddBatch** | 0.0001 | 0.0002 | **0.75x** |
 | **Fused** | **ExpMulBatch** | 0.0002 | 0.0005 | **0.52x** |
@@ -139,7 +151,7 @@ Both libraries prioritize zero-allocation paths for performance.
 
 - **Scalar operations:** Both use stack-only execution (0 allocs/op).
 - **Batch operations:** Both require a single allocation for the result slice (1 alloc/op).
-- **In-place operations (v2.0):** For pre-allocated buffers, zero additional allocations.
+- **In-place operations (v0.4):** For pre-allocated buffers, zero additional allocations.
 
 ```go
 // Scalar: 0 allocations

@@ -21,7 +21,9 @@ func CompileAST(n jit.Node) (*Program, error) {
 	if err := emitAST(n, p, varMap); err != nil {
 		return nil, err
 	}
-	p.CalculateMaxStackDepth()
+	if err := finalize(p); err != nil {
+		return nil, err
+	}
 	return p, nil
 }
 
@@ -95,17 +97,7 @@ func emitAST(n jit.Node, p *Program, varMap map[string]uint16) error {
 		if err := emitAST(v.Arg, p, varMap); err != nil {
 			return err
 		}
-		switch v.Name {
-		case "exp":
-			p.Ops = append(p.Ops, OpExp)
-		case "log":
-			p.Ops = append(p.Ops, OpLog)
-		case "sqrt":
-			p.Ops = append(p.Ops, OpSqrt)
-		default:
-			return fmt.Errorf("unsupported function in bytecode compiler: %s", v.Name)
-		}
-		return nil
+		return emitFunc(p, token{isFunc: true, name: v.Name, argCount: 1})
 
 	default:
 		return fmt.Errorf("unknown AST node type: %T", n)
@@ -123,7 +115,9 @@ func CompileEML(n *jit.EMLNode) (*Program, error) {
 	if err := emitEML(n, p, varMap); err != nil {
 		return nil, err
 	}
-	p.CalculateMaxStackDepth()
+	if err := finalize(p); err != nil {
+		return nil, err
+	}
 	return p, nil
 }
 
@@ -190,6 +184,10 @@ func emitEML(n *jit.EMLNode, p *Program, varMap map[string]uint16) error {
 		case "sqrt":
 			p.Ops = append(p.Ops, OpSqrt)
 		default:
+			if op, ok := unaryOpcode(n.Name); ok {
+				p.Ops = append(p.Ops, op)
+				return nil
+			}
 			return fmt.Errorf("unsupported EML function: %s", n.Name)
 		}
 		return nil
@@ -197,6 +195,20 @@ func emitEML(n *jit.EMLNode, p *Program, varMap map[string]uint16) error {
 	default:
 		return fmt.Errorf("unknown EMLNode kind: %d", n.Kind)
 	}
+}
+
+// finalize validates that the assembled opcode stream is a well-formed RPN
+// program and computes its maximum stack depth.
+//
+// Without the stack check the compiler happily emits programs such as "1 +"
+// or "*", which leave the evaluation stack underflowed; evaluating those
+// panics with an index-out-of-range error instead of failing at compile time.
+func finalize(p *Program) error {
+	if !ValidateStack(p.Ops) {
+		return fmt.Errorf("malformed expression: produced an invalid stack sequence (%d ops)", len(p.Ops))
+	}
+	p.CalculateMaxStackDepth()
+	return nil
 }
 
 // CompileExpr parses a mathematical expression string directly into a bytecode Program
@@ -216,16 +228,7 @@ func parseShuntingYard(expr string) (*Program, error) {
 	p := NewProgram()
 	varMap := make(map[string]uint16)
 
-	type opToken struct {
-		isFunc   bool
-		op       rune
-		name     string
-		preced   int
-		rAssoc   bool
-		argCount int
-	}
-
-	var opStack []opToken
+	var opStack []token
 	tokens := tokenize(expr)
 
 	for i := 0; i < len(tokens); i++ {
@@ -242,7 +245,7 @@ func parseShuntingYard(expr string) (*Program, error) {
 		case tok.isIdent:
 			lower := strings.ToLower(tok.str)
 			if isFunc(lower) {
-				opStack = append(opStack, opToken{isFunc: true, name: lower, preced: 10, argCount: 1})
+				opStack = append(opStack, token{isFunc: true, name: lower, preced: 10, argCount: 1})
 			} else {
 				idx, err := getOrAssignVar(tok.str, varMap)
 				if err != nil {
@@ -266,7 +269,7 @@ func parseShuntingYard(expr string) (*Program, error) {
 			}
 
 		case tok.str == "(":
-			opStack = append(opStack, opToken{op: '('})
+			opStack = append(opStack, token{op: '('})
 
 		case tok.str == ")":
 			for len(opStack) > 0 && opStack[len(opStack)-1].op != '(' {
@@ -303,7 +306,7 @@ func parseShuntingYard(expr string) (*Program, error) {
 					break
 				}
 			}
-			opStack = append(opStack, opToken{op: r, preced: preced, rAssoc: rAssoc})
+			opStack = append(opStack, token{op: r, preced: preced, rAssoc: rAssoc})
 		}
 	}
 
@@ -324,18 +327,25 @@ func parseShuntingYard(expr string) (*Program, error) {
 		}
 	}
 
-	p.CalculateMaxStackDepth()
+	if err := finalize(p); err != nil {
+		return nil, err
+	}
 	return p, nil
 }
 
-func emitOp(p *Program, tok struct {
+// token is one entry on the shunting-yard operator stack. It used to be an
+// anonymous struct duplicated in the signatures of emitOp and emitFunc, which
+// made it impossible to share code between them.
+type token struct {
 	isFunc   bool
 	op       rune
 	name     string
 	preced   int
 	rAssoc   bool
 	argCount int
-}) error {
+}
+
+func emitOp(p *Program, tok token) error {
 	switch tok.op {
 	case '+':
 		p.Ops = append(p.Ops, OpAdd)
@@ -353,35 +363,17 @@ func emitOp(p *Program, tok struct {
 	return nil
 }
 
-func emitFunc(p *Program, tok struct {
-	isFunc   bool
-	op       rune
-	name     string
-	preced   int
-	rAssoc   bool
-	argCount int
-}) error {
-	switch tok.name {
-	case "eml":
+func emitFunc(p *Program, tok token) error {
+	if tok.name == emlName {
 		p.Ops = append(p.Ops, OpEML)
-	case "exp":
-		p.Ops = append(p.Ops, OpExp)
-	case "log", "ln":
-		p.Ops = append(p.Ops, OpLog)
-	case "sqrt":
-		p.Ops = append(p.Ops, OpSqrt)
-	default:
+		return nil
+	}
+	op, ok := unaryOpcode(tok.name)
+	if !ok {
 		return fmt.Errorf("unsupported function: %s", tok.name)
 	}
+	p.Ops = append(p.Ops, op)
 	return nil
-}
-
-func isFunc(s string) bool {
-	switch s {
-	case "eml", "exp", "log", "ln", "sqrt", "sin", "cos":
-		return true
-	}
-	return false
 }
 
 func getPrecedence(op rune) (int, bool) {

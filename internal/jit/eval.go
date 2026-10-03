@@ -38,57 +38,8 @@ func EvalVars(n Node, vars map[string]float64) float64 {
 		}
 	case FunctionCall:
 		arg := EvalVars(v.Arg, vars)
-		switch v.Name {
-		case "sin":
-			return math.Sin(arg)
-		case "cos":
-			return math.Cos(arg)
-		case "exp":
-			return math.Exp(arg)
-		case "log":
-			return math.Log(arg)
-		case "sqrt":
-			return math.Sqrt(arg)
-		case "tan":
-			return math.Tan(arg)
-		case "asin":
-			return math.Asin(arg)
-		case "acos":
-			return math.Acos(arg)
-		case "atan":
-			return math.Atan(arg)
-		case "abs":
-			return math.Abs(arg)
-		case "cbrt":
-			return math.Cbrt(arg)
-		case "log2":
-			return math.Log2(arg)
-		case "log10":
-			return math.Log10(arg)
-		case "ceil":
-			return math.Ceil(arg)
-		case "floor":
-			return math.Floor(arg)
-		case "trunc":
-			return math.Trunc(arg)
-		case "round":
-			return math.Round(arg)
-		case "sinh":
-			return math.Sinh(arg)
-		case "cosh":
-			return math.Cosh(arg)
-		case "tanh":
-			return math.Tanh(arg)
-		case "asinh":
-			return math.Asinh(arg)
-		case "acosh":
-			return math.Acosh(arg)
-		case "atanh":
-			return math.Atanh(arg)
-		case "erf":
-			return math.Erf(arg)
-		case "gamma":
-			return math.Gamma(arg)
+		if result, ok := callMathFuncByName(v.Name, arg); ok {
+			return result
 		}
 	}
 	return 0

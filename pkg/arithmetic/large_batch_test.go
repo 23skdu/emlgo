@@ -30,7 +30,7 @@ func TestAllLargeBatches(t *testing.T) {
 }
 
 func TestArithmeticPanics(t *testing.T) {
-	defer func() { recover() }()
+	defer func() { _ = recover() }()
 	LCM(0, 0)
 }
 

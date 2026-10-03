@@ -74,6 +74,10 @@ func (p *Program) Eval(vars []float64, scratch []float64) float64 {
 			stack[sp-1] = fastmath.FastExp(stack[sp-1])
 		case OpLog:
 			stack[sp-1] = fastmath.FastLog(stack[sp-1])
+		default:
+			if fn := opUnaryTable[op]; fn != nil {
+				stack[sp-1] = fn(stack[sp-1])
+			}
 		}
 	}
 
@@ -160,6 +164,21 @@ func (p *Program) EvalRegularized(vars []float64, eps float64, scratch []float64
 			stack[sp-1] = fastmath.ExpClamped(stack[sp-1])
 		case OpLog:
 			stack[sp-1] = fastmath.LnRegularized(stack[sp-1], eps)
+		default:
+			if fn := opUnaryTable[op]; fn != nil {
+				// Regularization covers the pathological operators (ln, exp,
+				// sqrt, division). The remaining functions are undefined in
+				// narrower domains -- asin(2), log2(-1), gamma(0) -- so a NaN
+				// result from a finite input is replaced by the input itself.
+				// That keeps genetic-programming fitness finite without
+				// silently flattening the function everywhere else.
+				in := stack[sp-1]
+				if out := fn(in); !math.IsNaN(out) {
+					stack[sp-1] = out
+				} else if !math.IsNaN(in) {
+					stack[sp-1] = in
+				}
+			}
 		}
 	}
 

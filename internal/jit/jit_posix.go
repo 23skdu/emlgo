@@ -1,4 +1,4 @@
-//go:build !windows && (!js || !wasm)
+//go:build !windows && !wasip1 && (!js || !wasm)
 
 package jit
 
