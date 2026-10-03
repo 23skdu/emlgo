@@ -16,6 +16,7 @@ func TestStopWorkerPoolIdempotent(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping pool shutdown test in short mode")
 	}
+	t.Cleanup(restartWorkerPool)
 	// Calling StopWorkerPool many times sequentially must not panic.
 	for i := 0; i < 10; i++ {
 		func() {
@@ -35,6 +36,7 @@ func TestStopWorkerPoolConcurrent(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping pool shutdown test in short mode")
 	}
+	t.Cleanup(restartWorkerPool)
 
 	const goroutines = 10
 	panicked := make(chan interface{}, goroutines)

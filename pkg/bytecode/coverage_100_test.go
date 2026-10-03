@@ -212,7 +212,10 @@ func TestGAEdgeCases(t *testing.T) {
 		pop[i] = &Program{Ops: []OpCode{OpConst}, Consts: []float64{1.0}, MaxStackDepth: 1}
 	}
 	scores := make([]float64, 97)
-	scorePopulation(Config{Workers: 12}, pop, Dataset{X: [][]float64{{1}}, Y: []float64{1}}, LeastSquares(1e-6), scores)
+	pool := newGAWorkerPool(12)
+	defer pool.Close()
+	scorePopulation(pool, Config{Workers: 12}, pop, Dataset{X: [][]float64{{1}}, Y: []float64{1}}, LeastSquares(1e-6), scores)
+	scorePopulation(nil, Config{Workers: 12}, pop, Dataset{X: [][]float64{{1}}, Y: []float64{1}}, LeastSquares(1e-6), scores)
 }
 
 func TestCompilerEdgeCases(t *testing.T) {

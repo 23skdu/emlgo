@@ -89,7 +89,7 @@ func Exp(x float64) float64 {
 
 // Log returns the natural logarithm of x.
 func Log(x float64) float64 {
-	return math.Log(x)
+	return nativeLog(x)
 }
 
 // Log1p returns the natural logarithm of 1 plus its argument x.

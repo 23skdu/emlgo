@@ -12,22 +12,18 @@ func signbit(x float64) bool {
 	return f64bits(x)&(1<<63) != 0
 }
 
-//go:inline
 func nan() float64 {
 	return math.NaN()
 }
 
-//go:inline
 func inf(sign int) float64 {
 	return math.Inf(sign)
 }
 
-//go:inline
 func isNaN(f float64) bool {
 	return math.IsNaN(f)
 }
 
-//go:inline
 func isInf(f float64, sign int) bool {
 	return math.IsInf(f, sign)
 }
@@ -41,18 +37,45 @@ func nativeExp(x float64) float64 {
 }
 
 func nativeLog(x float64) float64 {
+	if x > 0 && x < 0x1p-1022 {
+		return math.Log(x*0x1p54) - 54*math.Ln2
+	}
+	return math.Log(x)
+}
+
+// ExactLogOracle evaluates ln(x) for x > 0 by scaling subnormals into the normal
+// range [2^-1020, 2^-968) before invoking the logarithm, eliminating toolchain subnormal truncation error.
+func ExactLogOracle(x float64) float64 {
+	if x <= 0 {
+		if x == 0 {
+			return Inf(-1)
+		}
+		return NaN()
+	}
+	if IsInf(x, 1) {
+		return Inf(1)
+	}
+	if IsNaN(x) {
+		return NaN()
+	}
+	if x < 0x1p-1022 {
+		return math.Log(x*0x1p54) - 54*math.Ln2
+	}
 	return math.Log(x)
 }
 
 // logScalar is the scalar logarithm used by the batch dispatchers. It applies
-// the same domain rule as pkg/logexp.Log -- NaN for any non-positive argument --
+// the same domain rule as pkg/logexp.Log -- NaN for negative argument and -Inf for zero --
 // so that Log and LogBatch cannot disagree.
 //
 // The unguarded nativeLog is still used for the EML operator itself and for the
 // fused LogDiv/LogSub kernels, where math.Log semantics are what we want.
 func logScalar(x float64) float64 {
-	if x <= 0 {
+	if x < 0 {
 		return NaN()
+	}
+	if x == 0 {
+		return Inf(-1)
 	}
 	return nativeLog(x)
 }
@@ -66,10 +89,16 @@ func nativeCos(x float64) float64 {
 }
 
 func nativeLog2(x float64) float64 {
+	if x > 0 && x < 0x1p-1022 {
+		return math.Log2(x*0x1p54) - 54
+	}
 	return math.Log2(x)
 }
 
 func nativeLog10(x float64) float64 {
+	if x > 0 && x < 0x1p-1022 {
+		return math.Log10(x*0x1p54) - 54*0.3010299956639811952137388947244930267681898814621085
+	}
 	return math.Log10(x)
 }
 

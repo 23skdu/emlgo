@@ -322,7 +322,7 @@ func ComplexDotProduct(a, b []complex128) complex128 {
 	if n == 0 {
 		return 0
 	}
-	if n < SmallCutoff || poolClosed.Load() {
+	if n < SmallCutoff() || poolClosed.Load() {
 		re, im := complexDotChunk(a, b, 0, n)
 		return complex(re, im)
 	}
@@ -424,7 +424,7 @@ func ComplexDotProductC64(a, b []complex64) complex64 {
 	if n == 0 {
 		return 0
 	}
-	if n < SmallCutoff || poolClosed.Load() {
+	if n < SmallCutoff() || poolClosed.Load() {
 		re, im := complexDotChunkC64(a, b, 0, n)
 		return complex64(complex(re, im))
 	}

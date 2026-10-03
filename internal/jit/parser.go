@@ -118,6 +118,7 @@ type parser struct {
 	l     *lexer
 	peek  token
 	ready bool
+	depth int
 }
 
 func newParser(input string) *parser {
@@ -178,6 +179,13 @@ func Parse(input string) (Node, error) {
 }
 
 func validateVars(n Node, allowed map[string]bool) error {
+	return validateVarsDepth(n, allowed, 0)
+}
+
+func validateVarsDepth(n Node, allowed map[string]bool, depth int) error {
+	if depth > MaxASTDepth {
+		return fmt.Errorf("expression nesting exceeds maximum depth (%d)", MaxASTDepth)
+	}
 	switch v := n.(type) {
 	case Variable:
 		name := v.Name
@@ -188,14 +196,14 @@ func validateVars(n Node, allowed map[string]bool) error {
 			return fmt.Errorf("undeclared variable %q", name)
 		}
 	case BinaryOp:
-		if err := validateVars(v.Left, allowed); err != nil {
+		if err := validateVarsDepth(v.Left, allowed, depth+1); err != nil {
 			return err
 		}
-		return validateVars(v.Right, allowed)
+		return validateVarsDepth(v.Right, allowed, depth+1)
 	case UnaryOp:
-		return validateVars(v.Operand, allowed)
+		return validateVarsDepth(v.Operand, allowed, depth+1)
 	case FunctionCall:
-		return validateVars(v.Arg, allowed)
+		return validateVarsDepth(v.Arg, allowed, depth+1)
 	}
 	return nil
 }
@@ -220,6 +228,11 @@ func ParseWithVars(input string, vars []string) (Node, error) {
 }
 
 func (p *parser) parseExpr() (Node, error) {
+	if p.depth > MaxASTDepth {
+		return nil, fmt.Errorf("expression nesting exceeds maximum depth (%d)", MaxASTDepth)
+	}
+	p.depth++
+	defer func() { p.depth-- }()
 	return p.parseAddSub()
 }
 
@@ -349,6 +362,13 @@ func FormatAST(n Node) string {
 }
 
 func FormatExpr(n Node) string {
+	return formatExprDepth(n, 0)
+}
+
+func formatExprDepth(n Node, depth int) string {
+	if depth > MaxASTDepth {
+		return "..."
+	}
 	switch v := n.(type) {
 	case Number:
 		s := strconv.FormatFloat(v.Value, 'f', -1, 64)
@@ -363,32 +383,40 @@ func FormatExpr(n Node) string {
 	case Variable:
 		return "x"
 	case UnaryOp:
-		return fmt.Sprintf("-%s", wrapParen(v.Operand))
+		return fmt.Sprintf("-%s", wrapParenDepth(v.Operand, depth+1))
 	case BinaryOp:
-		l, r := wrapBinOp(v.Left, v.Op, true), wrapBinOp(v.Right, v.Op, false)
+		l, r := wrapBinOpDepth(v.Left, v.Op, true, depth+1), wrapBinOpDepth(v.Right, v.Op, false, depth+1)
 		if v.Op == '^' {
-			return fmt.Sprintf("%s^%s", wrapPower(v.Left), wrapPower(v.Right))
+			return fmt.Sprintf("%s^%s", wrapPowerDepth(v.Left, depth+1), wrapPowerDepth(v.Right, depth+1))
 		}
 		return fmt.Sprintf("%s %c %s", l, v.Op, r)
 	case FunctionCall:
-		return fmt.Sprintf("%s(%s)", v.Name, FormatExpr(v.Arg))
+		return fmt.Sprintf("%s(%s)", v.Name, formatExprDepth(v.Arg, depth+1))
 	}
 	return n.String()
 }
 
 func wrapParen(n Node) string {
+	return wrapParenDepth(n, 0)
+}
+
+func wrapParenDepth(n Node, depth int) string {
 	_, isBin := n.(BinaryOp)
 	_, isUnary := n.(UnaryOp)
 	if isBin || isUnary {
-		return "(" + FormatExpr(n) + ")"
+		return "(" + formatExprDepth(n, depth) + ")"
 	}
-	return FormatExpr(n)
+	return formatExprDepth(n, depth)
 }
 
 func wrapBinOp(n Node, parentOp rune, left bool) string {
+	return wrapBinOpDepth(n, parentOp, left, 0)
+}
+
+func wrapBinOpDepth(n Node, parentOp rune, left bool, depth int) string {
 	bin, ok := n.(BinaryOp)
 	if !ok {
-		return wrapParen(n)
+		return wrapParenDepth(n, depth)
 	}
 	prec := func(op rune) int {
 		switch op {
@@ -402,22 +430,26 @@ func wrapBinOp(n Node, parentOp rune, left bool) string {
 		return 0
 	}
 	if prec(bin.Op) < prec(parentOp) {
-		return "(" + FormatExpr(n) + ")"
+		return "(" + formatExprDepth(n, depth) + ")"
 	}
 	if prec(bin.Op) == prec(parentOp) && !left && (parentOp == '-' || parentOp == '/') {
-		return "(" + FormatExpr(n) + ")"
+		return "(" + formatExprDepth(n, depth) + ")"
 	}
 	if prec(bin.Op) == prec(parentOp) && parentOp == '^' {
-		return "(" + FormatExpr(n) + ")"
+		return "(" + formatExprDepth(n, depth) + ")"
 	}
-	return FormatExpr(n)
+	return formatExprDepth(n, depth)
 }
 
 func wrapPower(n Node) string {
+	return wrapPowerDepth(n, 0)
+}
+
+func wrapPowerDepth(n Node, depth int) string {
 	_, isBin := n.(BinaryOp)
 	_, isUnary := n.(UnaryOp)
 	if isBin || isUnary {
-		return "(" + FormatExpr(n) + ")"
+		return "(" + formatExprDepth(n, depth) + ")"
 	}
-	return FormatExpr(n)
+	return formatExprDepth(n, depth)
 }

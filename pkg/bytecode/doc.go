@@ -3,5 +3,5 @@
 //
 // The core design eliminates pointer chasing, ensures prefetcher-friendly sequential memory access,
 // reduces heap allocations during evaluation to zero, and amortizes expression interpretation overhead
-// across large batch datasets via vectorized execution.
+// across large batch datasets via columnar chunked evaluation.
 package bytecode

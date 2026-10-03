@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -144,6 +145,10 @@ type Config struct {
 	// Parsimony is the weight lambda for ProgramCost penalty:
 	// fitness = data_fit - Parsimony * ProgramCost.
 	// Penalizes bloated trees to preserve compact formulas. Defaults to 0 (disabled).
+	// Note on interaction with Optimize: Optimize applies algebraic simplification
+	// and constant identity folding to candidates, which directly reduces ProgramCost.
+	// When Parsimony > 0 and Optimize is true, the penalty evaluates on the simplified
+	// tree structure.
 	Parsimony float64
 	// AdaptiveMutation enables self-adaptive mutation rate adjustment:
 	// decreases rate on improvement and increases rate on stagnation. Defaults to false.
@@ -154,7 +159,9 @@ type Config struct {
 	// PlateauGenerations is the count of consecutive generations without improvement before terminating early.
 	// Defaults to 0 (disabled).
 	PlateauGenerations int
-	// Optimize runs algebraic optimization and constant folding in the generational loop. Defaults to false.
+	// Optimize runs algebraic optimization and constant folding in the generational loop.
+	// When combined with Parsimony, it reduces tree size ahead of cost penalties.
+	// Defaults to false.
 	Optimize bool
 	// Seed makes the whole search reproducible. Zero picks a seed from the
 	// system entropy source.
@@ -245,6 +252,70 @@ func (r Result) Converged(tolerance float64) bool {
 // composition of elementary functions, which is what the source paper does with
 // gradient-based training of a parameterised tree, not with a genetic algorithm.
 // Use this for the first class of problem, and expect approximation elsewhere.
+type gaWorkerPool struct {
+	tasks chan func()
+	done  chan struct{}
+	once  sync.Once
+}
+
+func newGAWorkerPool(n int) *gaWorkerPool {
+	p := &gaWorkerPool{
+		tasks: make(chan func(), n*8),
+		done:  make(chan struct{}),
+	}
+	for i := 0; i < n; i++ {
+		go func() {
+			for {
+				select {
+				case <-p.done:
+					return
+				case fn := <-p.tasks:
+					fn()
+				}
+			}
+		}()
+	}
+	return p
+}
+
+func (p *gaWorkerPool) Close() {
+	p.once.Do(func() {
+		close(p.done)
+	})
+}
+
+func (p *gaWorkerPool) parallelFor(count int, workers int, minPerWorker int, fn func(start, end int)) {
+	if count <= 0 {
+		return
+	}
+	if p == nil || workers <= 1 || count <= minPerWorker {
+		fn(0, count)
+		return
+	}
+	actualWorkers := min(workers, (count+minPerWorker-1)/minPerWorker)
+	chunk := (count + actualWorkers - 1) / actualWorkers
+	var wg sync.WaitGroup
+	for w := 0; w < actualWorkers; w++ {
+		start := w * chunk
+		if start >= count {
+			break
+		}
+		end := min(start+chunk, count)
+		wg.Add(1)
+		p.tasks <- func() {
+			defer wg.Done()
+			fn(start, end)
+		}
+	}
+	wg.Wait()
+}
+
+// Search runs a genetic search over EML-tree candidates and returns the best
+// program found for the dataset.
+//
+// The search is deterministic for a given Config.Seed. Fitness is called
+// concurrently from up to Config.Workers goroutines, so it must be safe for
+// concurrent use; LeastSquares is.
 func Search(cfg Config, dataset Dataset, fitness Fitness) (Result, error) {
 	if fitness == nil {
 		return Result{}, fmt.Errorf("bytecode: nil fitness function")
@@ -265,12 +336,19 @@ func Search(cfg Config, dataset Dataset, fitness Fitness) (Result, error) {
 		nVars = 1
 	}
 
+	var pool *gaWorkerPool
+	if cfg.Workers > 1 {
+		pool = newGAWorkerPool(cfg.Workers)
+		defer pool.Close()
+	}
+
 	population := make([]*Program, cfg.PopulationSize)
 	for i := range population {
 		population[i] = RandomProgram(nVars, cfg.MinOps, cfg.MaxOps, rng)
 	}
 
 	scores := make([]float64, len(population))
+	order := make([]int, len(population))
 	history := make([]float64, 0, cfg.Generations)
 	evaluations := 0
 
@@ -279,9 +357,9 @@ func Search(cfg Config, dataset Dataset, fitness Fitness) (Result, error) {
 	lastBest := math.Inf(-1)
 
 	for gen := 0; gen < cfg.Generations; gen++ {
-		evaluations += scorePopulation(cfg, population, dataset, fitness, scores)
+		evaluations += scorePopulation(pool, cfg, population, dataset, fitness, scores)
 
-		order := sortedIndices(scores)
+		sortIndices(scores, order)
 		bestScore := scores[order[0]]
 		history = append(history, bestScore)
 
@@ -307,31 +385,39 @@ func Search(cfg Config, dataset Dataset, fitness Fitness) (Result, error) {
 
 		next := make([]*Program, 0, len(population))
 		// Elitism: carry the best candidates over, polishing their constants
-		// with a short local search first.
-		if cfg.Workers > 1 && cfg.Elitism > 1 && cfg.LocalSearchSteps > 0 {
+		// with local search and perturbation-on-stall.
+		if cfg.LocalSearchSteps > 0 {
 			elites := make([]*Program, cfg.Elitism)
 			for i := 0; i < cfg.Elitism; i++ {
 				elites[i] = population[order[i]].Clone()
 			}
-			var wg sync.WaitGroup
-			for i := 0; i < cfg.Elitism; i++ {
-				wg.Add(1)
-				go func(idx int) {
-					defer wg.Done()
-					tuneConstants(elites[idx], dataset, fitness, nil, cfg.LocalSearchSteps)
-					if cfg.Optimize {
-						elites[idx] = Optimize(elites[idx])
+			if pool != nil && cfg.Elitism > 1 {
+				var evalsTotal atomic.Int64
+				pool.parallelFor(cfg.Elitism, cfg.Workers, 1, func(start, end int) {
+					for i := start; i < end; i++ {
+						workerRng := rand.New(rand.NewSource(seed + int64(gen)*10007 + int64(i)*1009))
+						evals := tuneConstants(elites[i], dataset, fitness, workerRng, cfg.LocalSearchSteps)
+						evalsTotal.Add(int64(evals))
+						if cfg.Optimize {
+							elites[i] = Optimize(elites[i])
+						}
 					}
-				}(i)
+				})
+				evaluations += int(evalsTotal.Load())
+			} else {
+				for i := 0; i < cfg.Elitism; i++ {
+					workerRng := rand.New(rand.NewSource(seed + int64(gen)*10007 + int64(i)*1009))
+					evals := tuneConstants(elites[i], dataset, fitness, workerRng, cfg.LocalSearchSteps)
+					evaluations += evals
+					if cfg.Optimize {
+						elites[i] = Optimize(elites[i])
+					}
+				}
 			}
-			wg.Wait()
 			next = append(next, elites...)
 		} else {
 			for i := 0; i < cfg.Elitism; i++ {
 				elite := population[order[i]].Clone()
-				if cfg.LocalSearchSteps > 0 {
-					tuneConstants(elite, dataset, fitness, rng, cfg.LocalSearchSteps)
-				}
 				if cfg.Optimize {
 					elite = Optimize(elite)
 				}
@@ -370,8 +456,8 @@ func Search(cfg Config, dataset Dataset, fitness Fitness) (Result, error) {
 	}
 
 	// Score the final generation.
-	evaluations += scorePopulation(cfg, population, dataset, fitness, scores)
-	order := sortedIndices(scores)
+	evaluations += scorePopulation(pool, cfg, population, dataset, fitness, scores)
+	sortIndices(scores, order)
 
 	return Result{
 		Best:        population[order[0]],
@@ -382,53 +468,82 @@ func Search(cfg Config, dataset Dataset, fitness Fitness) (Result, error) {
 }
 
 // tuneConstants improves a candidate's constant operands by coordinate descent
-// on the fitness, shrinking the step size after each sweep.
+// on the fitness, shrinking the step size after each sweep and performing
+// stochastic perturbations on stall.
 //
 // Only the constants move; the opcode structure is left to the genetic
 // operators. This is what lets a candidate that has the right shape settle onto
 // the right coefficients in a few generations instead of drifting there by
 // random walk.
-func tuneConstants(p *Program, d Dataset, fitness Fitness, rng *rand.Rand, sweeps int) {
-	if p == nil || len(p.Consts) == 0 || fitness == nil {
-		return
+func tuneConstants(p *Program, d Dataset, fitness Fitness, rng *rand.Rand, sweeps int) int {
+	if p == nil || len(p.Consts) == 0 || fitness == nil || sweeps <= 0 {
+		return 0
 	}
+	evals := 0
 	step := 1.0
 	best := fitness(p, d)
+	evals++
+
+	bestConsts := make([]float64, len(p.Consts))
+	copy(bestConsts, p.Consts)
+
+	stallCount := 0
 	for s := 0; s < sweeps; s++ {
 		improved := false
 		for i := range p.Consts {
 			for _, delta := range []float64{step, -step} {
 				saved := p.Consts[i]
 				p.Consts[i] = saved + delta
-				if got := fitness(p, d); got > best {
+				got := fitness(p, d)
+				evals++
+				if got > best {
 					best = got
+					copy(bestConsts, p.Consts)
 					improved = true
 				} else {
 					p.Consts[i] = saved
 				}
 			}
 		}
-		if !improved {
+		if improved {
+			stallCount = 0
+		} else {
+			stallCount++
 			step /= 2
 			if step < 1e-12 {
-				return
+				if rng != nil && stallCount >= 4 && math.Abs(best) > 1e-6 {
+					for i := range p.Consts {
+						p.Consts[i] = bestConsts[i] + (rng.Float64()*2 - 1)*0.5
+					}
+					got := fitness(p, d)
+					evals++
+					if got > best {
+						best = got
+						copy(bestConsts, p.Consts)
+						step = 1.0
+						stallCount = 0
+					} else {
+						copy(p.Consts, bestConsts)
+						return evals
+					}
+				} else {
+					return evals
+				}
 			}
 		}
 	}
-	_ = rng
+	copy(p.Consts, bestConsts)
+	return evals
 }
 
-// sortedIndices returns the indices of scores in descending order. It is a plain
-// insertion into the caller's slice, avoiding a per-generation allocation.
-func sortedIndices(scores []float64) []int {
-	order := make([]int, len(scores))
+// sortIndices populates and sorts order with indices into scores in descending order.
+func sortIndices(scores []float64, order []int) {
 	for i := range order {
 		order[i] = i
 	}
 	sort.SliceStable(order, func(a, b int) bool {
 		return scores[order[a]] > scores[order[b]]
 	})
-	return order
 }
 
 // tournament picks one index from the population by sampling k candidates and
@@ -449,8 +564,8 @@ func tournament(rng *rand.Rand, scores []float64, order []int, k int) int {
 	return best
 }
 
-// scorePopulation evaluates every candidate, fanning out across workers.
-func scorePopulation(cfg Config, pop []*Program, d Dataset, fitness Fitness, scores []float64) int {
+// scorePopulation evaluates every candidate, fanning out across workers via gaWorkerPool.
+func scorePopulation(pool *gaWorkerPool, cfg Config, pop []*Program, d Dataset, fitness Fitness, scores []float64) int {
 	calcScore := func(p *Program) float64 {
 		s := fitness(p, d)
 		if cfg.Parsimony > 0 && !math.IsNaN(s) && !math.IsInf(s, -1) {
@@ -459,33 +574,18 @@ func scorePopulation(cfg Config, pop []*Program, d Dataset, fitness Fitness, sco
 		return s
 	}
 
-	// Below this many candidates per worker the goroutine hand-off costs more
-	// than the work it saves.
 	const minPerWorker = 8
-	if cfg.Workers <= 1 || len(pop) < cfg.Workers*minPerWorker {
+	if pool == nil || cfg.Workers <= 1 || len(pop) < cfg.Workers*minPerWorker {
 		for i, p := range pop {
 			scores[i] = calcScore(p)
 		}
 		return len(pop)
 	}
 
-	workers := cfg.Workers
-	chunk := (len(pop) + workers - 1) / workers
-	var wg sync.WaitGroup
-	for w := 0; w < workers; w++ {
-		lo := w * chunk
-		if lo >= len(pop) {
-			break
+	pool.parallelFor(len(pop), cfg.Workers, minPerWorker, func(start, end int) {
+		for i := start; i < end; i++ {
+			scores[i] = calcScore(pop[i])
 		}
-		hi := min(lo+chunk, len(pop))
-		wg.Add(1)
-		go func(lo, hi int) {
-			defer wg.Done()
-			for i := lo; i < hi; i++ {
-				scores[i] = calcScore(pop[i])
-			}
-		}(lo, hi)
-	}
-	wg.Wait()
+	})
 	return len(pop)
 }

@@ -142,13 +142,30 @@ func TestParallelChunkingLarge(t *testing.T) {
 	})
 
 	// Test parallelizeGenericF32 with SmallCutoff=1 to hit numWorkers > n, hi > n, and lo >= n
-	oldCutoff := SmallCutoff
-	SmallCutoff = 1
+	oldCutoff := SmallCutoff()
+	SetSmallCutoff(1)
 	short1 := make([]float32, 1)
 	parallelizeGenericF32(short1, short1, func(s, d []float32) {})
 	short17 := make([]float32, 17)
 	parallelizeGenericF32(short17, short17, func(s, d []float32) {})
-	SmallCutoff = oldCutoff
+	SetSmallCutoff(-1)
+	if SmallCutoff() <= 0 {
+		t.Errorf("expected positive default cutoff")
+	}
+	SetSmallCutoff(oldCutoff)
+
+	p := Parallelism()
+	if p <= 0 {
+		t.Errorf("expected positive parallelism")
+	}
+	SetParallelism(2)
+	if Parallelism() != 2 {
+		t.Errorf("expected parallelism 2, got %d", Parallelism())
+	}
+	SetParallelism(0)
+	if Parallelism() != p {
+		t.Errorf("expected parallelism reset to %d, got %d", p, Parallelism())
+	}
 
 	// Slice mismatch panics in simd_f32.go
 	func() { defer func() { _ = recover() }(); AddSIMDF32To(f32a, f32b[:10], f32res) }()

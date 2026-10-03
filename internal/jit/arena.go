@@ -66,7 +66,11 @@ func (a *Arena) Reset() {
 
 // ToInterface converts an ArenaNode to the corresponding Node interface value.
 func (a *Arena) ToInterface(n *ArenaNode) Node {
-	if n == nil {
+	return a.toInterfaceDepth(n, 0)
+}
+
+func (a *Arena) toInterfaceDepth(n *ArenaNode, depth int) Node {
+	if n == nil || depth > MaxASTDepth {
 		return nil
 	}
 	switch n.Kind {
@@ -75,22 +79,26 @@ func (a *Arena) ToInterface(n *ArenaNode) Node {
 	case kindVariable:
 		return Variable{}
 	case kindUnaryOp:
-		return UnaryOp{Op: n.Op, Operand: a.ToInterface(n.Left)}
+		return UnaryOp{Op: n.Op, Operand: a.toInterfaceDepth(n.Left, depth+1)}
 	case kindBinaryOp:
-		return BinaryOp{Left: a.ToInterface(n.Left), Op: n.Op, Right: a.ToInterface(n.Right)}
+		return BinaryOp{Left: a.toInterfaceDepth(n.Left, depth+1), Op: n.Op, Right: a.toInterfaceDepth(n.Right, depth+1)}
 	case kindFuncCall:
 		name := ""
 		for i := 0; i < len(n.Name) && n.Name[i] != 0; i++ {
 			name += string(n.Name[i])
 		}
-		return FunctionCall{Name: name, Arg: a.ToInterface(n.Left)}
+		return FunctionCall{Name: name, Arg: a.toInterfaceDepth(n.Left, depth+1)}
 	}
 	return nil
 }
 
 // FromInterface converts a Node interface value into a new ArenaNode allocated from the arena.
 func (a *Arena) FromInterface(n Node) *ArenaNode {
-	if n == nil {
+	return a.fromInterfaceDepth(n, 0)
+}
+
+func (a *Arena) fromInterfaceDepth(n Node, depth int) *ArenaNode {
+	if n == nil || depth > MaxASTDepth {
 		return nil
 	}
 	switch v := n.(type) {
@@ -107,14 +115,14 @@ func (a *Arena) FromInterface(n Node) *ArenaNode {
 		node := a.Alloc()
 		node.Kind = kindUnaryOp
 		node.Op = v.Op
-		node.Left = a.FromInterface(v.Operand)
+		node.Left = a.fromInterfaceDepth(v.Operand, depth+1)
 		return node
 	case BinaryOp:
 		node := a.Alloc()
 		node.Kind = kindBinaryOp
 		node.Op = v.Op
-		node.Left = a.FromInterface(v.Left)
-		node.Right = a.FromInterface(v.Right)
+		node.Left = a.fromInterfaceDepth(v.Left, depth+1)
+		node.Right = a.fromInterfaceDepth(v.Right, depth+1)
 		return node
 	case FunctionCall:
 		node := a.Alloc()
@@ -122,7 +130,7 @@ func (a *Arena) FromInterface(n Node) *ArenaNode {
 		for i := 0; i < len(v.Name) && i < 15; i++ {
 			node.Name[i] = v.Name[i]
 		}
-		node.Left = a.FromInterface(v.Arg)
+		node.Left = a.fromInterfaceDepth(v.Arg, depth+1)
 		return node
 	}
 	return nil
@@ -130,7 +138,11 @@ func (a *Arena) FromInterface(n Node) *ArenaNode {
 
 // EvalArena evaluates the expression tree rooted at n with variable x set to the given value.
 func EvalArena(n *ArenaNode, x float64) float64 {
-	if n == nil {
+	return evalArenaDepth(n, x, 0)
+}
+
+func evalArenaDepth(n *ArenaNode, x float64, depth int) float64 {
+	if n == nil || depth > MaxASTDepth {
 		return 0
 	}
 	switch n.Kind {
@@ -139,10 +151,10 @@ func EvalArena(n *ArenaNode, x float64) float64 {
 	case kindVariable:
 		return x
 	case kindUnaryOp:
-		return -EvalArena(n.Left, x)
+		return -evalArenaDepth(n.Left, x, depth+1)
 	case kindBinaryOp:
-		left := EvalArena(n.Left, x)
-		right := EvalArena(n.Right, x)
+		left := evalArenaDepth(n.Left, x, depth+1)
+		right := evalArenaDepth(n.Right, x, depth+1)
 		switch n.Op {
 		case '+':
 			return left + right
@@ -156,7 +168,7 @@ func EvalArena(n *ArenaNode, x float64) float64 {
 			return math.Pow(left, right)
 		}
 	case kindFuncCall:
-		arg := EvalArena(n.Left, x)
+		arg := evalArenaDepth(n.Left, x, depth+1)
 		nameLen := 0
 		for nameLen < len(n.Name) && n.Name[nameLen] != 0 {
 			nameLen++

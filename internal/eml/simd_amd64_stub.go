@@ -47,4 +47,10 @@ func cpuid(op, op2 uint32) (eax, ebx, ecx, edx uint32) {
 	return 0, 0, 0, 0
 }
 
+func xgetbv(cx uint32) (eax, edx uint32) {
+	_ = cx
+	return 0, 0
+}
+
 func detectAMD64SIMD() { _ = runtime.GOARCH }
+

@@ -4,9 +4,15 @@
 package bigmath
 
 import (
+	"fmt"
 	"math/big"
 	"sync"
 )
+
+// seriesMaxIterations computes a safe upper bound on series iterations for a given precision in bits.
+func seriesMaxIterations(prec uint) int {
+	return int(prec) + 64
+}
 
 // Prec defines the default precision in bits for big.Float operations.
 const Prec = 256
@@ -78,13 +84,15 @@ func expTaylor(x *big.Float, prec uint) *big.Float {
 	threshold := new(big.Float).SetPrec(prec).SetMantExp(
 		new(big.Float).SetPrec(prec).SetInt64(1), -int(prec))
 
-	maxIter := int(prec) + 100
+	denom := new(big.Float).SetPrec(prec)
+	absTerm := new(big.Float).SetPrec(prec)
+	maxIter := seriesMaxIterations(prec)
 	for i := int64(1); i < int64(maxIter); i++ {
-		denom := new(big.Float).SetPrec(prec).SetInt64(i)
+		denom.SetInt64(i)
 		term.Quo(term, denom)
 		term.Mul(term, x)
 		result.Add(result, term)
-		if new(big.Float).Abs(term).Cmp(threshold) < 0 {
+		if absTerm.Abs(term).Cmp(threshold) < 0 {
 			break
 		}
 	}
@@ -92,14 +100,21 @@ func expTaylor(x *big.Float, prec uint) *big.Float {
 }
 
 // Log computes log(x) (natural logarithm) at arbitrary precision.
+// Domain: x > 0.
+// If x is zero, Log returns -Inf (matching math.Log).
+// If x is negative, Log returns the NaN-equivalent sentinel 0 (matching Asin/Acos,
+// as math/big.Float does not represent NaN values).
 func Log(x *big.Float) *big.Float {
 	prec := x.Prec()
 	if prec == 0 {
 		prec = Prec
 	}
 
-	if x.Sign() <= 0 {
-		panic("bigmath.Log: x must be positive")
+	if x.Sign() == 0 {
+		return new(big.Float).SetPrec(prec).SetInf(true)
+	}
+	if x.Sign() < 0 {
+		return new(big.Float).SetPrec(prec)
 	}
 
 	if x.Cmp(one) == 0 {
@@ -112,6 +127,15 @@ func Log(x *big.Float) *big.Float {
 	// ln(x) = ln(m) + e * ln(2)
 	m2 := new(big.Float).SetPrec(wprec)
 	exp2 := x.MantExp(m2)
+
+	// If m2 < sqrt(0.5) ~ 0.7071, shift m2 = 2*m2 and exp2--
+	// so m2 in [sqrt(0.5), sqrt(2)], keeping |t| <= 0.1716 for faster convergence.
+	sqrtHalf := new(big.Float).SetPrec(wprec).SetFloat64(0.7071067811865475244)
+	if m2.Cmp(sqrtHalf) < 0 {
+		twoW := new(big.Float).SetPrec(wprec).SetInt64(2)
+		m2.Mul(m2, twoW)
+		exp2--
+	}
 
 	// Transform: t = (m2 - 1) / (m2 + 1)
 	// ln(m2) = 2 * (t + t^3/3 + t^5/5 + ...)
@@ -126,12 +150,16 @@ func Log(x *big.Float) *big.Float {
 	threshold := new(big.Float).SetPrec(wprec).SetMantExp(
 		new(big.Float).SetPrec(wprec).SetInt64(1), -int(wprec))
 
-	maxIter := int(wprec) + 100
+	part := new(big.Float).SetPrec(wprec)
+	nBig := new(big.Float).SetPrec(wprec)
+	absPart := new(big.Float).SetPrec(wprec)
+	maxIter := seriesMaxIterations(wprec)
 	for n := int64(3); n < int64(maxIter); n += 2 {
 		term.Mul(term, t2)
-		part := new(big.Float).SetPrec(wprec).Quo(term, new(big.Float).SetPrec(wprec).SetInt64(n))
+		nBig.SetInt64(n)
+		part.Quo(term, nBig)
 		sum.Add(sum, part)
-		if new(big.Float).Abs(part).Cmp(threshold) < 0 {
+		if absPart.Abs(part).Cmp(threshold) < 0 {
 			break
 		}
 	}
@@ -171,12 +199,16 @@ func computeLn2Const(prec uint) *big.Float {
 	threshold := new(big.Float).SetPrec(prec).SetMantExp(
 		new(big.Float).SetPrec(prec).SetInt64(1), -int(prec))
 
-	maxIter := int(prec) + 100
+	part := new(big.Float).SetPrec(prec)
+	nBig := new(big.Float).SetPrec(prec)
+	absPart := new(big.Float).SetPrec(prec)
+	maxIter := seriesMaxIterations(prec)
 	for n := int64(3); n < int64(maxIter); n += 2 {
 		term.Mul(term, t2)
-		part := new(big.Float).SetPrec(prec).Quo(term, new(big.Float).SetPrec(prec).SetInt64(n))
+		nBig.SetInt64(n)
+		part.Quo(term, nBig)
 		sum.Add(sum, part)
-		if new(big.Float).Abs(part).Cmp(threshold) < 0 {
+		if absPart.Abs(part).Cmp(threshold) < 0 {
 			break
 		}
 	}
@@ -251,14 +283,16 @@ func sinTaylor(x *big.Float, prec uint) *big.Float {
 	threshold := new(big.Float).SetPrec(prec).SetMantExp(
 		new(big.Float).SetPrec(prec).SetInt64(1), -int(prec))
 
-	maxIter := int(prec) + 100
+	denom := new(big.Float).SetPrec(prec)
+	absTerm := new(big.Float).SetPrec(prec)
+	maxIter := seriesMaxIterations(prec)
 	for n := int64(1); n < int64(maxIter); n++ {
 		k := 2 * n
-		denom := new(big.Float).SetPrec(prec).SetInt64(k * (k + 1))
+		denom.SetInt64(k * (k + 1))
 		term.Mul(term, negX2)
 		term.Quo(term, denom)
 		sum.Add(sum, term)
-		if new(big.Float).Abs(term).Cmp(threshold) < 0 {
+		if absTerm.Abs(term).Cmp(threshold) < 0 {
 			break
 		}
 	}
@@ -273,14 +307,16 @@ func cosTaylor(x *big.Float, prec uint) *big.Float {
 	threshold := new(big.Float).SetPrec(prec).SetMantExp(
 		new(big.Float).SetPrec(prec).SetInt64(1), -int(prec))
 
-	maxIter := int(prec) + 100
+	denom := new(big.Float).SetPrec(prec)
+	absTerm := new(big.Float).SetPrec(prec)
+	maxIter := seriesMaxIterations(prec)
 	for n := int64(1); n < int64(maxIter); n++ {
 		k := 2 * n
-		denom := new(big.Float).SetPrec(prec).SetInt64(k * (k - 1))
+		denom.SetInt64(k * (k - 1))
 		term.Mul(term, negX2)
 		term.Quo(term, denom)
 		sum.Add(sum, term)
-		if new(big.Float).Abs(term).Cmp(threshold) < 0 {
+		if absTerm.Abs(term).Cmp(threshold) < 0 {
 			break
 		}
 	}
@@ -322,13 +358,17 @@ func arctanSeries(x *big.Float, prec uint) *big.Float {
 	threshold := new(big.Float).SetPrec(prec).SetMantExp(
 		new(big.Float).SetPrec(prec).SetInt64(1), -int(prec))
 
-	maxIter := int(prec) + 100
+	part := new(big.Float).SetPrec(prec)
+	kBig := new(big.Float).SetPrec(prec)
+	absPart := new(big.Float).SetPrec(prec)
+	maxIter := seriesMaxIterations(prec)
 	for n := int64(1); n < int64(maxIter); n++ {
 		k := 2*n + 1
 		term.Mul(term, negX2)
-		part := new(big.Float).SetPrec(prec).Quo(term, new(big.Float).SetPrec(prec).SetInt64(k))
+		kBig.SetInt64(k)
+		part.Quo(term, kBig)
 		sum.Add(sum, part)
-		if new(big.Float).Abs(part).Cmp(threshold) < 0 {
+		if absPart.Abs(part).Cmp(threshold) < 0 {
 			break
 		}
 	}
@@ -389,10 +429,30 @@ func NewFloat(x float64) *big.Float {
 	return new(big.Float).SetPrec(Prec).SetFloat64(x)
 }
 
+// NewFloatFromStringChecked parses a string representation of a floating-point number
+// using base 0 (auto-detecting decimal or 0b/0o/0x prefixes) at default precision (Prec).
+// It returns an error if the string is empty, contains invalid characters, or has trailing garbage.
+func NewFloatFromStringChecked(s string) (*big.Float, error) {
+	if len(s) == 0 {
+		return nil, fmt.Errorf("bigmath: empty input string")
+	}
+	z := new(big.Float).SetPrec(Prec)
+	f, _, err := z.Parse(s, 0)
+	if err != nil {
+		return nil, err
+	}
+	return f, nil
+}
+
 // NewFloatFromString creates a new big.Float from a string at default precision.
+// Deprecated: Use NewFloatFromStringChecked to handle parsing errors safely.
+// If parsing fails, NewFloatFromString returns nil without panicking.
 func NewFloatFromString(s string) *big.Float {
-	f, _, _ := new(big.Float).Parse(s, 10)
-	return f.SetPrec(Prec)
+	f, err := NewFloatFromStringChecked(s)
+	if err != nil {
+		return nil
+	}
+	return f
 }
 
 // NewFloatFromInt creates a new big.Float from an int64 at default precision.
@@ -448,11 +508,15 @@ func Atan(x *big.Float) *big.Float {
 	// Repeat until |x| < 0.5 for fast series convergence.
 	halvings := 0
 	whalf := new(big.Float).SetPrec(wprec).SetFloat64(0.5)
+	x2 := new(big.Float).SetPrec(wprec)
+	inner := new(big.Float).SetPrec(wprec)
+	sq := new(big.Float).SetPrec(wprec)
+	denom := new(big.Float).SetPrec(wprec)
 	for ax.Cmp(whalf) >= 0 {
-		x2 := new(big.Float).SetPrec(wprec).Mul(ax, ax)
-		inner := new(big.Float).SetPrec(wprec).Add(wone, x2)
-		sq := new(big.Float).SetPrec(wprec).Sqrt(inner)
-		denom := new(big.Float).SetPrec(wprec).Add(wone, sq)
+		x2.Mul(ax, ax)
+		inner.Add(wone, x2)
+		sq.Sqrt(inner)
+		denom.Add(wone, sq)
 		ax.Quo(ax, denom)
 		halvings++
 	}
@@ -461,8 +525,9 @@ func Atan(x *big.Float) *big.Float {
 
 	// Undo halvings.
 	twoW := new(big.Float).SetPrec(wprec).SetInt64(1)
+	two := new(big.Float).SetPrec(wprec).SetInt64(2)
 	for i := 0; i < halvings; i++ {
-		twoW.Mul(twoW, new(big.Float).SetPrec(wprec).SetInt64(2))
+		twoW.Mul(twoW, two)
 	}
 	result.Mul(result, twoW)
 

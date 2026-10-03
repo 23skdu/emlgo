@@ -30,7 +30,7 @@ func detectSIMD() {
 
 // GetParallelChunkSize returns the ideal chunk size for parallel processing of n elements.
 func GetParallelChunkSize(n int) int {
-	if n < SmallCutoff {
+	if n < SmallCutoff() {
 		return n
 	}
 	chunkSize := (n + cpuNum - 1) / cpuNum
@@ -68,8 +68,6 @@ func HasAVXVNNI() bool { return hasAVXVNNI }
 func HasWasmSIMD() bool { return hasWasmSIMD }
 
 // FmaScalar returns a * b + c.
-//
-//go:inline
 func FmaScalar(a, b, c float64) float64 {
 	if hasFMA {
 		return fmaScalar(a, b, c)
@@ -78,18 +76,12 @@ func FmaScalar(a, b, c float64) float64 {
 }
 
 // SqrtScalar returns the square root of x.
-//
-//go:inline
 func SqrtScalar(x float64) float64 { return sqrtScalar(x) }
 
 // AbsScalar returns the absolute value of x.
-//
-//go:inline
 func AbsScalar(x float64) float64 { return absScalar(x) }
 
 // NegScalar returns the negation of x.
-//
-//go:inline
 func NegScalar(x float64) float64 { return negScalar(x) }
 
 // SIMD computes Exp(x[i]) - Log(y[i]) for each element and stores it in result.
@@ -97,11 +89,20 @@ func SIMD(x, y, result []float64) {
 	if len(x) != len(y) || len(x) != len(result) {
 		panic("slice length mismatch")
 	}
-	if len(x) == 0 {
+	n := len(x)
+	if n == 0 {
 		return
 	}
-	emlSIMD(x, y, result)
+	if n < SmallCutoff() || poolClosed.Load() {
+		emlSIMD(x, y, result)
+		return
+	}
+	ForEachChunk(n, func(start, end int) {
+		emlSIMD(x[start:end], y[start:end], result[start:end])
+	})
 }
+
+
 
 // ExpSIMD returns a new slice containing the exponential of each element in x.
 func ExpSIMD(x []float64) []float64 {
@@ -157,7 +158,14 @@ func SqrtSIMDTo(x, result []float64) {
 }
 
 func sqrtSIMDTo(x, result []float64) {
-	dispatchSqrtSIMDTo(x, result)
+	n := len(x)
+	if n < SmallCutoff() || poolClosed.Load() {
+		dispatchSqrtSIMDTo(x, result)
+		return
+	}
+	ForEachChunk(n, func(start, end int) {
+		dispatchSqrtSIMDTo(x[start:end], result[start:end])
+	})
 }
 
 // SinSIMD returns a new slice containing the sine of each element in x.
@@ -239,42 +247,90 @@ func sincosSIMDTo(x, sin, cos []float64) {
 
 // AddSIMD returns a new slice containing the sum of elements in a and b.
 func AddSIMD(a, b []float64) []float64 {
-	if len(a) != len(b) {
+	result := make([]float64, len(a))
+	AddSIMDTo(a, b, result)
+	return result
+}
+
+// AddSIMDTo computes the sum of elements in a and b and stores it in result.
+func AddSIMDTo(a, b, result []float64) {
+	if len(a) != len(b) || len(a) != len(result) {
 		panic("slice length mismatch")
 	}
-	result := make([]float64, len(a))
-	dispatchAddSIMD(a, b, result)
-	return result
+	n := len(a)
+	if n < SmallCutoff() || poolClosed.Load() {
+		dispatchAddSIMD(a, b, result)
+		return
+	}
+	ForEachChunk(n, func(start, end int) {
+		dispatchAddSIMD(a[start:end], b[start:end], result[start:end])
+	})
 }
 
 // SubSIMD returns a new slice containing the difference of elements in a and b.
 func SubSIMD(a, b []float64) []float64 {
-	if len(a) != len(b) {
+	result := make([]float64, len(a))
+	SubSIMDTo(a, b, result)
+	return result
+}
+
+// SubSIMDTo computes the difference of elements in a and b and stores it in result.
+func SubSIMDTo(a, b, result []float64) {
+	if len(a) != len(b) || len(a) != len(result) {
 		panic("slice length mismatch")
 	}
-	result := make([]float64, len(a))
-	dispatchSubSIMD(a, b, result)
-	return result
+	n := len(a)
+	if n < SmallCutoff() || poolClosed.Load() {
+		dispatchSubSIMD(a, b, result)
+		return
+	}
+	ForEachChunk(n, func(start, end int) {
+		dispatchSubSIMD(a[start:end], b[start:end], result[start:end])
+	})
 }
 
 // MulSIMD returns a new slice containing the product of elements in a and b.
 func MulSIMD(a, b []float64) []float64 {
-	if len(a) != len(b) {
+	result := make([]float64, len(a))
+	MulSIMDTo(a, b, result)
+	return result
+}
+
+// MulSIMDTo computes the product of elements in a and b and stores it in result.
+func MulSIMDTo(a, b, result []float64) {
+	if len(a) != len(b) || len(a) != len(result) {
 		panic("slice length mismatch")
 	}
-	result := make([]float64, len(a))
-	dispatchMulSIMD(a, b, result)
-	return result
+	n := len(a)
+	if n < SmallCutoff() || poolClosed.Load() {
+		dispatchMulSIMD(a, b, result)
+		return
+	}
+	ForEachChunk(n, func(start, end int) {
+		dispatchMulSIMD(a[start:end], b[start:end], result[start:end])
+	})
 }
 
 // DivSIMD returns a new slice containing the quotient of elements in a and b.
 func DivSIMD(a, b []float64) []float64 {
-	if len(a) != len(b) {
+	result := make([]float64, len(a))
+	DivSIMDTo(a, b, result)
+	return result
+}
+
+// DivSIMDTo computes the quotient of elements in a and b and stores it in result.
+func DivSIMDTo(a, b, result []float64) {
+	if len(a) != len(b) || len(a) != len(result) {
 		panic("slice length mismatch")
 	}
-	result := make([]float64, len(a))
-	dispatchDivSIMD(a, b, result)
-	return result
+	n := len(a)
+	if n < SmallCutoff() || poolClosed.Load() {
+		dispatchDivSIMD(a, b, result)
+		return
+	}
+	ForEachChunk(n, func(start, end int) {
+		dispatchDivSIMD(a[start:end], b[start:end], result[start:end])
+	})
 }
 
 // AbsSIMD returns a new slice containing the absolute value of each element in x.
@@ -293,7 +349,14 @@ func AbsSIMDTo(x, result []float64) {
 }
 
 func absSIMD(x, result []float64) {
-	dispatchAbsSIMD(x, result)
+	n := len(x)
+	if n < SmallCutoff() || poolClosed.Load() {
+		dispatchAbsSIMD(x, result)
+		return
+	}
+	ForEachChunk(n, func(start, end int) {
+		dispatchAbsSIMD(x[start:end], result[start:end])
+	})
 }
 
 // NegSIMD returns a new slice containing the negation of each element in x.
@@ -312,7 +375,14 @@ func NegSIMDTo(x, result []float64) {
 }
 
 func negSIMD(x, result []float64) {
-	dispatchNegSIMD(x, result)
+	n := len(x)
+	if n < SmallCutoff() || poolClosed.Load() {
+		dispatchNegSIMD(x, result)
+		return
+	}
+	ForEachChunk(n, func(start, end int) {
+		dispatchNegSIMD(x[start:end], result[start:end])
+	})
 }
 
 // InvSIMD returns a new slice containing the inverse of each element in x.
@@ -331,8 +401,16 @@ func InvSIMDTo(x, result []float64) {
 }
 
 func invSIMD(x, result []float64) {
-	dispatchInvSIMD(x, result)
+	n := len(x)
+	if n < SmallCutoff() || poolClosed.Load() {
+		dispatchInvSIMD(x, result)
+		return
+	}
+	ForEachChunk(n, func(start, end int) {
+		dispatchInvSIMD(x[start:end], result[start:end])
+	})
 }
+
 
 // SinhBatch returns a new slice containing the hyperbolic sine of each element in x.
 func SinhBatch(x []float64) []float64 {
@@ -403,15 +481,19 @@ const (
 var jobQueue chan parallelJob
 
 var (
+	poolMu     sync.Mutex
 	stopOnce   sync.Once
 	poolClosed atomic.Bool
+	workersWg  sync.WaitGroup
 )
 
 func initWorkerPool() {
 	numWorkers := max(1, cpuNum)
-	jobQueue = make(chan parallelJob, numWorkers*8)
+	q := make(chan parallelJob, numWorkers*8)
+	jobQueue = q
 	for i := 0; i < numWorkers; i++ {
-		go workerPoolWorker()
+		workersWg.Add(1)
+		go workerPoolWorker(q)
 	}
 }
 
@@ -422,11 +504,20 @@ func StopWorkerPool() {
 	stopOnce.Do(func() {
 		poolClosed.Store(true)
 		close(jobQueue)
+		workersWg.Wait()
 	})
 }
 
-func workerPoolWorker() {
-	for job := range jobQueue {
+func restartWorkerPool() {
+	workersWg.Wait()
+	stopOnce = sync.Once{}
+	poolClosed.Store(false)
+	initWorkerPool()
+}
+
+func workerPoolWorker(q <-chan parallelJob) {
+	defer workersWg.Done()
+	for job := range q {
 		switch {
 		case job.chunkFn != nil:
 			job.chunkFn(job.start, job.end)
@@ -481,7 +572,7 @@ func parallelizeGeneric(x, result []float64, fn func(float64) float64) {
 		return
 	}
 
-	if n < SmallCutoff || poolClosed.Load() {
+	if n < SmallCutoff() || poolClosed.Load() {
 		for j := 0; j < n; j++ {
 			result[j] = fn(x[j])
 		}
@@ -514,7 +605,7 @@ func parallelizeSinCos(x, sin, cos []float64) {
 		return
 	}
 
-	if n < SmallCutoff || poolClosed.Load() {
+	if n < SmallCutoff() || poolClosed.Load() {
 		for j := 0; j < n; j++ {
 			sin[j], cos[j] = Sincos(x[j])
 		}
@@ -548,7 +639,7 @@ func parallelizeFused(a, b, result []float64, fusedOp int) {
 		return
 	}
 
-	if n < SmallCutoff || poolClosed.Load() {
+	if n < SmallCutoff() || poolClosed.Load() {
 		applyFusedOp(parallelJob{a: a, b: b, result: result, fusedOp: fusedOp, start: 0, end: n})
 		return
 	}
@@ -575,14 +666,14 @@ func parallelizeFused(a, b, result []float64, fusedOp int) {
 }
 
 // ForEachChunk distributes work over [0, n) across the shared worker pool in chunks.
-// For small n (n < SmallCutoff) or when the worker pool is stopped, fn is executed
+// For small n (n < SmallCutoff()) or when the worker pool is stopped, fn is executed
 // synchronously on the caller goroutine.
 func ForEachChunk(n int, fn func(start, end int)) {
 	if n <= 0 {
 		return
 	}
 
-	if n < SmallCutoff || poolClosed.Load() {
+	if n < SmallCutoff() || poolClosed.Load() {
 		fn(0, n)
 		return
 	}
@@ -623,7 +714,43 @@ const SmallWorkloadFactor = 512
 // almost entirely scheduling overhead. It is now derived from the core count so
 // that a many-core machine needs proportionally more elements before fanning
 // out pays, and a single-core machine never fans out at all.
-var SmallCutoff = SmallWorkloadFactor * runtime.NumCPU()
+var smallCutoffVal atomic.Int64
+
+func init() {
+	smallCutoffVal.Store(int64(SmallWorkloadFactor * runtime.NumCPU()))
+}
+
+// SmallCutoff returns the threshold below which operations are performed
+// sequentially rather than fanned out to the worker pool.
+func SmallCutoff() int {
+	return int(smallCutoffVal.Load())
+}
+
+// SetSmallCutoff reconfigures the parallel cutoff threshold in elements.
+// If n <= 0, it resets to the default derived from runtime.NumCPU().
+func SetSmallCutoff(n int) {
+	if n <= 0 {
+		n = SmallWorkloadFactor * runtime.NumCPU()
+	}
+	smallCutoffVal.Store(int64(n))
+}
+
+// Parallelism returns the number of worker goroutines currently configured.
+func Parallelism() int {
+	return cpuNum
+}
+
+// SetParallelism reconfigures the worker pool size. If workers <= 0, resets to runtime.NumCPU().
+func SetParallelism(workers int) {
+	poolMu.Lock()
+	defer poolMu.Unlock()
+	if workers <= 0 {
+		workers = runtime.NumCPU()
+	}
+	StopWorkerPool()
+	cpuNum = workers
+	restartWorkerPool()
+}
 
 // LargeCutoff is the maximum chunk size for parallel operations.
 const LargeCutoff = 4096
@@ -661,7 +788,14 @@ func AddScalarSIMDTo(a []float64, b float64, result []float64) {
 	if len(a) != len(result) {
 		panic("slice length mismatch")
 	}
-	dispatchAddScalarSIMD(a, b, result)
+	n := len(a)
+	if n < SmallCutoff() || poolClosed.Load() {
+		dispatchAddScalarSIMD(a, b, result)
+		return
+	}
+	ForEachChunk(n, func(start, end int) {
+		dispatchAddScalarSIMD(a[start:end], b, result[start:end])
+	})
 }
 
 // MulScalarSIMD returns a new slice containing each element in a multiplied by b.
@@ -676,8 +810,16 @@ func MulScalarSIMDTo(a []float64, b float64, result []float64) {
 	if len(a) != len(result) {
 		panic("slice length mismatch")
 	}
-	dispatchMulScalarSIMD(a, b, result)
+	n := len(a)
+	if n < SmallCutoff() || poolClosed.Load() {
+		dispatchMulScalarSIMD(a, b, result)
+		return
+	}
+	ForEachChunk(n, func(start, end int) {
+		dispatchMulScalarSIMD(a[start:end], b, result[start:end])
+	})
 }
+
 
 // AddSatInt8SIMDTo computes saturating addition of int8 slices element-wise into result.
 func AddSatInt8SIMDTo(a, b, result []int8) {
@@ -694,6 +836,3 @@ func SubSatInt8SIMDTo(a, b, result []int8) {
 	}
 	dispatchSubSatInt8SIMD(a, b, result)
 }
-
-// L1TileSize is the suggested tile size for L1 cache optimizations.
-const L1TileSize = 32768

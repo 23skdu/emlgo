@@ -13,6 +13,14 @@ TEXT ·cpuid(SB), NOSPLIT, $0-24
 	MOVL DX, edx+20(FP)
 	RET
 
+// func xgetbv(cx uint32) (eax, edx uint32)
+TEXT ·xgetbv(SB), NOSPLIT, $0-16
+	MOVL cx+0(FP), CX
+	BYTE $0x0F; BYTE $0x01; BYTE $0xD0 // XGETBV
+	MOVL AX, eax+8(FP)
+	MOVL DX, edx+12(FP)
+	RET
+
 // func addAVX2(a, b, result []float64)
 TEXT ·addAVX2(SB), NOSPLIT, $0-72
 	MOVQ a_base+0(FP), SI
@@ -170,6 +178,7 @@ loop_add512:
     DECQ CX
     JNZ loop_add512
 done_add512:
+    VZEROUPPER
     RET
 
 // func subAVX512(a, b, result []float64)
@@ -191,6 +200,7 @@ loop_sub512:
     DECQ CX
     JNZ loop_sub512
 done_sub512:
+    VZEROUPPER
     RET
 
 // func mulAVX512(a, b, result []float64)
@@ -212,6 +222,7 @@ loop_mul512:
     DECQ CX
     JNZ loop_mul512
 done_mul512:
+    VZEROUPPER
     RET
 
 // func divAVX512(a, b, result []float64)
@@ -233,6 +244,7 @@ loop_div512:
     DECQ CX
     JNZ loop_div512
 done_div512:
+    VZEROUPPER
     RET
 
 // func addScalarAVX512(a []float64, b float64, result []float64)
@@ -253,6 +265,7 @@ loop_add_scalar512:
     DECQ CX
     JNZ loop_add_scalar512
 done_add_scalar512:
+    VZEROUPPER
     RET
 
 // func mulScalarAVX512(a []float64, b float64, result []float64)
@@ -273,6 +286,7 @@ loop_mul_scalar512:
     DECQ CX
     JNZ loop_mul_scalar512
 done_mul_scalar512:
+    VZEROUPPER
     RET
 
 // func sqrtAVX2(a, result []float64)
@@ -308,6 +322,7 @@ loop_sqrt512:
     DECQ CX
     JNZ loop_sqrt512
 done_sqrt512:
+    VZEROUPPER
     RET
 
 // func sqrtScalar(x float64) float64
@@ -400,6 +415,7 @@ loop_fma512:
 	JNZ loop_fma512
 
 done_fma512:
+	VZEROUPPER
 	RET
 
 // func absAVX2(a, result []float64)
@@ -487,6 +503,7 @@ loop_abs512:
     DECQ CX
     JNZ loop_abs512
 done_abs512:
+    VZEROUPPER
     RET
 
 // func negAVX512(a, result []float64)
@@ -508,6 +525,7 @@ loop_neg512:
     DECQ CX
     JNZ loop_neg512
 done_neg512:
+    VZEROUPPER
     RET
 
 // func invAVX512(a, result []float64)
@@ -529,6 +547,7 @@ loop_inv512:
     DECQ CX
     JNZ loop_inv512
 done_inv512:
+    VZEROUPPER
     RET
 
 DATA add_1023_val<>+0(SB)/4, $1023

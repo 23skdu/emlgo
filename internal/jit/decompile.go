@@ -42,7 +42,11 @@ func emlPrec(n *EMLNode) int {
 }
 
 func wrapDecomp(n *EMLNode, parentOp string, left bool) string {
-	s := Decompile(n)
+	return wrapDecompDepth(n, parentOp, left, 0)
+}
+
+func wrapDecompDepth(n *EMLNode, parentOp string, left bool, depth int) string {
+	s := decompileDepth(n, depth)
 	if n == nil {
 		return s
 	}
@@ -77,7 +81,11 @@ func wrapDecomp(n *EMLNode, parentOp string, left bool) string {
 
 // Decompile converts an EMLNode tree to a parenthesized infix string with correct operator precedence.
 func Decompile(n *EMLNode) string {
-	if n == nil {
+	return decompileDepth(n, 0)
+}
+
+func decompileDepth(n *EMLNode, depth int) string {
+	if n == nil || depth > MaxASTDepth {
 		return ""
 	}
 	switch n.Kind {
@@ -89,38 +97,38 @@ func Decompile(n *EMLNode) string {
 		}
 		return "x"
 	case EMLOp:
-		left := Decompile(n.Left)
-		right := Decompile(n.Right)
+		left := decompileDepth(n.Left, depth+1)
+		right := decompileDepth(n.Right, depth+1)
 		return fmt.Sprintf("eml(%s, %s)", left, right)
 	case EMLFunc:
 		switch n.Name {
 		case "exp":
-			return fmt.Sprintf("exp(%s)", Decompile(n.Left))
+			return fmt.Sprintf("exp(%s)", decompileDepth(n.Left, depth+1))
 		case "log":
-			return fmt.Sprintf("log(%s)", Decompile(n.Left))
+			return fmt.Sprintf("log(%s)", decompileDepth(n.Left, depth+1))
 		case "sin":
-			return fmt.Sprintf("sin(%s)", Decompile(n.Left))
+			return fmt.Sprintf("sin(%s)", decompileDepth(n.Left, depth+1))
 		case "cos":
-			return fmt.Sprintf("cos(%s)", Decompile(n.Left))
+			return fmt.Sprintf("cos(%s)", decompileDepth(n.Left, depth+1))
 		case "sqrt":
-			return fmt.Sprintf("sqrt(%s)", Decompile(n.Left))
+			return fmt.Sprintf("sqrt(%s)", decompileDepth(n.Left, depth+1))
 		case "neg":
 			if emlPrec(n.Left) <= 2 {
-				return fmt.Sprintf("-(%s)", Decompile(n.Left))
+				return fmt.Sprintf("-(%s)", decompileDepth(n.Left, depth+1))
 			}
-			return fmt.Sprintf("-%s", wrapDecomp(n.Left, "neg", true))
+			return fmt.Sprintf("-%s", wrapDecompDepth(n.Left, "neg", true, depth+1))
 		case "add":
-			return fmt.Sprintf("%s + %s", wrapDecomp(n.Left, "add", true), wrapDecomp(n.Right, "add", false))
+			return fmt.Sprintf("%s + %s", wrapDecompDepth(n.Left, "add", true, depth+1), wrapDecompDepth(n.Right, "add", false, depth+1))
 		case "sub":
-			return fmt.Sprintf("%s - %s", wrapDecomp(n.Left, "sub", true), wrapDecomp(n.Right, "sub", false))
+			return fmt.Sprintf("%s - %s", wrapDecompDepth(n.Left, "sub", true, depth+1), wrapDecompDepth(n.Right, "sub", false, depth+1))
 		case "mul":
-			return fmt.Sprintf("%s * %s", wrapDecomp(n.Left, "mul", true), wrapDecomp(n.Right, "mul", false))
+			return fmt.Sprintf("%s * %s", wrapDecompDepth(n.Left, "mul", true, depth+1), wrapDecompDepth(n.Right, "mul", false, depth+1))
 		case "div":
-			return fmt.Sprintf("%s / %s", wrapDecomp(n.Left, "div", true), wrapDecomp(n.Right, "div", false))
+			return fmt.Sprintf("%s / %s", wrapDecompDepth(n.Left, "div", true, depth+1), wrapDecompDepth(n.Right, "div", false, depth+1))
 		case "pow":
-			return fmt.Sprintf("%s^%s", wrapDecomp(n.Left, "pow", true), wrapDecomp(n.Right, "pow", false))
+			return fmt.Sprintf("%s^%s", wrapDecompDepth(n.Left, "pow", true, depth+1), wrapDecompDepth(n.Right, "pow", false, depth+1))
 		default:
-			return fmt.Sprintf("%s(%s)", n.Name, Decompile(n.Left))
+			return fmt.Sprintf("%s(%s)", n.Name, decompileDepth(n.Left, depth+1))
 		}
 	}
 	return ""
@@ -128,7 +136,11 @@ func Decompile(n *EMLNode) string {
 
 // DecompileLaTeX converts an EMLNode tree to LaTeX math mode output.
 func DecompileLaTeX(n *EMLNode) string {
-	if n == nil {
+	return decompileLaTeXDepth(n, 0)
+}
+
+func decompileLaTeXDepth(n *EMLNode, depth int) string {
+	if n == nil || depth > MaxASTDepth {
 		return ""
 	}
 	switch n.Kind {
@@ -140,11 +152,11 @@ func DecompileLaTeX(n *EMLNode) string {
 		}
 		return "x"
 	case EMLOp:
-		left := DecompileLaTeX(n.Left)
-		right := DecompileLaTeX(n.Right)
+		left := decompileLaTeXDepth(n.Left, depth+1)
+		right := decompileLaTeXDepth(n.Right, depth+1)
 		return fmt.Sprintf("\\operatorname{eml}(%s, %s)", left, right)
 	case EMLFunc:
-		arg := DecompileLaTeX(n.Left)
+		arg := decompileLaTeXDepth(n.Left, depth+1)
 		switch n.Name {
 		case "exp":
 			return fmt.Sprintf("e^{%s}", wrapLatexNode(n.Left, arg))
@@ -161,20 +173,20 @@ func DecompileLaTeX(n *EMLNode) string {
 		case "neg":
 			return fmt.Sprintf("-%s", wrapLatexNode(n.Left, arg))
 		case "add":
-			rightArg := DecompileLaTeX(n.Right)
+			rightArg := decompileLaTeXDepth(n.Right, depth+1)
 			return fmt.Sprintf("%s + %s", arg, rightArg)
 		case "sub":
-			rightArg := DecompileLaTeX(n.Right)
+			rightArg := decompileLaTeXDepth(n.Right, depth+1)
 			return fmt.Sprintf("%s - %s", arg, rightArg)
 		case "mul":
-			rightArg := DecompileLaTeX(n.Right)
+			rightArg := decompileLaTeXDepth(n.Right, depth+1)
 			return fmt.Sprintf("%s \\cdot %s", wrapLatexNode(n.Left, arg), wrapLatexNode(n.Right, rightArg))
 		case "div":
-			rightArg := DecompileLaTeX(n.Right)
+			rightArg := decompileLaTeXDepth(n.Right, depth+1)
 			return fmt.Sprintf("\\frac{%s}{%s}", arg, rightArg)
 		case "pow":
-			rightArg := DecompileLaTeX(n.Right)
-			return fmt.Sprintf("%s^{%s}", wrapLatexPow(n.Left), rightArg)
+			rightArg := decompileLaTeXDepth(n.Right, depth+1)
+			return fmt.Sprintf("%s^{%s}", wrapLatexPowDepth(n.Left, depth+1), rightArg)
 		default:
 			return fmt.Sprintf("\\operatorname{%s}(%s)", n.Name, arg)
 		}
@@ -206,7 +218,11 @@ func wrapLatexNode(n *EMLNode, s string) string {
 }
 
 func wrapLatexPow(n *EMLNode) string {
-	s := DecompileLaTeX(n)
+	return wrapLatexPowDepth(n, 0)
+}
+
+func wrapLatexPowDepth(n *EMLNode, depth int) string {
+	s := decompileLaTeXDepth(n, depth)
 	if n != nil && (n.Kind == EMLOp || (n.Kind == EMLFunc && emlPrec(n) < 5)) {
 		return "(" + s + ")"
 	}
@@ -226,7 +242,11 @@ func DecompileNodeToExpr(n *EMLNode) string {
 }
 
 func emlNodeToJITNode(n *EMLNode) Node {
-	if n == nil {
+	return emlNodeToJITNodeDepth(n, 0)
+}
+
+func emlNodeToJITNodeDepth(n *EMLNode, depth int) Node {
+	if n == nil || depth > MaxASTDepth {
 		return nil
 	}
 	switch n.Kind {
@@ -235,26 +255,26 @@ func emlNodeToJITNode(n *EMLNode) Node {
 	case EMLVar:
 		return Variable{Name: "x"}
 	case EMLOp:
-		left := emlNodeToJITNode(n.Left)
-		right := emlNodeToJITNode(n.Right)
+		left := emlNodeToJITNodeDepth(n.Left, depth+1)
+		right := emlNodeToJITNodeDepth(n.Right, depth+1)
 		return BinaryOp{
 			Left:  FunctionCall{Name: "exp", Arg: left},
 			Op:    '-',
 			Right: FunctionCall{Name: "log", Arg: right},
 		}
 	case EMLFunc:
-		arg := emlNodeToJITNode(n.Left)
+		arg := emlNodeToJITNodeDepth(n.Left, depth+1)
 		switch n.Name {
 		case "add":
-			return BinaryOp{Left: arg, Op: '+', Right: emlNodeToJITNode(n.Right)}
+			return BinaryOp{Left: arg, Op: '+', Right: emlNodeToJITNodeDepth(n.Right, depth+1)}
 		case "sub":
-			return BinaryOp{Left: arg, Op: '-', Right: emlNodeToJITNode(n.Right)}
+			return BinaryOp{Left: arg, Op: '-', Right: emlNodeToJITNodeDepth(n.Right, depth+1)}
 		case "mul":
-			return BinaryOp{Left: arg, Op: '*', Right: emlNodeToJITNode(n.Right)}
+			return BinaryOp{Left: arg, Op: '*', Right: emlNodeToJITNodeDepth(n.Right, depth+1)}
 		case "div":
-			return BinaryOp{Left: arg, Op: '/', Right: emlNodeToJITNode(n.Right)}
+			return BinaryOp{Left: arg, Op: '/', Right: emlNodeToJITNodeDepth(n.Right, depth+1)}
 		case "pow":
-			return BinaryOp{Left: arg, Op: '^', Right: emlNodeToJITNode(n.Right)}
+			return BinaryOp{Left: arg, Op: '^', Right: emlNodeToJITNodeDepth(n.Right, depth+1)}
 		case "neg":
 			return UnaryOp{Op: '-', Operand: arg}
 		default:

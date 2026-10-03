@@ -6,6 +6,7 @@ package eml
 import _ "unsafe"
 
 func cpuid(op, op2 uint32) (eax, ebx, ecx, edx uint32)
+func xgetbv(cx uint32) (eax, edx uint32)
 
 func addAVX2(a, b, result []float64)
 func subAVX2(a, b, result []float64)
@@ -55,13 +56,24 @@ func absScalar(x float64) float64
 func detectAMD64SIMD() {
 	_, _, ecx, _ := cpuid(1, 0)
 	hasSSE4 = (ecx & (1 << 19)) != 0
-	hasFMA = (ecx & (1 << 12)) != 0
+
+	hasOSXSAVE := (ecx & (1 << 27)) != 0
+	var osAVX, osAVX512 bool
+	if hasOSXSAVE {
+		eaxX, edxX := xgetbv(0)
+		xcr0 := uint64(eaxX) | (uint64(edxX) << 32)
+		osAVX = (xcr0 & 0x6) == 0x6
+		osAVX512 = (xcr0 & 0xe6) == 0xe6
+	}
+
+	hasFMA = (ecx&(1<<12)) != 0 && osAVX
 
 	_, ebx, _, _ := cpuid(7, 0)
-	hasAVX2 = (ebx & (1 << 5)) != 0
-	hasAVX512 = (ebx & (1 << 16)) != 0
+	hasAVX2 = (ebx&(1<<5)) != 0 && osAVX
+	hasAVX512 = (ebx&(1<<16)) != 0 && osAVX512
 
 	// CPUID.7.1:EAX
 	eax71, _, _, _ := cpuid(7, 1)
-	hasAVXVNNI = (eax71 & (1 << 4)) != 0
+	hasAVXVNNI = (eax71&(1<<4)) != 0 && osAVX
 }
+

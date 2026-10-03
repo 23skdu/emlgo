@@ -75,7 +75,7 @@ func TestSimdF32Coverage(t *testing.T) {
 	_ = TanSIMDF32(a)
 
 	// Test parallelizeGenericF32 with large slice >= SmallCutoff
-	large := make([]float32, SmallCutoff+100)
+	large := make([]float32, SmallCutoff()+100)
 	for i := range large {
 		large[i] = float32(i%10) + 1.0
 	}

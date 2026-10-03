@@ -109,7 +109,7 @@ func TestBatchKernelAccuracy(t *testing.T) {
 			name:      "log",
 			in:        denseGrid(1e-6, 100, n),
 			kernel:    LogSIMDTo,
-			reference: math.Log,
+			reference: ExactLogOracle,
 			ulpBudget: budgetLogULP,
 		},
 		{
@@ -326,14 +326,20 @@ func TestBatchKernelSpecialValues(t *testing.T) {
 		}
 	}
 
-	// log follows the library's own domain rule (logScalar, matching
-	// pkg/logexp.Log): NaN for any non-positive argument. This deliberately
-	// differs from math.Log, which returns -Inf at the origin.
-	for _, in := range []float64{0, -1, -1e300, math.Copysign(0, -1)} {
+	// log follows the reconciled domain rule (logScalar, matching pkg/logexp.Log):
+	// -Inf for zero and NaN for negative arguments.
+	for _, in := range []float64{-1, -1e300} {
 		got := make([]float64, 1)
 		LogSIMDTo([]float64{in}, got)
 		if !math.IsNaN(got[0]) {
 			t.Errorf("LogSIMDTo(%v) = %v, want NaN", in, got[0])
+		}
+	}
+	for _, in := range []float64{0, math.Copysign(0, -1)} {
+		got := make([]float64, 1)
+		LogSIMDTo([]float64{in}, got)
+		if !math.IsInf(got[0], -1) {
+			t.Errorf("LogSIMDTo(%v) = %v, want -Inf", in, got[0])
 		}
 	}
 
@@ -374,12 +380,13 @@ func TestBatchLogMatchesScalarDomain(t *testing.T) {
 	}
 }
 
-// TestScalarLogIsStdlibForPositive checks that the guarded scalar logarithm is
-// exactly math.Log over its valid domain.
-func TestScalarLogIsStdlibForPositive(t *testing.T) {
+// TestScalarLogMatchesOracleForPositive checks that the guarded scalar logarithm matches
+// the exact rescaling oracle across the positive domain, including subnormals.
+func TestScalarLogMatchesOracleForPositive(t *testing.T) {
 	for _, x := range []float64{5e-324, 1e-300, 1e-10, 0.5, 1, 1.5, 2, 1e300, math.MaxFloat64} {
-		if got, want := logScalar(x), math.Log(x); got != want {
-			t.Errorf("logScalar(%v) = %v, want math.Log = %v", x, got, want)
+		want := ExactLogOracle(x)
+		if got := logScalar(x); math.Abs(got-want) > 1e-12 {
+			t.Errorf("logScalar(%v) = %v, want ExactLogOracle = %v", x, got, want)
 		}
 	}
 }

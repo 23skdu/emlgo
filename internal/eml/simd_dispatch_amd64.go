@@ -21,7 +21,7 @@ func amd64AddSIMD(a, b, result []float64) {
 		}
 		return
 	}
-	for i := range result {
+	for i := 0; i < n; i++ {
 		result[i] = a[i] + b[i]
 	}
 }
@@ -44,7 +44,7 @@ func amd64SubSIMD(a, b, result []float64) {
 		}
 		return
 	}
-	for i := range result {
+	for i := 0; i < n; i++ {
 		result[i] = a[i] - b[i]
 	}
 }
@@ -67,7 +67,7 @@ func amd64MulSIMD(a, b, result []float64) {
 		}
 		return
 	}
-	for i := range result {
+	for i := 0; i < n; i++ {
 		result[i] = a[i] * b[i]
 	}
 }
@@ -90,7 +90,7 @@ func amd64DivSIMD(a, b, result []float64) {
 		}
 		return
 	}
-	for i := range result {
+	for i := 0; i < n; i++ {
 		result[i] = a[i] / b[i]
 	}
 }
