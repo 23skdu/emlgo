@@ -6,6 +6,7 @@ package jit
 import (
 	"fmt"
 	"math"
+	"math/rand"
 	"testing"
 )
 
@@ -284,6 +285,139 @@ func TestJITHyperbolicAndSpecial(t *testing.T) {
 			if math.Abs(got-want) > 1e-12 {
 				t.Errorf("%s(%v): got %v, want %v", fn.name, x, got, want)
 			}
+		}
+	}
+}
+
+func generateRandomExpr(rng *rand.Rand, depth int) string {
+	if depth <= 0 || (depth < 6 && rng.Float64() < 0.25) {
+		if rng.Float64() < 0.5 {
+			return "x"
+		}
+		return fmt.Sprintf("%.3f", rng.Float64()*4.0-2.0)
+	}
+	r := rng.Intn(3)
+	switch r {
+	case 0:
+		return fmt.Sprintf("(-%s)", generateRandomExpr(rng, depth-1))
+	case 1:
+		fnNames := []string{"sin", "cos", "tan", "exp", "log", "sqrt", "sinh", "cosh", "tanh", "asinh", "erf", "log2"}
+		fn := fnNames[rng.Intn(len(fnNames))]
+		return fmt.Sprintf("%s(%s)", fn, generateRandomExpr(rng, depth-1))
+	default:
+		ops := []byte{'+', '-', '*'}
+		op := ops[rng.Intn(len(ops))]
+		return fmt.Sprintf("(%s %c %s)", generateRandomExpr(rng, depth-1), op, generateRandomExpr(rng, depth-1))
+	}
+}
+
+func matchValues(a, b float64) bool {
+	if math.IsNaN(a) && math.IsNaN(b) {
+		return true
+	}
+	if math.IsInf(a, 1) && math.IsInf(b, 1) {
+		return true
+	}
+	if math.IsInf(a, -1) && math.IsInf(b, -1) {
+		return true
+	}
+	diff := math.Abs(a - b)
+	if diff <= 1e-9 {
+		return true
+	}
+	rel := diff / (math.Abs(b) + 1e-9)
+	return rel <= 1e-7
+}
+
+func TestJITDifferentialStep11(t *testing.T) {
+	rng := rand.New(rand.NewSource(42))
+	compiler := NewCompiler()
+	mismatches := 0
+	total := 3000
+
+	testPoints := []float64{0.05, 0.5, 1.4}
+
+	for i := 0; i < total; i++ {
+		depth := 3 + rng.Intn(6) // depth 3 to 8
+		expr := generateRandomExpr(rng, depth)
+		ast, err := Parse(expr)
+		if err != nil {
+			continue
+		}
+		fn, err := compiler.Compile(expr)
+		if err != nil {
+			// Some deep expressions may exceed register limits or be invalid
+			continue
+		}
+
+		for _, x := range testPoints {
+			got := fn(x)
+			want := Eval(ast, x)
+			if !matchValues(got, want) {
+				mismatches++
+				if mismatches <= 5 {
+					t.Logf("Mismatch in %s @ x=%v: jit=%v, interp=%v", expr, x, got, want)
+				}
+				break
+			}
+		}
+	}
+
+	if mismatches > 0 {
+		t.Fatalf("JIT differential: %d/%d expressions MISMATCH", mismatches, total)
+	}
+	t.Logf("JIT differential: 0/%d expressions MISMATCH (100%% agreement)", total)
+}
+
+func FuzzJITDifferential(f *testing.F) {
+	f.Add("x + 1", 0.5)
+	f.Add("sin(x) * cos(x)", 1.2)
+	f.Add("1+(2+(3+(4+(sin(x)))))", 0.7)
+	f.Add("exp(x) - log(x + 2)", 0.3)
+	f.Add("sinh(x) / (cosh(x) + 1)", 0.8)
+
+	compiler := NewCompiler()
+	f.Fuzz(func(t *testing.T, expr string, x float64) {
+		if math.IsNaN(x) || math.IsInf(x, 0) {
+			return
+		}
+		ast, err := Parse(expr)
+		if err != nil {
+			return
+		}
+		fn, err := compiler.Compile(expr)
+		if err != nil {
+			return
+		}
+		got := fn(x)
+		want := Eval(ast, x)
+		if !matchValues(got, want) {
+			t.Errorf("expr=%s, x=%v: jit=%v, interp=%v", expr, x, got, want)
+		}
+	})
+}
+
+func TestJITPowerDeepNesting(t *testing.T) {
+	c := NewCompiler()
+	x := -5341.967999999999
+	for _, expr := range []string{
+		"2^x",
+		"2^(2^x)",
+		"2^(2^(2^x))",
+		"2^(2^(2^(2^x)))",
+	} {
+		ast, err := Parse(expr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		fn, err := c.Compile(expr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := fn(x)
+		want := Eval(ast, x)
+		if !matchValues(got, want) {
+			t.Errorf("expr %s: got=%v, want=%v", expr, got, want)
 		}
 	}
 }

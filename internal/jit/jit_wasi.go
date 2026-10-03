@@ -13,3 +13,8 @@ import (
 func AllocateExecutableMemory(code []byte) (unsafe.Pointer, error) {
 	return nil, fmt.Errorf("executable memory allocation is not supported on WASI")
 }
+
+// FreeExecutableMemory is a no-op on WASI.
+func FreeExecutableMemory(ptr unsafe.Pointer, size int) error {
+	return nil
+}

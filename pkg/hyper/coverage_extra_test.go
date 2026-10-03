@@ -29,4 +29,13 @@ func TestLargeHyperBatchForCoverage(t *testing.T) {
 	t.Run("AtanhBatch_Large", func(t *testing.T) {
 		AtanhBatch(data)
 	})
+
+	t.Run("ScalarEdgeCases", func(t *testing.T) {
+		_ = Cosh(25.0)
+		_ = Cosh(-25.0)
+		_ = Tanh(0.1)
+		_ = Tanh(-0.1)
+		_ = Atanh(1e-9)
+		_ = Atanh(-1e-9)
+	})
 }

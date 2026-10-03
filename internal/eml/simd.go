@@ -408,10 +408,7 @@ var (
 )
 
 func initWorkerPool() {
-	numWorkers := cpuNum
-	if numWorkers < 1 {
-		numWorkers = 1
-	}
+	numWorkers := max(1, cpuNum)
 	jobQueue = make(chan parallelJob, numWorkers*8)
 	for i := 0; i < numWorkers; i++ {
 		go workerPoolWorker()

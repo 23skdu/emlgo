@@ -47,10 +47,16 @@ func TestULPDiff(t *testing.T) {
 		{"zero vs zero", 0, 0, 0},
 		{"one ulp", 1.0, math.Nextafter(1.0, 2), 1},
 		{"two ulp", 1.0, math.Nextafter(math.Nextafter(1.0, 2), 2), 2},
-		{"nan either", math.NaN(), 1, 0},
+		{"nan either", math.NaN(), 1, math.MaxUint64},
+		{"either nan", 1, math.NaN(), math.MaxUint64},
 		{"both nan", math.NaN(), math.NaN(), 0},
-		{"inf either", math.Inf(1), 1, 0},
+		{"inf either", math.Inf(1), 1, math.MaxUint64},
+		{"either inf", 1, math.Inf(1), math.MaxUint64},
 		{"both inf", math.Inf(1), math.Inf(1), 0},
+		{"both neg inf", math.Inf(-1), math.Inf(-1), 0},
+		{"mismatched inf", math.Inf(1), math.Inf(-1), math.MaxUint64},
+		{"neg inf either", math.Inf(-1), 1, math.MaxUint64},
+		{"opposite sign", 1.0, -1.0, (math.Float64bits(1.0) & 0x7fffffffffffffff) + (math.Float64bits(-1.0) & 0x7fffffffffffffff)},
 	}
 	for _, tc := range tests {
 		if got := ulpDiff(tc.a, tc.b); got != tc.want {
@@ -250,7 +256,7 @@ func TestClassifyRegressions(t *testing.T) {
 		},
 		{
 			name:        "regression above threshold",
-			results:     []BenchmarkResult{{Type: "float64", Name: "Exp", Ratio: 1.30}},
+			results:     []BenchmarkResult{{Type: "float64", Name: "Exp", Ratio: 1.50}},
 			wantRegress: 1,
 			wantImprove: 0,
 		},
@@ -263,7 +269,7 @@ func TestClassifyRegressions(t *testing.T) {
 		{
 			name: "mixed",
 			results: []BenchmarkResult{
-				{Type: "float64", Name: "Exp", Ratio: 1.30},
+				{Type: "float64", Name: "Exp", Ratio: 1.50},
 				{Type: "int", Name: "Add", Ratio: 2.00},
 				{Type: "uint", Name: "Mul", Ratio: 0.10},
 				{Type: "float64", Name: "Log", Ratio: 1.00},

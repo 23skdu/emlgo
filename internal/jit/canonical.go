@@ -327,12 +327,6 @@ func Simplify(n *EMLNode) *EMLNode {
 					return &EMLNode{Kind: EMLFunc, Name: "log", Left: u.Right}
 				}
 			}
-			if r.Kind == EMLOp && r.Right != nil && r.Right.Kind == EMLConst && r.Right.Value == 1.0 && r.Left != nil && r.Left.Kind == EMLOp {
-				u := r.Left
-				if u.Left != nil && u.Left.Kind == EMLConst && u.Left.Value == 1.0 && u.Right != nil {
-					return &EMLNode{Kind: EMLFunc, Name: "log", Left: u.Right}
-				}
-			}
 		}
 		// Note: no negation or reciprocal reductions are performed here. The
 		// candidate reductions (e.g. eml(eml(1, eml(x,1)), eml(1,1)) -> -x)

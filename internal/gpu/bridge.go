@@ -83,8 +83,31 @@ func Shutdown() {
 	}
 }
 
+var getDevicesFn = getCudaDevices
+
+// SetGetDevicesForTesting overrides the device lookup for testing purposes.
+// It returns a restore function that reverts to the previous implementation.
+func SetGetDevicesForTesting(fn func() ([]Device, error)) func() {
+	prev := getDevicesFn
+	getDevicesFn = fn
+	return func() { getDevicesFn = prev }
+}
+
+var expBatchHook func(x []float64) ([]float64, error)
+
+// SetExpBatchForTesting allows testing ExpBatch behavior.
+func SetExpBatchForTesting(fn func(x []float64) ([]float64, error)) func() {
+	prev := expBatchHook
+	expBatchHook = fn
+	return func() { expBatchHook = prev }
+}
+
 // GetDevices returns a list of available GPU devices.
 func GetDevices() ([]Device, error) {
+	return getDevicesFn()
+}
+
+func getCudaDevices() ([]Device, error) {
 	var count C.int
 	err := C.eml_get_device_count(&count)
 	if err != 0 {
@@ -368,6 +391,9 @@ func launchDot[T any](a, b []T, elemSize int, fn func(dA, dB, dResult unsafe.Poi
 // ============================================================================
 
 func (d *Device) ExpBatch(x []float64) ([]float64, error) {
+	if expBatchHook != nil {
+		return expBatchHook(x)
+	}
 	return launchUnary(x, 8, func(dRes, dX unsafe.Pointer) C.int {
 		return C.eml_launch_exp(dX, dRes, C.int(len(x)), C.int(DefaultBlockSize))
 	})

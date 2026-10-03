@@ -197,6 +197,8 @@ func emitEML(n *jit.EMLNode, p *Program, varMap map[string]uint16) error {
 	}
 }
 
+var validateStackFn = ValidateStack
+
 // finalize validates that the assembled opcode stream is a well-formed RPN
 // program and computes its maximum stack depth.
 //
@@ -204,8 +206,30 @@ func emitEML(n *jit.EMLNode, p *Program, varMap map[string]uint16) error {
 // or "*", which leave the evaluation stack underflowed; evaluating those
 // panics with an index-out-of-range error instead of failing at compile time.
 func finalize(p *Program) error {
-	if !ValidateStack(p.Ops) {
+	if !validateStackFn(p.Ops) {
 		return fmt.Errorf("malformed expression: produced an invalid stack sequence (%d ops)", len(p.Ops))
+	}
+	cCount := 0
+	vCount := 0
+	for _, op := range p.Ops {
+		switch op {
+		case OpConst:
+			cCount++
+		case OpVar:
+			vCount++
+		case OpEML, OpAdd, OpSub, OpMul, OpDiv, OpPow, OpNeg, OpInv:
+			// valid native operations
+		default:
+			if opUnaryTable[op] == nil {
+				return fmt.Errorf("unresolvable opcode %d (%s)", op, op.String())
+			}
+		}
+	}
+	if cCount != len(p.Consts) {
+		return fmt.Errorf("constant count mismatch: %d OpConst vs %d Consts", cCount, len(p.Consts))
+	}
+	if vCount != len(p.VarIndices) {
+		return fmt.Errorf("var index count mismatch: %d OpVar vs %d VarIndices", vCount, len(p.VarIndices))
 	}
 	p.CalculateMaxStackDepth()
 	return nil

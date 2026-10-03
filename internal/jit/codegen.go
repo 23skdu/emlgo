@@ -67,15 +67,19 @@ func (e *encoder) sse2(prefix, opcode byte, dst, src byte) {
 		rx |= 1
 	}
 	rex := e.rex(0, rx>>2, 0, rx&1)
+	if prefix != 0 {
+		e.emit(prefix)
+	}
 	if rex != 0x40 {
 		e.emit(rex)
 	}
-	e.emit(prefix, 0x0F, opcode, e.modrm(3, dst&7, src&7))
+	e.emit(0x0F, opcode, e.modrm(3, dst&7, src&7))
 }
 
 func (e *encoder) addPool(f float64) int {
+	bits := math.Float64bits(f)
 	for i, v := range e.pool {
-		if v == f {
+		if math.Float64bits(v) == bits {
 			return i
 		}
 	}
@@ -99,13 +103,16 @@ func (e *encoder) loadConstant(dst byte, idx int) {
 	dispOff := 4 // displacement at byte 4 for MOVSD without REX
 	hasREX := dst >= 8
 	if hasREX {
-		e.emit(0x44)
 		insLen = 9
 		dispOff = 5 // displacement shifts by 1 with REX prefix
 	}
 	e.fixups = append(e.fixups, poolFixup{poolIdx: idx, codeOff: off, insLen: insLen, dispOff: dispOff})
 	xmmReg := dst & 7
-	e.emit(0xF2, 0x0F, 0x10, e.modrm(0, xmmReg, 5))
+	e.emit(0xF2)
+	if hasREX {
+		e.emit(0x44)
+	}
+	e.emit(0x0F, 0x10, e.modrm(0, xmmReg, 5))
 	e.emit32(0)
 }
 
@@ -146,20 +153,20 @@ func (e *encoder) movsdXmmXmm(dst, src byte) {
 
 func (e *encoder) movsdStore(reg byte) {
 	xmmReg := reg & 7
-	hasREX := reg >= 8
-	if hasREX {
+	e.emit(0xF2)
+	if reg >= 8 {
 		e.emit(0x44)
 	}
-	e.emit(0xF2, 0x0F, 0x11, e.modrm(0, xmmReg, rsp), e.sib(0, 4, rsp))
+	e.emit(0x0F, 0x11, e.modrm(0, xmmReg, rsp), e.sib(0, 4, rsp))
 }
 
 func (e *encoder) movsdLoad(reg byte) {
 	xmmReg := reg & 7
-	hasREX := reg >= 8
-	if hasREX {
+	e.emit(0xF2)
+	if reg >= 8 {
 		e.emit(0x44)
 	}
-	e.emit(0xF2, 0x0F, 0x10, e.modrm(0, xmmReg, rsp), e.sib(0, 4, rsp))
+	e.emit(0x0F, 0x10, e.modrm(0, xmmReg, rsp), e.sib(0, 4, rsp))
 }
 
 func (e *encoder) push() {
@@ -179,37 +186,65 @@ func (e *encoder) divsd(dst, src byte)  { e.sse2(0xF2, 0x5E, dst, src) }
 func (e *encoder) sqrtsd(dst, src byte) { e.sse2(0xF2, 0x51, dst, src) }
 func (e *encoder) xorpd(dst, src byte)  { e.sse2(0x66, 0x57, dst, src) }
 
+const (
+	callFrameSize  = 264
+	callSaveOffset = 128
+)
+
+func (e *encoder) saveXMM(reg byte, offset int32) {
+	e.emit(0xF2)
+	if reg >= 8 {
+		e.emit(0x44)
+	}
+	e.emit(0x0F, 0x11, e.modrm(2, reg&7, rsp), e.sib(0, 4, rsp))
+	e.emit32(uint32(offset))
+}
+
+func (e *encoder) restoreXMM(reg byte, offset int32) {
+	e.emit(0xF2)
+	if reg >= 8 {
+		e.emit(0x44)
+	}
+	e.emit(0x0F, 0x10, e.modrm(2, reg&7, rsp), e.sib(0, 4, rsp))
+	e.emit32(uint32(offset))
+}
+
+func (e *encoder) push16(reg byte) {
+	e.emit(0x48, 0x83, 0xEC, 16) // sub rsp, 16
+	e.movsdStore(reg)
+}
+
+func (e *encoder) pop16(reg byte) {
+	e.movsdLoad(reg)
+	e.emit(0x48, 0x83, 0xC4, 16) // add rsp, 16
+}
+
 type jitFunc2 func(float64, float64) float64
 
 // callFunc2 emits code to call a two-argument Go function through an indirect call.
 // Uses ABIInternal calling convention: arg0 in xmm0, arg1 in xmm1, result in xmm0.
-// Saves xmm0-xmm7 before the call and restores xmm1-xmm7 after.
+// Allocates 128 bytes of callee register spill space above RSP to ensure that
+// Go ABIInternal callees do not overwrite saved caller registers.
 func (e *encoder) callFunc2(fn jitFunc2, arg0, arg1 byte) {
 	funcAddr := reflect.ValueOf(fn).Pointer()
 	idx := e.addUint64Pool(uint64(funcAddr)) // #nosec G115
 
-	// On entry: sub 72 aligns stack to 16 bytes
-	e.emit(0x48, 0x83, 0xEC, 72) // sub rsp, 72
+	// On entry to JIT: RSP = 16n - 8
+	// sub 264: RSP = 16n - 272 = 16(n-17), aligned to 16 bytes
+	e.emit(0x48, 0x81, 0xEC)
+	e.emit32(callFrameSize)
 
-	// Save xmm0-xmm7 to [rsp+0]..[rsp+56]
-	for i := byte(0); i < 8; i++ {
-		xmmReg := i & 7
-		e.emit(0xF2, 0x0F, 0x11, e.modrm(1, xmmReg, rsp), e.sib(0, 4, rsp), i*8)
+	// Save xmm0-xmm15 to [rsp+128]..[rsp+248]
+	for i := byte(0); i < 16; i++ {
+		e.saveXMM(i, callSaveOffset+int32(i)*8)
 	}
 
-	// Move arguments: arg0 -> xmm0, arg1 -> xmm1.
-	// Since original xmm0..xmm7 were saved on the stack at [rsp + i*8],
-	// load from their saved stack slots or move from register.
-	if arg0 < 8 {
-		e.emit(0xF2, 0x0F, 0x10, e.modrm(1, 0, rsp), e.sib(0, 4, rsp), arg0*8)
-	} else {
-		e.movsdXmmXmm(0, arg0)
-	}
-	if arg1 < 8 {
-		e.emit(0xF2, 0x0F, 0x10, e.modrm(1, 1, rsp), e.sib(0, 4, rsp), arg1*8)
-	} else {
-		e.movsdXmmXmm(1, arg1)
-	}
+	// Move arguments: arg0 -> xmm0, arg1 -> xmm1 from saved stack slots.
+	e.restoreXMM(0, callSaveOffset+int32(arg0)*8)
+	e.restoreXMM(1, callSaveOffset+int32(arg1)*8)
+
+	// Zero xmm15 (Go ABI register invariant)
+	e.xorpd(15, 15)
 
 	// Load function pointer into R8
 	off := len(e.code)
@@ -220,39 +255,41 @@ func (e *encoder) callFunc2(fn jitFunc2, arg0, arg1 byte) {
 	// CALL R8 — result in xmm0
 	e.emit(0x41, 0xFF, 0xD0)
 
-	// Restore xmm1-xmm7
-	for i := byte(1); i < 8; i++ {
-		xmmReg := i & 7
-		e.emit(0xF2, 0x0F, 0x10, e.modrm(1, xmmReg, rsp), e.sib(0, 4, rsp), i*8)
+	// Restore xmm1-xmm15 (skip xmm0 which holds the return value)
+	for i := byte(1); i < 16; i++ {
+		e.restoreXMM(i, callSaveOffset+int32(i)*8)
 	}
 
-	// add rsp, 72
-	e.emit(0x48, 0x83, 0xC4, 72)
+	// add rsp, 264
+	e.emit(0x48, 0x81, 0xC4)
+	e.emit32(callFrameSize)
 }
 
 // callFunc emits code to call a Go function through an indirect call.
 // Uses ABIInternal calling convention: argument in xmm0, result in xmm0.
-// Saves xmm0-xmm7 before the call and restores xmm1-xmm7 after (not xmm0,
-// since it holds the return value). If the caller needs xmm0's pre-call value,
-// it must save/restore it around the callFunc call.
+// Allocates 128 bytes of callee register spill space above RSP to ensure that
+// Go ABIInternal callees do not overwrite saved caller registers.
 func (e *encoder) callFunc(fn jitFunc, argReg byte) {
 	funcAddr := reflect.ValueOf(fn).Pointer()
 	idx := e.addUint64Pool(uint64(funcAddr)) // #nosec G115
 
-	// On entry to JIT: RSP = 16n - 8 (after Go's CALL pushed ret addr)
-	// sub 72: RSP = 16n - 80 = 16(n-5), aligned ✓
-	e.emit(0x48, 0x83, 0xEC, 72) // sub rsp, 72
+	// On entry to JIT: RSP = 16n - 8
+	// sub 264: RSP = 16n - 272 = 16(n-17), aligned to 16 bytes
+	e.emit(0x48, 0x81, 0xEC)
+	e.emit32(callFrameSize)
 
-	// Save xmm0-xmm7 to [rsp+0] through [rsp+56]
-	for i := byte(0); i < 8; i++ {
-		xmmReg := i & 7
-		e.emit(0xF2, 0x0F, 0x11, e.modrm(1, xmmReg, rsp), e.sib(0, 4, rsp), i*8)
+	// Save xmm0-xmm15 to [rsp+128] through [rsp+248]
+	for i := byte(0); i < 16; i++ {
+		e.saveXMM(i, callSaveOffset+int32(i)*8)
 	}
 
-	// Move argument to xmm0 AFTER saving (so original xmm0 is preserved on stack)
+	// Move argument to xmm0 AFTER saving (from saved stack slot)
 	if argReg != 0 {
-		e.movsdXmmXmm(0, argReg)
+		e.restoreXMM(0, callSaveOffset+int32(argReg)*8)
 	}
+
+	// Zero xmm15 (Go ABI register invariant)
+	e.xorpd(15, 15)
 
 	// Load function pointer into R8
 	off := len(e.code)
@@ -263,26 +300,28 @@ func (e *encoder) callFunc(fn jitFunc, argReg byte) {
 	// CALL R8 — result in xmm0
 	e.emit(0x41, 0xFF, 0xD0)
 
-	// Restore xmm1-xmm7 only (xmm0 holds the return value, skip it)
-	for i := byte(1); i < 8; i++ {
-		xmmReg := i & 7
-		e.emit(0xF2, 0x0F, 0x10, e.modrm(1, xmmReg, rsp), e.sib(0, 4, rsp), i*8)
+	// Restore xmm1-xmm15 only (xmm0 holds the return value, skip it)
+	for i := byte(1); i < 16; i++ {
+		e.restoreXMM(i, callSaveOffset+int32(i)*8)
 	}
 
-	// add rsp, 72
-	e.emit(0x48, 0x83, 0xC4, 72)
+	// add rsp, 264
+	e.emit(0x48, 0x81, 0xC4)
+	e.emit32(callFrameSize)
 	// Result is in xmm0.
 }
 
-const xReg byte = 15
+const xReg byte = 14
+const maxSpillDepth = 5
 
 type generator struct {
-	enc  encoder
-	used [16]bool
+	enc        encoder
+	used       [16]bool
+	spillDepth int
 }
 
 func (g *generator) alloc() (byte, error) {
-	for i := byte(0); i < 15; i++ { // Skip xReg (15)
+	for i := byte(0); i < 14; i++ { // Skip xReg (14) and xmm15 (scratch/zero)
 		if !g.used[i] {
 			g.used[i] = true
 			return i, nil
@@ -328,36 +367,67 @@ func (g *generator) gen(n Node, dst byte) error {
 			return err
 		}
 		leftSave, err := g.alloc()
-		if err != nil {
-			return err
-		}
-		g.enc.movsdXmmXmm(leftSave, dst)
-		tmp, err := g.alloc()
-		if err != nil {
+		if err == nil {
+			g.enc.movsdXmmXmm(leftSave, dst)
+			tmp, err := g.alloc()
+			if err == nil {
+				if err := g.gen(v.Right, tmp); err != nil {
+					g.free(tmp)
+					g.free(leftSave)
+					return err
+				}
+				g.enc.movsdXmmXmm(dst, leftSave)
+				g.free(leftSave)
+				switch v.Op {
+				case '+':
+					g.enc.addsd(dst, tmp)
+				case '-':
+					g.enc.subsd(dst, tmp)
+				case '*':
+					g.enc.mulsd(dst, tmp)
+				case '/':
+					g.enc.divsd(dst, tmp)
+				default:
+					g.free(tmp)
+					return fmt.Errorf("unsupported operator: %c", v.Op)
+				}
+				g.free(tmp)
+				return nil
+			}
 			g.free(leftSave)
+		}
+
+		// Register spill path: all scratch registers are currently occupied.
+		if g.spillDepth >= maxSpillDepth {
+			return fmt.Errorf("out of register resources")
+		}
+		g.spillDepth++
+		defer func() { g.spillDepth-- }()
+
+		// Spill left operand to stack (preserves 16-byte alignment).
+		g.enc.push16(dst)
+		// Evaluate right operand into dst.
+		if err := g.gen(v.Right, dst); err != nil {
 			return err
 		}
-		if err := g.gen(v.Right, tmp); err != nil {
-			g.free(tmp)
-			g.free(leftSave)
-			return err
-		}
-		g.enc.movsdXmmXmm(dst, leftSave)
-		g.free(leftSave)
+		// Move right operand to scratch register 15.
+		g.enc.movsdXmmXmm(15, dst)
+		// Restore left operand from stack into dst.
+		g.enc.pop16(dst)
 		switch v.Op {
 		case '+':
-			g.enc.addsd(dst, tmp)
+			g.enc.addsd(dst, 15)
 		case '-':
-			g.enc.subsd(dst, tmp)
+			g.enc.subsd(dst, 15)
 		case '*':
-			g.enc.mulsd(dst, tmp)
+			g.enc.mulsd(dst, 15)
 		case '/':
-			g.enc.divsd(dst, tmp)
+			g.enc.divsd(dst, 15)
 		default:
-			g.free(tmp)
 			return fmt.Errorf("unsupported operator: %c", v.Op)
 		}
-		g.free(tmp)
+		g.enc.xorpd(15, 15)
+		return nil
 	case FunctionCall:
 		return g.genFuncCall(v.Name, v.Arg, dst)
 	}

@@ -102,6 +102,8 @@ func TestInt8AndUint8Operations(t *testing.T) {
 	_ = CosineDistanceInt8(aInt8, bInt8)
 	assertMismatch(func() { _ = CosineDistanceInt8([]int8{1}, []int8{2, 3}) })
 	_ = CosineDistanceInt8([]int8{1, 1}, []int8{-1, -1}) // opposite
+	_ = CosineDistanceInt8([]int8{1, 1, 1}, []int8{1, 1, 1})
+	_ = CosineDistanceInt8([]int8{1, 1, 1}, []int8{-1, -1, -1})
 
 	// CosineDistanceUint8
 	if CosineDistanceUint8(nil, nil) != 1.0 {
@@ -114,6 +116,8 @@ func TestInt8AndUint8Operations(t *testing.T) {
 	bUint8 := []uint8{2, 3, 4, 5, 6, 7, 8, 9, 10, 11}
 	_ = CosineDistanceUint8(aUint8, bUint8)
 	assertMismatch(func() { _ = CosineDistanceUint8([]uint8{1}, []uint8{2, 3}) })
+	_ = CosineDistanceUint8([]uint8{1, 1, 1}, []uint8{1, 1, 1})
+	_ = clampSimilarityUint8(-0.5)
 
 	// AddBatchInt8 saturation and length mismatch
 	assertMismatch(func() { _ = AddBatchInt8([]int8{1}, []int8{2, 3}) })

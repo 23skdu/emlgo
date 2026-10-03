@@ -62,8 +62,7 @@ func Cosh(x float64) float64 {
 		return nativeExp(absX) / 2
 	}
 	ex := nativeExp(absX)
-	emx := nativeExp(-absX)
-	return (ex + emx) / 2
+	return 0.5 * (ex + 1.0/ex)
 }
 
 func Tanh(x float64) float64 {

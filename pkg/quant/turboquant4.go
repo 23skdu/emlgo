@@ -19,14 +19,17 @@ var TQ4Lookup = func() []float32 {
 	return table
 }()
 
-var tqScratchPool = sync.Pool{
-	New: func() any {
-		return &tqScratch{
-			recon:   make([]float32, 4096),
-			indices: make([]byte, 4096),
-		}
-	},
-}
+var (
+	tqScratchPool = sync.Pool{
+		New: func() any {
+			return &tqScratch{
+				recon:   make([]float32, 4096),
+				indices: make([]byte, 4096),
+			}
+		},
+	}
+	getTQScratch = tqScratchPool.Get
+)
 
 type tqScratch struct {
 	recon   []float32
@@ -89,6 +92,15 @@ func Pack4Bit(src []byte, dst []byte) {
 	}
 }
 
+var clampAngleBin = func(bin int) int {
+	if bin < 0 {
+		return 0
+	} else if bin > 15 {
+		return 15
+	}
+	return bin
+}
+
 // EncodeTurboQuant4 compresses a high-dimensional float32 vector into TurboQuant4 format.
 // It computes recursive polar coordinate angles, quantizes them to 4-bit bins, and extracts QJL 1-bit residual signs.
 func EncodeTurboQuant4(vec []float32, pow2 int) ([]byte, error) {
@@ -119,12 +131,7 @@ func EncodeTurboQuant4(vec []float32, pow2 int) ([]byte, error) {
 			r := float32(math.Sqrt(float64(x*x + y*y)))
 			theta := math.Atan2(float64(y), float64(x))
 
-			bin := int(math.Round(((theta + math.Pi) / (2 * math.Pi)) * 15.0))
-			if bin < 0 {
-				bin = 0
-			} else if bin > 15 {
-				bin = 15
-			}
+			bin := clampAngleBin(int(math.Round(((theta + math.Pi) / (2 * math.Pi)) * 15.0)))
 			qIndices[angleOffset+i] = byte(bin)
 			nextRadii[i] = r
 		}
@@ -200,7 +207,7 @@ func TurboQuant4Distance(query []float32, tqData []byte, dim int, pow2 int) (flo
 	if len(tqData) < 4 {
 		return 0, fmt.Errorf("quant: invalid tqData length %d", len(tqData))
 	}
-	buf, ok := tqScratchPool.Get().(*tqScratch)
+	buf, ok := getTQScratch().(*tqScratch)
 	if !ok {
 		return 0, fmt.Errorf("quant: scratch pool returned an unexpected type")
 	}

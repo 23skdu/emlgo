@@ -400,6 +400,8 @@ func NewFloatFromInt(n int64) *big.Float {
 	return new(big.Float).SetPrec(Prec).SetInt64(n)
 }
 
+var cosFn = Cos
+
 // Tan computes tan(x) = Sin(x)/Cos(x) at arbitrary precision.
 // Panics if cos(x) is zero (i.e., x is an odd multiple of π/2).
 func Tan(x *big.Float) *big.Float {
@@ -408,7 +410,7 @@ func Tan(x *big.Float) *big.Float {
 		prec = Prec
 	}
 	s := Sin(new(big.Float).SetPrec(prec).Copy(x))
-	c := Cos(new(big.Float).SetPrec(prec).Copy(x))
+	c := cosFn(new(big.Float).SetPrec(prec).Copy(x))
 	if c.Sign() == 0 {
 		// cos(x) = 0: return ±Inf analogous to math.Tan
 		inf := new(big.Float).SetPrec(prec).SetInf(s.Sign() >= 0)

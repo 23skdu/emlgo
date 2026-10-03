@@ -1,4 +1,5 @@
-//go:build (!cuda || !cgo) && (!darwin || !arm64 || !cgo || cuda)
+//go:build !cuda || !cgo
+// +build !cuda !cgo
 
 package gpu
 
@@ -13,6 +14,14 @@ var cudaSupportedOS = func() bool {
 }
 
 var getDevicesFn = getDevicesImpl
+
+// SetGetDevicesForTesting overrides the device lookup for testing purposes.
+// It returns a restore function that reverts to the previous implementation.
+func SetGetDevicesForTesting(fn func() ([]Device, error)) func() {
+	prev := getDevicesFn
+	getDevicesFn = fn
+	return func() { getDevicesFn = prev }
+}
 
 // GetDevices returns a list of available GPU devices.
 // Without the cuda build tag, always returns empty.
@@ -49,8 +58,20 @@ func Shutdown() {
 	_ = 1
 }
 
+var expBatchHook func(x []float64) ([]float64, error)
+
+// SetExpBatchForTesting allows testing ExpBatch behavior.
+func SetExpBatchForTesting(fn func(x []float64) ([]float64, error)) func() {
+	prev := expBatchHook
+	expBatchHook = fn
+	return func() { expBatchHook = prev }
+}
+
 func (d *Device) ExpBatch(x []float64) ([]float64, error) {
 	_ = d
+	if expBatchHook != nil {
+		return expBatchHook(x)
+	}
 	return nil, fmt.Errorf("GPU execution not available (build with -tags cuda)")
 }
 
