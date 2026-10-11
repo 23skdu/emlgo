@@ -11,7 +11,7 @@ Every step below cites measurements and audit findings from this repository.
 - **Completed & Verified Milestones (Archived)** — Steps 1–8, 11–30 are retained as historical implementation records; their test evidence is listed in the table below.
 - **Part 1: Platform & Kernel Extensions (Hardware-gated)** — Steps 9 (ARM64 JIT) and 10 (AVX-512 kernels) remain open.
 - **Part 2: Residual Defects & Newly Measured Gaps** — Steps 31–40, all verified in the current status table. Steps 31–35 were residual defects in code that Steps 11–30 claimed to close; Steps 36–40 were gaps the v0.5 work exposed.
-- **Part 3: Numerical Assurance, Performance Evidence & DevSecOps** — Proposed Steps 41–50, based on this codebase review. These are work items, not claims that the current implementation has been certified.
+- **Part 3: Numerical Assurance, Performance Evidence & DevSecOps** — Steps 41–50 track completed controls and remaining verification; they are not claims that the implementation has been certified.
 
 **Note on the archived table.** Every claim in the Steps 11–30 table was
 re-verified for this update. The following are **confirmed fixed**:
@@ -1095,7 +1095,7 @@ all read as working features to anyone who does not run them.
 
 ---
 
-## Proposed Steps 41–50 — Accuracy, Performance & DevSecOps
+## Steps 41–50 — Accuracy, Performance & DevSecOps
 
 These are follow-on improvement tasks identified while reviewing the math
 implementations, tests, benchmark documentation, and GitHub Actions workflows.

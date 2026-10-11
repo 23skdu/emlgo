@@ -2,6 +2,10 @@
 
 This document provides practical examples of using the emlgo library.
 
+Examples using packages under `internal/` are for development within this
+repository only; Go prevents downstream modules from importing those packages.
+For external applications, use the public `pkg/*` APIs.
+
 ## Basic Usage
 
 ### Trigonometric Functions
@@ -115,6 +119,7 @@ package main
 
 import (
     "fmt"
+    "math"
     "github.com/emlgo/eml/internal/eml"
 )
 
@@ -138,10 +143,10 @@ func main() {
         fmt.Printf("  exp(%v) = %v\n", z, expResults[i])
     }
 
-    // Trigonometric identity: sin²(z) + cos²(z) = 1
+    // Trigonometric identity, subject to floating-point rounding.
     sinResults := eml.ComplexSinBatch(inputs)
     cosResults := eml.ComplexCosBatch(inputs)
-    fmt.Println("\nTrig identity sin²(z) + cos²(z) = 1:")
+    fmt.Println("\nTrig identity sin²(z) + cos²(z) ≈ 1:")
     for i, z := range inputs {
         s := sinResults[i]
         c := cosResults[i]
@@ -149,8 +154,7 @@ func main() {
         fmt.Printf("  sin²(%v) + cos²(%v) = %v\n", z, z, identity)
     }
 
-    // Euler's identity: e^(iπ) + 1 = 0
-    // requires "math" in the import block
+    // Euler's identity: e^(iπ) + 1 ≈ 0
     euler := eml.ComplexExpBatch([]complex128{complex(0, math.Pi)})
     fmt.Printf("\ne^(iπ) = %v (should be ≈ -1)\n", euler[0])
     fmt.Printf("e^(iπ) + 1 = %v (should be ≈ 0)\n", euler[0]+1)
@@ -216,6 +220,7 @@ package main
 
 import (
     "fmt"
+    "reflect"
     "github.com/emlgo/eml/internal/jit"
 )
 
@@ -263,7 +268,7 @@ node := jit.Canonicalize(ast)
 
     // More complex: d/dx sin(x) = cos(x)
     sinAst, _ := jit.Parse("sin(x)")
-    sinNode := jit.Canonicalize(sinAst))
+    sinNode := jit.Canonicalize(sinAst)
     dsin := jit.Diff(sinNode)
     fmt.Printf("d/dx sin(x) = %s\n", jit.Decompile(dsin)) // cos(x)
 }
@@ -558,7 +563,8 @@ func main() {
 
 ## Error Handling
 
-All functions handle edge cases correctly:
+Public scalar wrappers generally follow Go `math` semantics; behavior for
+domain errors and special values depends on the operation:
 
 ```go
 package main
@@ -627,11 +633,10 @@ func main() {
 
 ## Performance Considerations
 
-- Single function calls have similar overhead to math library
-- Batch operations (SinBatch, CosBatch, etc.) are optimized for large slices
-- SIMD chunk size: 4 for AVX2/NEON, 8 for AVX-512
-- For small slices (<8 elements), scalar implementation may be faster
-- Arena allocator eliminates GC pressure in JIT hot paths
+- Performance depends on operation, input size, build tags, Go version, and target hardware; benchmark the workload you care about.
+- Batch operations use operation- and platform-specific kernels, with portable Go fallbacks.
+- SIMD capability detection does not guarantee a speedup; see [performance.md](performance.md) for the benchmark method.
+- The arena allocator and JIT cache are repository-internal APIs.
 - Canonical EML trees enable expression-level optimization and comparison
 - Pipeline API provides zero-allocation chained operations
 - JIT expression cache avoids recompilation for repeated expressions

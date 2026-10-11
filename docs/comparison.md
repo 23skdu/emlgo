@@ -1,197 +1,28 @@
-# Performance Comparison: emlgo vs Go math Library
+# emlgo and Go's `math` Package
 
-> **Status: historical, not current performance evidence.** The estimates in
-> this report conflict with [performance.md](performance.md), and the raw
-> benchmark output and complete environment metadata are unavailable. Treat
-> every numeric performance claim below as withdrawn; use the reproduction
-> procedure in `performance.md` for new measurements.
+## Performance claims
 
-## Executive Summary
+Older comparisons in this document used inconsistent benchmark setups and did
+not retain enough raw output and environment metadata to reproduce the reported
+ratios. Those performance claims have been withdrawn; they must not be treated
+as current results or release claims. The repository does not claim that emlgo
+is generally faster than Go's `math` package.
 
-This document provides detailed benchmark results comparing `emlgo` (EML-based mathematical library) against Go's standard `math` library across multiple architectures.
+Use the reproducible procedure in [`performance.md`](performance.md) to measure
+a specific workload on the target machine. The continuous-integration
+regression gate compares selected batch benchmarks between revisions on the
+same hosted runner; it does not compare emlgo against `math` or certify
+cross-platform performance.
 
-**Overall Results:**
+## API and numerical behavior
 
-- **Average Ratio (AMD64)**: 1.15x (emlgo vs math)
-- **Average Ratio (ARM64)**: 1.20x (emlgo vs math)
-- **Batch Performance (SIMD)**: mixed. In the recorded runs the CPU SIMD batch paths were **0.31x-0.98x** of the reference loops (i.e. slower); see [nextsteps.md](nextsteps.md) Steps 1-3 for the measured cause.
-- **FastMath**: minimax polynomials for `exp` (~1.5e-6 rel. error) and `log` (~1e-7). `Sin`/`Cos`/`Sqrt` delegate to `math` and are bit-exact — they are not faster.
-- **Parity & Accuracy**: 100% feature parity on the **scalar** path (matched to within 1 ULP). The CPU batch kernels are **not** accuracy-tested today and are measurably worse; see [nextsteps.md](nextsteps.md) Step 4.
+The public scalar wrappers generally delegate to Go's `math` package, with
+individual exceptions and semantics documented in their package references.
+`pkg/fastmath` intentionally includes approximate algorithms. Batch and fused
+operations use their own implementations and are validated against
+operation-specific tolerances; no single accuracy guarantee applies to every
+backend.
 
-**Recent Improvements:**
-
-- **Parallel Chunk Sizing**: Dynamic chunk sizing based on slice size and core count
-- **Batch Operation Fusion**: Combined Exp+Mul, Log+Div in single pass
-- **Zero-Allocation APIs**: In-place batch operations (SIMDTo functions)
-- **Fused Operations**: ExpMulBatch, ExpAddBatch, LogDivBatch, LogSubBatch for reduced memory traffic
-
-## Benchmark Configuration
-
-- **Host A (Local)**: Apple Silicon M2 (`darwin/arm64`)
-- **Host B (Remote)**: AMD64 Linux (AVX2/AVX512 support)
-- **Iterations**: 1,000,000 per operation
-- **Ratio Interpretation**: <1.0 = faster than math, >1.0 = slower than math
-
----
-
-## Detailed Results (float64)
-
-| Function | Local (Ratio) | Remote (Ratio) | Status |
-| :--- | :--- | :--- | :--- |
-| **High Speed** | | | |
-| PowInt | **0.19x** | **0.15x** | ✓ 5-6x Faster |
-| Pow | **0.89x** | **0.76x** | ✓ Faster |
-| fastmath.Sin | **0.90x** | **0.89x** | ≈ parity (delegates to `math.Sin`) |
-| Square | **0.90x** | **0.96x** | ✓ Faster |
-| Add/Sub/Mul | **0.92x** | **1.01x** | ✓ Parity |
-| **Near Parity** | | | |
-| Log | 1.06x | 1.04x | ≈ Equal |
-| Exp | 1.13x | 1.05x | ≈ Equal |
-| Sin/Cos | 1.15x | 1.12x | ≈ Equal |
-| **Hardware Accelerated** | | | |
-| Sqrt | 1.86x | 1.22x | Hardware Assembly |
-| FMA | 2.17x | 1.21x | Hardware Assembly |
-
-*Note: Sqrt and FMA are slightly slower than math intrinsics due to Go's function call overhead for non-intrinsified assembly stubs.*
-
----
-
-## Batch Operations Performance (SIMD)
-
-| Operation | Size | Local Speedup | Remote Speedup |
-| :--- | :--- | :--- | :--- |
-| AddBatch | 1K+ | **1.2x** | **1.3x** |
-| ExpBatch | 1K+ | **1.1x** | **1.2x** |
-| MulBatch | 1K+ | **1.2x** | **1.4x** |
-| ExpMulBatch | 1K+ | **1.3x** | **1.5x** |
-| LogDivBatch | 1K+ | **1.2x** | **1.4x** |
-
-**Fused Operations:**
-
-- `ExpMulBatch`: Fuses Exp and multiply in single pass (20-30% less memory bandwidth)
-- `ExpAddBatch`: Fuses Exp and add in single pass
-- `LogDivBatch`: Fuses Log and divide in single pass
-- `LogSubBatch`: Fuses Log and subtract in single pass
-
-*Note: Batch operations now use full architecture-specific SIMD (AVX2/AVX512/NEON).*
-
----
-
-## Zero-Allocation API
-
-New in-place batch operations avoid allocation overhead:
-
-```go
-// Allocation-free operations
-src := make([]float64, 10000)
-dst := make([]float64, 10000)
-
-ExpSIMDTo(src, dst)      // In-place: no allocation
-LogSIMDTo(src, dst)      // In-place: no allocation
-SinSIMDTo(src, dst)     // In-place: no allocation
-CosSIMDTo(src, dst)    // In-place: no allocation
-SinCosSIMDTo(src, s, c) // In-place: no allocation
-TanSIMDTo(src, dst)     // In-place: no allocation
-SqrtSIMDTo(src, dst)    // In-place: no allocation
-```
-
----
-
-## Parallel Chunk Sizing
-
-Work is split by slice size and core count:
-
-```text
-Small Cutoff:   256 elements   (below this, run inline)
-Large Cutoff: 4096 elements   (max elements per worker chunk)
-```
-
-`GetParallelChunkSize(n)` divides `n` across `runtime.NumCPU()` workers and caps
-each chunk at `LargeCutoff`. It is not tuned to cache topology.
-
----
-
-## Accuracy Results (ULP)
-
-| Function | Max ULP | Status |
-| :--- | :--- | :--- |
-| Exp | 0 | ✓ Exact |
-| Log | 0 | ✓ Exact |
-| Sin / Cos | 0 | ✓ Exact |
-| Sqrt | 0 | ✓ Exact |
-| Pow | 10 | ✓ Very Close |
-| FastMath Sin | 0 | ✓ Exact (delegates to `math.Sin`) |
-
----
-
-## Performance Analysis
-
-### Why emlgo Wins
-
-1. **SIMD Vectorization**: Batch operations process 4-8 values per cycle using hardware vectors.
-2. **FMA Optimization**: `fastmath` uses Fused Multiply-Add instructions to evaluate polynomials in fewer cycles.
-3. **Optimized Integer Powers**: `PowInt` avoids the overhead of the general power function.
-4. **Batch Operation Fusion**: Combined operations reduce memory bandwidth by 20-30%.
-5. **Cache-Aware Parallelization**: Dynamic chunk sizing reduces cache misses.
-
-### Remaining Overheads
-
-1. **Function Call Indirection**: Unlike `math.Sqrt`, our assembly kernels are not inlined by the compiler as intrinsics.
-2. **Dispatch Logic**: Selecting between AVX2 and AVX512 at runtime adds a small branch overhead.
-
----
-
-## Recommendations & Roadmap
-
-### Completed
-
-- `[x]` **True SIMD assembly**: AVX2/AVX512/NEON batch operations.
-- `[x]` **Scalar kernels**: Direct assembly for Sqrt and FMA.
-- `[x]` **FastMath package**: Relaxed accuracy for maximum throughput.
-- `[x]` **Zero-Allocation APIs**: In-place batch operations.
-- `[x]` **Fused Operations**: ExpMul, LogDiv combined passes.
-- `[x]` **Parallel Chunk Sizing**: Core-count-aware chunk sizing.
-
-### Completed (Since Last Update)
-
-- `[x]` **GPU Acceleration**: CUDA and Metal kernels for massive parallel workloads.
-- `[x]` **ARM SVE/SVE2 Support**: VLA dispatch with Go-level kernels for Graviton/Neoverse.
-- `[x]` **WASM SIMD**: 8-wide unrolled kernels for browser auto-vectorization.
-- `[x]` **JIT Compiler**: x86-64 SSE2 codegen with register allocation and binary exponentiation.
-- `[x]` **Fused Operations**: ExpMul, ExpAdd, LogDiv, LogSub combined passes.
-- `[x]` **Parallel Chunk Sizing**: Core-count-aware chunk sizing with pre-allocated worker pool.
-- `[x]` **JIT Function Calls**: 16 math functions (sin, cos, exp, log, sqrt, tan, asin, acos, atan, abs, cbrt, log2, log10, ceil, floor, trunc).
-- `[x]` **JIT Negative Exponents**: `x^-n` decomposed as `1.0/x^n`.
-- `[x]` **JIT Non-Integer Exponents**: `x^0.5`, `x^1.5` via `exp(y*log(x))`.
-- `[x]` **JIT Variable Exponents**: `x^x`, `x^(x-1)` via `exp(y*log(x))`.
-- `[x]` **Complex Number Support**: `complex128` batch operations via `math/cmplx`.
-- `[x]` **Arbitrary Precision Backend**: `math/big.Float` Taylor series, IdentityVerifier.
-- `[x]` **Zero-Allocation Arena**: Bump allocator for JIT parse/eval paths.
-- `[x]` **Canonical EML Trees**: Normalize any expression to minimal EML form.
-- `[x]` **Numerical Stability**: Log1p/Expm1 for Pow near x=1, Exp near x=0.
-- `[x]` **Worker Pool Shutdown**: `StopWorkerPool()` for graceful termination.
-- `[x]` **CI/CD Pipeline**: GitHub Actions with a Go 1.26/1.27 matrix plus a cross-build job (linux/amd64, linux/arm64, darwin/amd64, darwin/arm64, windows/amd64, js/wasm, wasip1/wasm).
-
-### Remaining Work
-
-1. **ARM64 NEON Assembly Kernels**: Write native NEON assembly kernels (currently Go-level loops).
-2. **ARM64 SVE/SVE2 Assembly Kernels**: Write native SVE/SVE2 assembly kernels.
-3. **ARM64 Transcendental Batch Kernels**: Vectorize Exp/Log/Sin/Cos/Tan for ARM64.
-
----
-
-## Running Benchmarks
-
-```bash
-# Comprehensive benchmark (1M iterations)
-go run cmd/bench/main.go -n 1000000
-
-# Accuracy test
-go run cmd/bench/main.go -accuracy
-
-# Feature parity check
-go run cmd/bench/main.go -compare
-
-# Batch operations benchmark
-go test ./internal/eml/... -bench=Benchmark -benchmem
-```
+See [`FUNCTIONS.md`](FUNCTIONS.md) for the API inventory and
+[`accuracy.md`](accuracy.md) for numerical contracts, test budgets, and
+assurance limits.

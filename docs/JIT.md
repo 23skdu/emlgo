@@ -1,10 +1,13 @@
 # JIT Compiler
 
-emlgo includes a JIT (Just-In-Time) compiler that generates x86-64 machine code from mathematical expression strings, plus symbolic differentiation, expression simplification, and an EML decompiler.
+emlgo includes a JIT (Just-In-Time) compiler that generates AMD64 machine code from mathematical expression strings, plus symbolic differentiation, expression simplification, and an EML decompiler.
 
 ## Overview
 
-The JIT compiler (`internal/jit`) parses a mathematical expression string, builds an AST, and emits native x86-64 SSE2 machine code that can be called as a regular Go function. This provides near-native performance for compiled expressions without interpretation overhead.
+The JIT compiler (`internal/jit`) parses a mathematical expression string, builds an AST, and emits native AMD64 SSE2 machine code that can be called as a regular Go function. Performance depends on the expression and target; this project makes no portable JIT speedup claim.
+
+`internal/jit` is restricted by Go to this module and cannot be imported by
+downstream modules. The examples below document repository-internal APIs.
 
 **Platform**: `amd64` uses codegen; `js/wasm` falls back to the AST interpreter (`jit_wasm.go`); all other targets return an error from `Compile`.
 
@@ -191,7 +194,8 @@ The `Diff` function performs symbolic differentiation of EMLNode trees:
 
 ```go
 // Parse and canonicalize
-node := jit.Canonicalize(jit.Parse("x^2"))
+ast, _ := jit.Parse("x^2")
+node := jit.Canonicalize(ast)
 
 // Differentiate: d/dx x² = 2x
 dx := jit.Diff(node)
@@ -222,15 +226,18 @@ The `Simplify` function performs constant folding and algebraic simplification:
 
 ```go
 // Constant folding
-node := jit.Simplify(jit.Canonicalize(jit.Parse("2 + 3")))
+sumAST, _ := jit.Parse("2 + 3")
+node := jit.Simplify(jit.Canonicalize(sumAST))
 // Result: constNode(5.0)
 
 // Identity reduction
-node2 := jit.Simplify(jit.Parse("x + 0"))
+zeroAST, _ := jit.Parse("x + 0")
+node2 := jit.Simplify(jit.Canonicalize(zeroAST))
 // Result: x
 
 // Double negation
-node3 := jit.Simplify(jit.Parse("-(-x)"))
+negAST, _ := jit.Parse("-(-x)")
+node3 := jit.Simplify(jit.Canonicalize(negAST))
 // Result: x
 ```
 
@@ -251,7 +258,8 @@ Convert canonical EML trees back to human-readable forms:
 
 ```go
 // Parse and canonicalize
-emlNode := jit.Canonicalize(jit.Parse("sin(x)^2 + cos(x)^2"))
+ast, _ := jit.Parse("sin(x)^2 + cos(x)^2")
+emlNode := jit.Canonicalize(ast)
 
 // Infix notation
 fmt.Println(jit.Decompile(emlNode))
@@ -392,12 +400,13 @@ JIT-compiled functions are called through indirect calls using ABIInternal calli
 
 - **Integer powers**: Binary exponentiation, O(log n) multiplications
 - **Non-integer powers**: `exp(y * log(x))` — single `log` + `exp` call
-- **Function calls**: Indirect call overhead (~2-3ns per call)
-- **Overall**: Typically 1.5-3x faster than interpreting the AST
+- **Function calls**: Calls to supported Go math functions use generated call sequences
+- Benchmark the expressions and target platforms used by your application; no general speedup is guaranteed.
 
 ## Limitations
 
-- Only available on AMD64 (uses SSE2 instruction set)
+- Native code generation is available on AMD64 (uses SSE2); JS/WASM uses an interpreter, and other targets do not provide native JIT codegen.
 - Maximum 14 allocatable live temporaries (expressions with more will fail to compile)
 - Function names limited to 15 characters
 - No support for user-defined functions
+- Parser input, AST size/depth, and emitted code are bounded; see `internal/jit/parser.go` for current limits.

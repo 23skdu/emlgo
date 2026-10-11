@@ -1,10 +1,10 @@
-# WebAssembly (WASM) Support
+# WebAssembly (WASM) Targets
 
-This document describes emlgo's WebAssembly support, including SIMD-optimized kernels, build instructions, and testing infrastructure.
+This document describes emlgo's WebAssembly targets, loop-unrolled batch kernels, build instructions, and test infrastructure.
 
 ## Overview
 
-emlgo compiles to WebAssembly via `GOOS=js GOARCH=wasm` (browser/Node.js) or `GOOS=wasip1 GOARCH=wasm` (WASI). All core mathematical functions are available in WASM builds, with SIMD-accelerated batch operations using loop-unrolled kernels designed for WASM JIT auto-vectorization.
+emlgo compiles to WebAssembly via `GOOS=js GOARCH=wasm` (browser/Node.js) or `GOOS=wasip1 GOARCH=wasm` (WASI). Core math APIs and batch operations are available; batch kernels use loop-unrolled Go code. The Go toolchain and runtime determine whether any operations are lowered to SIMD instructions.
 
 The JIT compiler is **not** available on WebAssembly. `js/wasm` falls back to the AST interpreter in `internal/jit/jit_wasm.go`; on `wasip1` `Compile` returns an error, and `AllocateExecutableMemory` reports that executable memory is unsupported. Both targets are covered by the `cross-build` CI job.
 
@@ -22,9 +22,13 @@ Build the CLI tool as a WASM binary:
 GOOS=js GOARCH=wasm go build -o wasm/emlcli.wasm ./cmd/emlcli
 ```
 
-## WASM SIMD Kernels
+## WASM Batch Kernels
 
-The library provides optimized batch kernels that take advantage of WASM SIMD (wasm_simd128) through JIT auto-vectorization. Rather than architecture-specific assembly, these kernels use 8-wide loop unrolling, enabling V8 (Chrome/Node.js) and SpiderMonkey (Firefox) to emit SIMD instructions automatically.
+The `js/wasm` dispatch uses 8-wide loop-unrolled Go loops rather than
+hand-written `wasm_simd128` instructions. Unrolling amortizes loop overhead, but
+it does not guarantee that Go or a browser engine emits SIMD instructions.
+Transcendental operations call scalar math functions for each element. Measure
+the generated build on the target runtime before making performance assumptions.
 
 ### Available Operations
 
@@ -59,7 +63,9 @@ import "github.com/emlgo/eml/internal/eml"
 fmt.Printf("Has WASM SIMD: %v\n", eml.HasWasmSIMD())
 ```
 
-On WASM builds, `HasWasmSIMD()` returns `true` and all non-WASM feature flags (AVX2, AVX512, NEON, SVE) return `false`.
+On WASM builds, `HasWasmSIMD()` reports that the WASM dispatch path is selected;
+it is not evidence that a particular loop was vectorized. Non-WASM CPU feature
+flags return `false`.
 
 ## Memory Alignment
 
@@ -67,7 +73,9 @@ WASM linear memory access benefits from alignment. The library provides two util
 
 ### WasmAlign16
 
-Aligns a float64 slice to a 16-byte boundary, enabling JIT compilers to emit aligned `wasm_simd128` load/store instructions:
+Returns a float64 subslice that is 16-byte aligned when the slice has an
+element available to skip. This is a low-level helper and does not guarantee
+that the compiler emits aligned SIMD loads or stores:
 
 ```go
 import "github.com/emlgo/eml/internal/eml"
@@ -91,7 +99,7 @@ The `scripts/wasm_test.sh` script builds WASM binaries and runs them with Node.j
 ### Prerequisites
 
 - Go 1.26+ (for WASM target support)
-- Node.js 16+ (for WASM SIMD support)
+- Node.js (to execute the test harness; browser/runtime support depends on the target)
 
 ### Usage
 
@@ -140,6 +148,6 @@ The WASM build uses `//go:build wasm` build tags to select the appropriate dispa
 
 - **Batch size**: Optimal performance is achieved with batch sizes >1024 elements. Small batches incur overhead from memory allocation and function call dispatch.
 - **Goroutines**: On WASM, goroutines are cooperatively scheduled on a single thread. Parallelized operations (ExpBatch, LogBatch, etc.) provide concurrency but not true parallelism.
-- **SIMD auto-vectorization**: The block-unrolled loops are recognized by V8/TurboFan and SpiderMonkey and compiled to `wasm_simd128` instructions. Check the browser's DevTools Performance panel to verify SIMD usage.
+- **SIMD lowering**: The block-unrolled loops may help the runtime optimize regular memory access, but do not guarantee `wasm_simd128` instructions. Inspect generated code or profile the selected runtime.
 - **Memory alignment**: Use `WasmAlign16()` for critical paths to avoid alignment-related slowdowns in JIT-compiled code.
-- **Transcendental SIMD**: Exp, Log, Sin, Cos, Tan, Sinh, Cosh, Tanh, and SinCos all have dedicated WASM SIMD implementations using 8-wide unrolled kernels.
+- **Transcendentals**: Exp, Log, Sin, Cos, Tan, Sinh, Cosh, Tanh, and SinCos use unrolled batch loops around scalar math calls, not vector transcendental instructions.

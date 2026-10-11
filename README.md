@@ -1,28 +1,28 @@
 # emlgo
 
-A high-performance mathematical library for Go built around the EML (Exp-Minus-Log) operator, with SIMD acceleration, JIT compilation, GPU backends, and arbitrary-precision verification.
+A mathematical library for Go built around the EML (Exp-Minus-Log) operator, with scalar and batch APIs, architecture-specific kernels, expression tooling, and experimental GPU and arbitrary-precision components.
 
-The scalar elementary functions delegate to the Go standard library (`math`, `math/cmplx`) so they stay bit-exact with `math`. EML provides the theoretical foundation and the machinery built on it: canonical EML expression trees, identity reductions, symbolic differentiation, and a JIT compiler that emits x86-64 machine code directly.
+The public scalar wrappers generally delegate to Go's `math` and `math/cmplx` packages; see each API for its semantics. EML provides the theoretical foundation and related implementation: canonical expression trees, identity reductions, symbolic differentiation, and an AMD64 JIT compiler. Approximate `fastmath` functions and backend-specific batch paths have distinct accuracy behavior; this project does not claim universal correct rounding or performance wins. See [numerical accuracy](docs/accuracy.md) and [benchmark methodology](docs/performance.md).
 
 Based on the research of **Andrzej Odrzywołek**: [All elementary functions from a single operator](https://arxiv.org/abs/2603.21852v2) (2026).
 
 ## Features
 
 - **EML Operator**: `eml(x, y) = exp(x) - ln(y)` — single primitive from which all elementary functions derive
-- **SIMD Batch Operations**: AVX2, AVX-512 (AMD64), NEON, SVE (ARM64), WASM SIMD128
-- **float32 SIMD**: Dedicated `float32` batch operations for memory-constrained workloads
-- **JIT Compiler**: x86-64 machine code generation for math expressions (25 functions, non-integer/variable exponents)
+- **Batch Operations**: Architecture-specific kernels for selected operations, with portable Go fallbacks
+- **float32 Batch Operations**: Dedicated `float32` APIs for memory-constrained workloads
+- **JIT Compiler**: AMD64 machine-code generation for math expressions (25 functions, non-integer/variable exponents); `js/wasm` uses an AST interpreter
 - **JIT Expression Cache**: LRU cache with `CompileCached` for repeated compilations
-- **GPU Backends**: CUDA (Linux/Windows) and Metal (macOS/ARM64)
+- **GPU Backends**: Optional CUDA and Metal implementations; require supported hardware and platform-specific setup
 - **Complex Numbers**: First-class `complex128` support via `math/cmplx`
-- **Arbitrary Precision**: `math/big.Float` backend for symbolic verification
+- **Arbitrary Precision**: `math/big.Float` implementation for experimentation and identity checks, not an independent correctness oracle
 - **Symbolic Regression**: `pkg/bytecode` GA recovers closed forms from data
-- **Zero-Allocation AST**: Arena allocator for JIT parse/eval paths
+- **Arena Allocator**: Reusable storage for JIT parse/eval paths
 - **Canonical EML Trees**: Map any expression to minimal EML form
 - **Symbolic Differentiation**: `Diff()` with chain rule and simplification
 - **Expression Simplification**: Constant folding, identity reduction, algebraic simplifications
 - **EML Decompiler**: `Decompile()` and `DecompileLaTeX()` for EML tree → infix/LaTeX conversion
-- **Composable Pipeline**: Zero-allocation `Pipeline` API with buffer swapping
+- **Composable Pipeline**: Reusable double-buffered pipeline that avoids per-stage allocations after setup
 - **Numerically Stable**: Log1p/Expm1 optimization for compound expressions
 - **FastMath**: Minimax polynomial approximations for `exp` and `log` (`Sin`/`Cos`/`Sqrt` delegate to `math`), plus domain guardrails
 
@@ -61,7 +61,7 @@ func main() {
     // Hyperbolic
     fmt.Printf("sinh(1) = %.6f\n", hyper.Sinh(1))
 
-    // Batch operations (SIMD-accelerated)
+    // Batch operations
     x := []float64{0, 0.5, 1.0, 1.5, 2.0}
     sin := trig.SinBatch(x)
     exp := logexp.ExpBatch(x)
@@ -81,10 +81,10 @@ func main() {
 | `pkg/fastmath` | Minimax polynomial approximations for Exp and Log, domain guardrails |
 | `pkg/bytecode` | Bytecode VM (all 27 functions), compiler, optimizer, genetic search for symbolic regression |
 | `pkg/quant` | TurboQuant4: 4-bit polar-quantized vector search and distance |
-| `internal/eml` | Core EML operator, SIMD dispatch, worker pool, complex batch ops, Pipeline |
+| `internal/eml` | Core EML operator, batch dispatch, worker pool, complex batch ops, Pipeline (repository-internal) |
 | `internal/eml/bigmath` | Arbitrary-precision EML via `math/big.Float`, identity verifier |
 | `internal/jit` | JIT compiler, arena allocator, canonical trees, Diff, Simplify, Decompile, Cache |
-| `internal/gpu` | CUDA & Metal GPU backends, ULP-based verification |
+| `internal/gpu` | Optional CUDA & Metal GPU backends, ULP-based verification (repository-internal) |
 | `internal/constants` | Mathematical constants (e, π, ln2, √2, φ, etc.) |
 
 ## Architecture
@@ -118,19 +118,29 @@ emlgo/
 └── .github/workflows/   # CI and release automation
 ```
 
+Packages under `internal/` are restricted by Go to this module and cannot be
+imported by downstream modules. They are listed here to describe the
+implementation, not as supported external APIs.
+
 ## SIMD Support
 
 | Architecture | Instructions | Width |
 | :--- | :--- | :--- |
-| AMD64 | AVX-512 | 8-wide float64 |
-| AMD64 | AVX2 + FMA | 4-wide float64 |
-| ARM64 | NEON | 2-wide float64 |
-| ARM64 | SVE/SVE2 | Scalable |
-| WASM | SIMD128 | 2-wide float64 (8-wide unrolled) |
+| AMD64 | AVX-512 | 8-wide float64 for selected arithmetic kernels |
+| AMD64 | AVX2 | 4-wide float64 for selected arithmetic kernels |
+| ARM64 | NEON | 2-wide float64 for selected kernels |
+| `js/wasm` | Go batch kernels | Loop-unrolled; SIMD lowering is compiler/runtime dependent |
 
-Batch operations automatically dispatch to the fastest available SIMD path.
+Available kernels are selected at runtime where supported; other operations and
+platforms use Go implementations. Kernel availability does not guarantee a
+speedup for every operation or input size. SVE/SVE2 kernels are not currently
+implemented.
 
 ## Symbolic Differentiation
+
+The following advanced examples use `internal/jit` and are for work within this
+repository; downstream modules cannot import `internal/` packages. Public
+consumer examples are in the `pkg/*` packages and [docs/USAGE.md](docs/USAGE.md).
 
 ```go
 import "github.com/emlgo/eml/internal/jit"
@@ -244,8 +254,8 @@ z := []complex128{1 + 2i, 3 + 4i, 5 + 6i}
 exp := eml.ComplexExpBatch(z)
 sin := eml.ComplexSinBatch(z)
 
-// Trigonometric identities hold
-// sin²(z) + cos²(z) = 1 verified at complex128 precision
+// Trigonometric identity, subject to floating-point rounding:
+// sin²(z) + cos²(z) ≈ 1
 ```
 
 ## Numerical Stability
@@ -254,11 +264,11 @@ sin := eml.ComplexSinBatch(z)
 // Pow near x=1 uses Log1p for stability
 arithmetic.Pow(1.0+1e-15, 1e6) // accurate, not catastrophic cancellation
 
-// Exp near x=0 uses Expm1
-logexp.Exp(1e-15) // accurate to ~1e-25
+// Exp near x=0 uses a numerically stable formulation
+logexp.Exp(1e-15)
 
 // Log near x=1 uses Log1p
-arithmetic.Log(1.0+1e-15) // accurate to ~1e-25
+arithmetic.Log(1.0 + 1e-15)
 ```
 
 ## Arbitrary Precision
@@ -312,22 +322,11 @@ make gosec                                  # Security scan
 
 ## Performance
 
-Ratio is `emlgo time / reference time`, so **lower is faster**.
-
-| Operation | Scalar | Batch (SIMD) |
-| :--- | :--- | :--- |
-| Add/Sub/Mul | Bit-exact with `math` | 0.75x - 0.84x |
-| Exp/Log/Sin/Cos | Bit-exact with `math` | 0.31x - 0.98x |
-| PowInt | **0.15x - 0.19x** (5-6x faster than `math.Pow`) | parallelized |
-| FastMath Exp / Log | Minimax polynomials, ~1.5e-6 / ~1e-7 relative error | N/A |
-| Fused (ExpMul) | N/A | One pass instead of two, **20-30% less memory traffic** |
-
-Measured on the two hosts recorded in [docs/performance.md](docs/performance.md)
-(`linux/arm64` NEON and `linux/amd64` AVX2, n=1e6). In those runs the SIMD batch
-paths were **slower** than the naive reference loops — the AVX2/AVX-512 kernels are
-selected by runtime CPU detection and the generic scalar fallback otherwise
-dominates. Integer exponentiation is the clear win. Re-run
-`./scripts/bench-compare.sh` on your own hardware before relying on the batch paths.
+This project does not publish portable speedup claims: results depend on the
+operation, input size, build tags, Go version, and hardware. Reproduce
+measurements with the commands and same-runner regression gate in
+[docs/performance.md](docs/performance.md). Approximate-function error budgets
+and their validation limits are documented in [docs/accuracy.md](docs/accuracy.md).
 
 ## License
 

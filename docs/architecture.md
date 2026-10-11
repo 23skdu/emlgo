@@ -12,19 +12,19 @@ This operator is implemented in `internal/eml` and is the primary target for har
 
 ## 2. Dispatch Layer (`internal/eml`)
 
-The dispatch layer automatically detects the host architecture and selects the most efficient implementation:
+The dispatch layer selects an available implementation for the target architecture; selection does not guarantee the fastest path for every operation or input size:
 
-- **AMD64**: Targets AVX2 and AVX512.
-- **ARM64**: Targets NEON (ASIMD), SVE/SVE2.
-- **WASM**: SIMD128 with 8-wide unrolled kernels.
+- **AMD64**: AVX2 and AVX-512 kernels are used for selected arithmetic operations; other paths use Go implementations.
+- **ARM64**: NEON kernels are used for selected operations. SVE/SVE2 kernels are not implemented, and `HasSVE()` remains false.
+- **WASM**: Batch functions use loop-unrolled Go kernels. The toolchain/runtime may lower suitable code to SIMD instructions, but the implementation does not guarantee this.
 - **Generic**: Clean Go fallback for other architectures.
 
 ### Optimization Strategy
 
-- **Batch Processing**: Operations on slices are chunked across cores. Real-valued work runs through a worker pool that fans out once a slice is large enough to pay for the hand-off (`SmallCutoff` = 512 elements per core, measured; see docs/nextsteps.md Step 2).
+- **Batch Processing**: Selected operations on slices are chunked across cores. Real-valued work uses a worker pool above a configurable cutoff; see `SmallCutoff()` and the benchmark evidence in [nextsteps.md](nextsteps.md).
 - **Scalar Kernels**: Latency-sensitive operations use direct assembly for instructions like `Sqrt` and `FMA`.
-- **Transcendentals**: `exp`/`log`/`sin`/`cos`/`tan` batches run on the generic parallel path, which delegates to `math`. The hand-written AVX2 kernels are available behind `-tags emlasm` but are strictly dominated: they re-broadcast their polynomial coefficients inside the loop and measured up to 190x slower *and* less accurate. See docs/nextsteps.md Step 3.
-- **float32 SIMD**: Dedicated `float32` batch operations for memory-constrained workloads.
+- **Transcendentals**: The default batch paths use Go math implementations. Experimental AVX2 transcendental kernels are available behind `-tags emlasm`; historical tests reported substantial performance and accuracy regressions, so measure and validate that opt-in path before use (see [nextsteps.md](nextsteps.md), Step 3).
+- **float32 batch operations**: Dedicated `float32` APIs are provided; architecture acceleration and accuracy vary by operation and target.
 
 ## 3. Composable Pipeline (`internal/eml/pipeline.go`)
 
@@ -38,7 +38,7 @@ Double-buffered composable pipeline with zero-allocation output:
 
 The library provides first-class `complex128` support via `internal/eml/complex_batch.go`:
 
-- **Fast path (float64)**: All scalar `float64` operations use native EML+SIMD paths.
+- **Real path (float64)**: Scalar operations use the package's Go math wrappers and selected low-level kernels; batch acceleration varies by operation and target.
 - **Complex path (complex128)**: Uses `math/cmplx` for `Exp`, `Log`, `Sin`, `Cos`, `Tan` on complex arguments. The complex EML operator is defined as `Complex(x, y) = cmplx.Exp(x) - cmplx.Log(y)`.
 
 Batch operations (`ComplexBatch`, `ComplexExpBatch`, etc.) apply `math/cmplx` element-wise in a single serial loop. The worker pool is used by the real-valued fused and parallel batch paths, not by the complex ones.
@@ -57,7 +57,7 @@ Default precision: 256 bits. All functions accept and return `*big.Float`.
 
 The arena allocator provides zero-allocation paths for JIT expression parsing and evaluation:
 
-- **ArenaNode**: 86-byte fixed-size nodes (Kind, Op, Value, Name, Left, Right pointers)
+- **ArenaNode**: 56-byte fixed-size nodes (Kind, Op, Value, Name, Left, Right pointers)
 - **Bump allocator**: `Arena.Alloc()` returns the next available node, growing the buffer exponentially when needed
 - **Conversion**: `FromInterface`/`ToInterface` convert between the `Node` interface and arena nodes
 - **Evaluation**: `EvalArena` evaluates arena-allocated trees without touching the heap
@@ -137,7 +137,7 @@ parallel and was previously serial.
 
 ## 14. JIT Compiler (`internal/jit`)
 
-The JIT compiler generates x86-64 machine code from string expressions:
+The JIT compiler generates native AMD64 machine code from string expressions; JS/WASM uses an AST interpreter, while other targets do not provide native code generation. JIT performance depends on the expression and platform; no portable speedup is claimed.
 
 - **25 supported functions**: sin, cos, exp, log, sqrt, tan, asin, acos, atan, abs, cbrt, log2, log10, ceil, floor, trunc, round, sinh, cosh, tanh, asinh, acosh, atanh, erf, gamma
 - All three dispatch paths (codegen, tree evaluator, arena interpreter) share the single table in `internal/jit/functab.go`
@@ -183,4 +183,7 @@ docs/nextsteps.md for the measured limit.
 1. **Zero Allocations**: Hot paths avoid heap allocations to ensure predictable performance.
 2. **Minimal Dependencies**: The library depends only on the Go standard library and `golang.org/x/sys`.
 3. **Architecture-Aware**: High-level APIs automatically benefit from hardware acceleration without user intervention.
-4. **Correctness First**: The `internal/eml` layer ensures that edge cases (NaN, Inf) are handled consistently across all architectures.
+4. **Correctness First**: Tests cover documented edge-case semantics and selected backend comparisons; see [accuracy.md](accuracy.md) for the limits of that evidence.
+
+Packages under `internal/` are restricted by Go to this module; they are not
+importable by downstream modules or part of the supported external API.

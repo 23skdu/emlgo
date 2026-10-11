@@ -1,10 +1,11 @@
 # Function Reference
 
-Reference for the public API of the emlgo library.
+Reference for the public `pkg/*` API and selected repository-internal APIs.
 
 Coverage: `pkg/logexp`, `pkg/trig`, `pkg/hyper`, `pkg/arithmetic`,
 `pkg/bytecode`, `internal/eml`, `internal/eml/bigmath`, `internal/jit`,
-`internal/constants`. `pkg/fastmath` and `pkg/quant` are not yet documented here;
+`internal/constants`. Packages under `internal/` are not importable by
+downstream modules. `pkg/fastmath` and `pkg/quant` are not yet documented here;
 see their package docs instead.
 
 ---
@@ -19,8 +20,8 @@ Exponential and logarithmic functions using EML operator.
 | Log | `func Log(x float64) float64` | Natural logarithm ln(x) |
 | ExpBatch | `func ExpBatch(x []float64) []float64` | Batch exponential (SIMD) |
 | LogBatch | `func LogBatch(x []float64) []float64` | Batch logarithm (SIMD) |
-| ExpFast | `func ExpFast(x float64) float64` | exp with overflow/underflow clamping (exact, not an approximation) |
-| LogFast | `func LogFast(x float64) float64` | log with a non-positive-input guard (exact, not an approximation) |
+| ExpFast | `func ExpFast(x float64) float64` | `math.Exp` with explicit overflow/underflow guards |
+| LogFast | `func LogFast(x float64) float64` | Logarithm with a non-positive-input guard |
 
 ---
 
