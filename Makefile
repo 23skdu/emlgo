@@ -1,4 +1,4 @@
-.PHONY: build test test-race test-cover bench lint vet fuzz clean wasm gosec govulncheck docker docker-build docker-build-cpu docker-build-cuda
+.PHONY: build test test-race test-cover bench lint vet fuzz clean wasm gosec govulncheck docker docker-build docker-build-cpu docker-build-cuda docker-push docker-push-cpu docker-push-cuda
 
 build:
 	go build ./...
@@ -77,6 +77,22 @@ docker-build-cuda:
 docker-build: docker-build-cpu docker-build-cuda
 
 docker: docker-build
+
+docker-push-cpu:
+	docker push $(IMAGE_REPO)-cpu:$(TAG)
+	docker push $(IMAGE_REPO)-cpu:latest
+	docker push $(IMAGE_REPO):$(TAG)-cpu
+	docker push $(IMAGE_REPO):latest-cpu
+	docker push $(IMAGE_REPO):$(TAG)
+	docker push $(IMAGE_REPO):latest
+
+docker-push-cuda:
+	docker push $(IMAGE_REPO)-cuda:$(TAG)
+	docker push $(IMAGE_REPO)-cuda:latest
+	docker push $(IMAGE_REPO):$(TAG)-cuda
+	docker push $(IMAGE_REPO):latest-cuda
+
+docker-push: docker-push-cpu docker-push-cuda
 
 clean:
 	rm -f bench validate emlcli wasmbench coverage.out *.out *.test *.prof *.cov
