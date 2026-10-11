@@ -98,7 +98,7 @@ The `scripts/wasm_test.sh` script builds WASM binaries and runs them with Node.j
 
 ### Prerequisites
 
-- Go 1.26+ (for WASM target support)
+- Go 1.27.2+ (for WASM target support)
 - Node.js (to execute the test harness; browser/runtime support depends on the target)
 
 ### Usage

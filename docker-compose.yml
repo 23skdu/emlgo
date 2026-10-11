@@ -1,0 +1,87 @@
+services:
+  # ----------------------------------------------------------------------------
+  # CPU AVX2 Services
+  # ----------------------------------------------------------------------------
+  emlgo-cpu:
+    build:
+      context: .
+      dockerfile: Dockerfile.cpu
+    image: emlgo:cpu-avx2
+    container_name: emlgo-cpu
+    command: ["demo"]
+
+  emlgo-cpu-bench:
+    build:
+      context: .
+      dockerfile: Dockerfile.cpu
+    image: emlgo:cpu-avx2
+    container_name: emlgo-cpu-bench
+    entrypoint: ["bench"]
+    command: ["-device", "cpu", "-n", "100000"]
+    profiles: ["bench"]
+
+  emlgo-cpu-validate:
+    build:
+      context: .
+      dockerfile: Dockerfile.cpu
+    image: emlgo:cpu-avx2
+    container_name: emlgo-cpu-validate
+    entrypoint: ["validate"]
+    profiles: ["validate"]
+
+  # ----------------------------------------------------------------------------
+  # CUDA GPU Services
+  # ----------------------------------------------------------------------------
+  emlgo-cuda:
+    build:
+      context: .
+      dockerfile: Dockerfile.cuda
+      args:
+        CUDA_ARCH: ${CUDA_ARCH:-sm_89}
+    image: emlgo:cuda
+    container_name: emlgo-cuda
+    command: ["gpu-status"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  emlgo-cuda-bench:
+    build:
+      context: .
+      dockerfile: Dockerfile.cuda
+      args:
+        CUDA_ARCH: ${CUDA_ARCH:-sm_89}
+    image: emlgo:cuda
+    container_name: emlgo-cuda-bench
+    entrypoint: ["bench"]
+    command: ["-device", "gpu", "-n", "100000"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    profiles: ["bench"]
+
+  emlgo-cuda-verify:
+    build:
+      context: .
+      dockerfile: Dockerfile.cuda
+      args:
+        CUDA_ARCH: ${CUDA_ARCH:-sm_89}
+    image: emlgo:cuda
+    container_name: emlgo-cuda-verify
+    command: ["gpu-verify"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    profiles: ["verify"]

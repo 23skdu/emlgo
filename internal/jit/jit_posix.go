@@ -41,6 +41,6 @@ func FreeExecutableMemory(ptr unsafe.Pointer, size int) error {
 	}
 	pageSize := unix.Getpagesize()
 	allocSize := ((size + pageSize - 1) / pageSize) * pageSize
-	data := unsafe.Slice((*byte)(ptr), allocSize)
+	data := unsafe.Slice((*byte)(ptr), allocSize) // #nosec G103 -- audited low-level mmap/munmap interface
 	return unix.Munmap(data)
 }

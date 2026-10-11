@@ -1,0 +1,51 @@
+# ==============================================================================
+# Dockerfile.cpu: EMLGo CPU AVX2-Optimized Build
+#
+# Enables x86-64-v3 microarchitecture (AVX2, FMA, BMI1/2) compiler generation
+# and connects emlgo's hand-crafted AVX2 SIMD assembly kernels.
+# ==============================================================================
+
+ARG GO_VERSION=1.27.2
+FROM golang:${GO_VERSION}-bookworm AS builder
+
+# Set compiler to target x86-64-v3 (AVX, AVX2, BMI1, BMI2, FMA)
+ENV CGO_ENABLED=0
+ENV GOAMD64=v3
+ENV GOOS=linux
+ENV GOARCH=amd64
+
+WORKDIR /src
+
+# Cache dependency layer
+COPY go.mod go.sum* ./
+RUN go mod download
+
+# Copy source tree
+COPY . .
+
+# Build statically-linked, stripped binaries
+RUN mkdir -p /out && \
+    go build -trimpath -ldflags="-s -w" -o /out/emlcli ./cmd/emlcli && \
+    go build -trimpath -ldflags="-s -w" -o /out/bench ./cmd/bench && \
+    go build -trimpath -ldflags="-s -w" -o /out/validate ./cmd/validate
+
+# Verification step in builder
+RUN /out/validate
+
+# ==============================================================================
+# Final Minimal Runtime Stage
+# ==============================================================================
+FROM debian:bookworm-slim AS runtime
+
+RUN groupadd -r emlgo && useradd -r -g emlgo -m -d /home/emlgo emlgo
+
+WORKDIR /home/emlgo
+
+COPY --from=builder /out/emlcli /usr/local/bin/emlcli
+COPY --from=builder /out/bench /usr/local/bin/bench
+COPY --from=builder /out/validate /usr/local/bin/validate
+
+USER emlgo:emlgo
+
+ENTRYPOINT ["emlcli"]
+CMD ["demo"]

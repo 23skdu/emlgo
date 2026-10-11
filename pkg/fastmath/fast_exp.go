@@ -64,7 +64,7 @@ func FastExpMinimax(x float64) float64 {
 	// Scale by 2^k via IEEE 754 exponent bit-shift
 	if k < -1022 {
 		// Subnormal range: split exponent scaling into two factors to prevent underflow
-		scale1 := math.Float64frombits(uint64(1023+k+1000) << 52)
+		scale1 := math.Float64frombits(uint64(1023+k+1000) << 52) // #nosec G115 -- exponent in valid range
 		scale2 := math.Float64frombits(uint64(1023-1000) << 52)
 		return (p * scale1) * scale2
 	}
@@ -72,7 +72,7 @@ func FastExpMinimax(x float64) float64 {
 		scale := math.Float64frombits(uint64(1023+1023) << 52)
 		return (p * 2.0) * scale
 	}
-	scale := math.Float64frombits(uint64(1023+k) << 52)
+	scale := math.Float64frombits(uint64(1023+k) << 52) // #nosec G115 -- exponent in valid range
 	return p * scale
 }
 
@@ -110,7 +110,7 @@ func FastExpF32(x float32) float32 {
 	p := 1.0 + r*(1.0+r*(c2F+r*(c3F+r*(c4F+r*c5F))))
 	if k < -126 {
 		// Subnormal range for float32: split exponent scaling
-		scale1 := math.Float32frombits(uint32(127+k+100) << 23)
+		scale1 := math.Float32frombits(uint32(127+k+100) << 23) // #nosec G115 -- exponent in valid range
 		scale2 := math.Float32frombits(uint32(127-100) << 23)
 		return (p * scale1) * scale2
 	}
@@ -118,6 +118,6 @@ func FastExpF32(x float32) float32 {
 		scale := math.Float32frombits(uint32(127+127) << 23)
 		return (p * 2.0) * scale
 	}
-	scale := math.Float32frombits(uint32(127+k) << 23)
+	scale := math.Float32frombits(uint32(127+k) << 23) // #nosec G115 -- exponent in valid range
 	return p * scale
 }

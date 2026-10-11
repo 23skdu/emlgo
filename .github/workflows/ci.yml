@@ -14,12 +14,12 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go-version: ['1.26', '1.27']
+        go-version: ['1.27.2']
     steps:
-      - uses: actions/checkout@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v7
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-      - uses: actions/setup-go@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
           go-version: ${{ matrix.go-version }}
       - name: Build
@@ -29,16 +29,16 @@ jobs:
       - name: Test
         run: go test -race -count=1 ./...
       - name: Test with coverage
-        if: matrix.go-version == '1.27'
+        if: matrix.go-version == '1.27.2'
         run: go test -coverprofile=coverage.out -covermode=atomic ./...
       - name: Upload coverage
-        if: matrix.go-version == '1.27'
-        uses: codecov/codecov-action@efb35369e0ad2afab669f228072c1b0d510eae64 # v7
+        if: matrix.go-version == '1.27.2'
+        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
         with:
           files: coverage.out
           fail_ci_if_error: false
       - name: Fuzz (short burst)
-        if: matrix.go-version == '1.27'
+        if: matrix.go-version == '1.27.2'
         run: |
           go test -run='^$' -fuzz='^FuzzParseNoPanic$' -fuzztime=10s ./internal/jit/...
           go test -run='^$' -fuzz='^FuzzEval$' -fuzztime=10s ./internal/jit/...
@@ -52,8 +52,7 @@ jobs:
           gosec -exclude-generated -tags purego ./...
       - name: Govulncheck
         run: |
-          # v1.1.4's SSA frontend does not yet support the Go 1.27 parser.
-          GOTOOLCHAIN=go1.26.0 go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./...
+          go run golang.org/x/vuln/cmd/govulncheck@latest ./...
 
   cross-build:
     runs-on: ubuntu-latest
@@ -82,12 +81,12 @@ jobs:
             goos: wasip1
             goarch: wasm
     steps:
-      - uses: actions/checkout@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v7
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-      - uses: actions/setup-go@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
-          go-version: '1.27'
+          go-version: '1.27.2'
       - name: Build ${{ matrix.target }}
         env:
           GOOS: ${{ matrix.goos }}
@@ -97,16 +96,16 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v7
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-      - uses: actions/setup-go@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
-          go-version: '1.27'
+          go-version: '1.27.2'
       - name: Golangci-lint
-        uses: golangci/golangci-lint-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v9
+        uses: golangci/golangci-lint-action@55c2c1448f86e01eaae002a5a3a9624417608d84 # v6.5.2
         with:
-          version: v2.14.0
+          version: latest
 
   platform-test:
     strategy:
@@ -124,12 +123,12 @@ jobs:
     name: Test (${{ matrix.name }})
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v7
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-      - uses: actions/setup-go@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
-          go-version: '1.27'
+          go-version: '1.27.2'
       - name: Run platform tests
         if: matrix.name != 'js/wasm'
         run: go test -count=1 ./...
@@ -144,17 +143,17 @@ jobs:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v7
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-      - uses: actions/checkout@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v7
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
           ref: ${{ github.event.pull_request.base.sha }}
           path: baseline
-      - uses: actions/setup-go@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
-          go-version: '1.27'
+          go-version: '1.27.2'
       - name: Benchmark base revision
         working-directory: baseline
         run: go test -run='^$' -bench='^(BenchmarkSIMD|BenchmarkExpSIMD|BenchmarkLogSIMD|BenchmarkAddSIMD)$' -benchmem -benchtime=250ms -count=10 ./internal/eml > "$RUNNER_TEMP/bench-base.txt"
