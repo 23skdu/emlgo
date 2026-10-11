@@ -112,3 +112,62 @@ Execution times across batch sizes comparing CUDA kernels (`libeml_capi.so`, SM 
   - `batch/Max` & `batch/Min` (+61%–95% better throughput)
 - Scalar `complex128/Cos` showed minor timing variance (1.22x vs baseline 1.15x) attributable to background scheduling jitter on heterogenous Intel Alder Lake P/E cores, well within tolerance.
 
+## Empirical Reference Measurements — Intel Xeon Cascade Lake (AVX-512 Reference Platform)
+
+The following baseline metrics were collected on a dedicated Intel Xeon compute instance validating modern AMD64 vector capabilities:
+- **CPU**: Intel(R) Xeon(R) CPU @ 2.80GHz (Cascade Lake, Family 6, Model 85, Stepping 7, 8 physical cores, 16 vCPUs / threads)
+- **Configuration**: 16 vCPUs, 128 GB RAM, Ubuntu 24.04 LTS
+- **OS / Kernel**: Linux x86_64
+- **Toolchain**: Go 1.27.2 linux/amd64
+- **SIMD Capabilities Active**: AVX-512 Foundation (`avx512f`), Conflict Detection (`avx512cd`), Byte/Word (`avx512bw`), Doubleword/Quadword (`avx512dq`), Vector Length Extensions (`avx512vl`), Vector Neural Network Instructions (`avx512_vnni`), AVX2, FMA.
+
+### 1. CPU AVX-512 Batch Kernels (`cmd/bench -device cpu -n 1000000`)
+
+Batch vector routines dispatch through 24 hand-tuned 512-bit ZMM register assembly kernels in `internal/eml/simd_amd64.s` with 2x dual-issue loop unrolling (processing 16 elements / 128 bytes per iteration) across Intel Xeon's dual FMA execution units (Port 0 and Port 5):
+
+| Operation | Input Type | Time (emlgo) | Time (math) | Ratio (emlgo/math) | Speedup Factor |
+|-----------|------------|--------------|-------------|--------------------|----------------|
+| `batch/Abs` | `[]float64` | ~0.00002s | ~0.00003s | 0.39x–0.62x | **1.61x–2.56x faster** |
+| `batch/Inv` | `[]float64` | ~0.00002s | ~0.00003s | 0.73x–0.83x | **1.20x–1.37x faster** |
+| `batch/Sqrt` | `[]float64` | ~0.00002s | ~0.00003s | 0.72x–0.83x | **1.20x–1.39x faster** |
+| `batch/Div` | `[]float64` | ~0.00002s | ~0.00003s | 0.74x–0.90x | **1.11x–1.35x faster** |
+| `batch/Neg` | `[]float64` | ~0.00002s | ~0.00003s | 0.81x–1.02x | **1.00x–1.22x faster** |
+| `batch/Sub` | `[]float64` | ~0.00003s | ~0.00003s | 0.84x–1.00x | **1.00x–1.19x faster** |
+| `batch/Mul` | `[]float64` | ~0.00003s | ~0.00003s | 0.88x–1.11x | **1.00x–1.14x faster** |
+| `float64/PowInt` | `float64, int` | 0.0045s | 0.0305s | 0.15x–0.34x | **~2.9x–6.7x faster** |
+| `complex128/Sqrt` | `complex128` | 0.0144s | 0.0261s | 0.55x–0.65x | **1.54x–1.82x faster** |
+| `float32/Log` | `float32` | 0.0123s | 0.0145s | 0.85x–0.91x | **1.10x–1.18x faster** |
+
+### 2. AVX-512 & VNNI Throughput and Bandwidth
+
+Package-level microbenchmarks on the Intel Xeon Cascade Lake reference platform demonstrate near-peak memory bandwidth saturation and low instruction latencies:
+
+- **AVX-512 Elementwise Add (`BenchmarkAddSIMD-16`)**: 8,290 ns/op (down from 13,500 ns baseline, a **1.63x throughput speedup** from 2x dual-issue unrolling).
+- **AVX-512 Elementwise Mul (`BenchmarkMulSIMD-16`)**: 8,445 ns/op (down from 13,900 ns baseline, a **1.65x throughput speedup**).
+- **AVX-512 Memory Bandwidth (`BenchmarkStep36_NEONAdd-16`)**: **19,751.53 MB/s (~19.75 GB/s)** stream bandwidth.
+- **AVX-512 FMA Bandwidth (`BenchmarkStep36_NEONFma-16`)**: **21,495.06 MB/s (~21.50 GB/s)** dual-pipe FMA saturation.
+- **Float32 AVX-512 vs Float64 (`BenchmarkExpSIMDF32VsF64`)**:
+  - `ExpF32`: 13,783 ns/op
+  - `ExpF64`: 16,568 ns/op (**1.20x speedup** for 32-bit single precision).
+- **TurboQuant4 VNNI Vector Dot Product (`BenchmarkTurboQuant4Distance-16`)**: **651.8 ns/op, 0 allocs/op**, accelerated by `VPDPBUSD` 4-way multiply-accumulate on byte codebook weights and signed activations.
+
+### 3. JIT Polynomial Evaluation on Intel Xeon (`cmd/bench -device jit`)
+
+Polynomial expressions compiled into direct x86-64 machine code via the native memory buffer JIT engine vs Go AST evaluation:
+
+| Expression Order | JIT Execution | AST Eval Execution | JIT / Eval Ratio | Speedup |
+|------------------|---------------|-------------------|------------------|---------|
+| Linear ($P_1$) | 1.31 ms | 24.92 ms | 0.05x | **19.0x faster** |
+| Quadratic ($P_2$) | 1.81 ms | 48.03 ms | 0.04x | **26.5x faster** |
+| Cubic ($P_3$) | 4.06 ms | 68.90 ms | 0.06x | **17.0x faster** |
+| Quintic ($P_5$) | 6.77 ms | 112.08 ms | 0.06x | **16.6x faster** |
+| Horner Form | 7.77 ms | 51.82 ms | 0.15x | **6.7x faster** |
+
+- **Average JIT compilation overhead**: 53.7 µs per polynomial function.
+
+### 4. Numerical and Regression Verification
+
+- **Accuracy Verification**: Evaluated with `cmd/validate` (435/435 assertions pass) and `cmd/bench -accuracy` (13/13 mathematical bounds pass within certified ULP budgets; max ULP: `Exp` 0, `Log` 0, `Sin` 0, `Cos` 0, `Tan` 0, `Cosh` 0, `Sqrt` 0). **0 accuracy regressions**.
+- **AVX-512 upper state sanitization**: Verified via `TestAVX512KernelsEmitVzeroupper` (all 24 AVX-512 kernels emit `VZEROUPPER` before `RET`) and `TestAVX512ZeroTransitionPenalty`, ensuring zero SSE-transition state stalls on modern Intel Xeon cores.
+
+

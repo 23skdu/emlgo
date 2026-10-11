@@ -102,6 +102,102 @@ func TestMulScalarSIMDF32(t *testing.T) {
 	}
 }
 
+func TestSubSIMDF32(t *testing.T) {
+	for _, n := range []int{0, 1, 7, 16, 31, 32, 35, 64, 73} {
+		a := make([]float32, n)
+		b := make([]float32, n)
+		dst := make([]float32, n)
+		for i := 0; i < n; i++ {
+			a[i] = float32(i * 3)
+			b[i] = float32(i + 1)
+		}
+		SubSIMDF32To(a, b, dst)
+		for i := 0; i < n; i++ {
+			want := a[i] - b[i]
+			if dst[i] != want {
+				t.Fatalf("SubSIMDF32To n=%d i=%d got %f want %f", n, i, dst[i], want)
+			}
+		}
+		got := SubSIMDF32(a, b)
+		for i := 0; i < n; i++ {
+			if got[i] != dst[i] {
+				t.Fatalf("SubSIMDF32 n=%d i=%d got %f want %f", n, i, got[i], dst[i])
+			}
+		}
+	}
+}
+
+func TestDivSIMDF32(t *testing.T) {
+	for _, n := range []int{0, 1, 7, 16, 31, 32, 35, 64, 73} {
+		a := make([]float32, n)
+		b := make([]float32, n)
+		dst := make([]float32, n)
+		for i := 0; i < n; i++ {
+			a[i] = float32((i + 1) * 6)
+			b[i] = float32(i + 2)
+		}
+		DivSIMDF32To(a, b, dst)
+		for i := 0; i < n; i++ {
+			want := a[i] / b[i]
+			if math.Abs(float64(dst[i]-want)) > 1e-6 {
+				t.Fatalf("DivSIMDF32To n=%d i=%d got %f want %f", n, i, dst[i], want)
+			}
+		}
+		got := DivSIMDF32(a, b)
+		for i := 0; i < n; i++ {
+			if got[i] != dst[i] {
+				t.Fatalf("DivSIMDF32 n=%d i=%d got %f want %f", n, i, got[i], dst[i])
+			}
+		}
+	}
+}
+
+func TestAddMulSqrtSIMDF32To(t *testing.T) {
+	for _, n := range []int{0, 1, 7, 16, 31, 32, 35, 64, 73} {
+		a := make([]float32, n)
+		b := make([]float32, n)
+		dstAdd := make([]float32, n)
+		dstMul := make([]float32, n)
+		dstSqrt := make([]float32, n)
+		for i := 0; i < n; i++ {
+			a[i] = float32(i + 1)
+			b[i] = float32(i + 2)
+		}
+		AddSIMDF32To(a, b, dstAdd)
+		MulSIMDF32To(a, b, dstMul)
+		SqrtSIMDF32To(a, dstSqrt)
+		for i := 0; i < n; i++ {
+			if dstAdd[i] != a[i]+b[i] {
+				t.Fatalf("AddSIMDF32To n=%d got %f want %f", n, dstAdd[i], a[i]+b[i])
+			}
+			if dstMul[i] != a[i]*b[i] {
+				t.Fatalf("MulSIMDF32To n=%d got %f want %f", n, dstMul[i], a[i]*b[i])
+			}
+			wantSqrt := float32(math.Sqrt(float64(a[i])))
+			if math.Abs(float64(dstSqrt[i]-wantSqrt)) > 1e-6 {
+				t.Fatalf("SqrtSIMDF32To n=%d got %f want %f", n, dstSqrt[i], wantSqrt)
+			}
+		}
+	}
+}
+
+func TestDotInt8SIMD(t *testing.T) {
+	for _, n := range []int{0, 1, 7, 63, 64, 65, 127, 128, 137} {
+		a := make([]uint8, n)
+		b := make([]int8, n)
+		var expected int32
+		for i := 0; i < n; i++ {
+			a[i] = uint8((i * 3) % 256)
+			b[i] = int8((i*5)%256 - 128)
+			expected += int32(a[i]) * int32(b[i])
+		}
+		got := DotInt8SIMD(a, b)
+		if got != expected {
+			t.Fatalf("DotInt8SIMD n=%d got %d want %d", n, got, expected)
+		}
+	}
+}
+
 func BenchmarkExpSIMDF32VsF64(b *testing.B) {
 	const n = 1024
 	f32in := make([]float32, n)

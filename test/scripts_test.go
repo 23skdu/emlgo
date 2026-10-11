@@ -275,6 +275,9 @@ func TestWasmTestScript(t *testing.T) {
 	if err != nil {
 		t.Skip("bash not found; skipping bash script tests")
 	}
+	if _, err := exec.LookPath("node"); err != nil {
+		t.Skip("node not found; skipping wasm_test.sh tests")
+	}
 
 	t.Run("BashSyntaxCheck", func(t *testing.T) {
 		cmd := exec.Command(bashPath, "-n", scriptPath)

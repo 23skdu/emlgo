@@ -115,3 +115,41 @@ func dispatchSubSatInt8SIMD(a, b, result []int8) {
 		result[i] = int8(v)
 	}
 }
+
+func dispatchDotInt8SIMD(a []uint8, b []int8) int32 {
+	var sum int32
+	for i := range a {
+		sum += int32(a[i]) * int32(b[i])
+	}
+	return sum
+}
+
+func dispatchAddSIMDF32To(a, b, dst []float32) {
+	for i := range a {
+		dst[i] = a[i] + b[i]
+	}
+}
+
+func dispatchSubSIMDF32To(a, b, dst []float32) {
+	for i := range a {
+		dst[i] = a[i] - b[i]
+	}
+}
+
+func dispatchMulSIMDF32To(a, b, dst []float32) {
+	for i := range a {
+		dst[i] = a[i] * b[i]
+	}
+}
+
+func dispatchDivSIMDF32To(a, b, dst []float32) {
+	for i := range a {
+		dst[i] = a[i] / b[i]
+	}
+}
+
+func dispatchSqrtSIMDF32To(src, dst []float32) {
+	for i := range src {
+		dst[i] = float32(nativeSqrt(float64(src[i])))
+	}
+}
