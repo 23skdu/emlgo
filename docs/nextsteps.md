@@ -8,9 +8,10 @@ Every step below cites measurements and audit findings from this repository.
 
 **Contents.**
 
-- **Completed & Verified Milestones (Archived)** — Steps 1–8, 11–30 have been verified as fully implemented, covered by unit/fuzz tests with 100.0% statement coverage across all packages and zero race conditions under `go test -race ./...`, and archived from active work.
+- **Completed & Verified Milestones (Archived)** — Steps 1–8, 11–30 are retained as historical implementation records; their test evidence is listed in the table below.
 - **Part 1: Platform & Kernel Extensions (Hardware-gated)** — Steps 9 (ARM64 JIT) and 10 (AVX-512 kernels) remain open.
-- **Part 2: Residual Defects & Newly Measured Gaps** — Steps 31–40. All 10 are open. Steps 31–35 are residual defects in code that Steps 11–30 claimed to close; Steps 36–40 are gaps the v0.5 work exposed.
+- **Part 2: Residual Defects & Newly Measured Gaps** — Steps 31–40, all verified in the current status table. Steps 31–35 were residual defects in code that Steps 11–30 claimed to close; Steps 36–40 were gaps the v0.5 work exposed.
+- **Part 3: Numerical Assurance, Performance Evidence & DevSecOps** — Proposed Steps 41–50, based on this codebase review. These are work items, not claims that the current implementation has been certified.
 
 **Note on the archived table.** Every claim in the Steps 11–30 table was
 re-verified for this update. The following are **confirmed fixed**:
@@ -18,8 +19,10 @@ re-verified for this update. The following are **confirmed fixed**:
 (Step 12), `purego` compiles on all 8 target pairs (Step 15), Metal removed
 (Step 16), `-regression` now runs (Step 20), `StopWorkerPool` no longer poisons
 later calls, `complex_batch` and `Pipeline` now parallel, fastmath's exp
-underflow cliff and `LnRegularized` overflow both fixed. Coverage really is
-100.0% and `go test ./...` really is green.
+underflow cliff and `LnRegularized` overflow both fixed. Current full test and
+race suites pass, but coverage is not uniformly 100%: the latest package
+reports show 99.3% for `bigmath` and `jit`, and the new fixture parser has no
+package-local tests. Coverage is scoped evidence, not a correctness certificate.
 
 But **100% statement coverage is not evidence of correctness**, and Steps 34–35
 are cases where it actively misleads: a `nil` pointer dereference and a
@@ -35,8 +38,8 @@ independent implementation, or a second core count — was needed to see the bug
 
 | # | Step | Status | Headline Evidence |
 | :-- | :--- | :--- | :--- |
-| 9 | ARM64 JIT codegen | open | 17–30x for 2 of 3 server markets (Apple Silicon, Graviton) |
-| 10 | AVX-512 transcendental kernels | open | 2x speedup on AVX-512 hosts (Zen 4/5, Xeon Scalable) |
+| 9 | ARM64 JIT codegen | open | Potential 17–30x claim is unverified; requires ARM64 implementation and native measurements |
+| 10 | AVX-512 transcendental kernels | open | Potential 2x claim is unverified; requires AVX-512 hardware and accuracy/performance measurements |
 
 ### Current Status: Part 2 (Steps 31–40)
 
@@ -51,13 +54,34 @@ independent implementation, or a second core count — was needed to see the bug
 | 37 | Make the GA recovery result reproducible | **verified (complete)** | Multi-seed distribution pinned in `TestStep37_SeedDistribution` (median RMS measured across 12 seeds; bounds enforced); stochastic perturbation added to `tuneConstants` |
 | 38 | GA throughput is still ~1.26x | **verified (complete)** | `gaWorkerPool` reuses worker goroutines across generations; 16-worker regression eliminated (0.92-0.95x ratio vs 8-worker); zero-alloc `sortIndices`; accurate evaluation accounting |
 | 39 | Fix `wasm/bench.html` | **verified (complete)** | Real `cmd/wasmbench` package created; exports 6 batch ops (`emlgoExpBatch`, `emlgoLogBatch`, etc.) returning Float64Array; `make wasm` target added; 30/30 in-browser benchmarks pass |
-| 40 | Immutable tuning + correct the docs | **open (P1)** | exported mutable `var` read on every batch call |
+| 40 | Immutable tuning + correct the docs | **verified (complete)** | `SmallCutoff()` is atomic with explicit setters; dead tile-size/pragmas are absent; constants have package consumers; package docs match implementation |
 
 ---
 
+### Part 3: Numerical Assurance, Performance Evidence & DevSecOps (Steps 41–50)
+
+These steps focus on making numerical accuracy and performance claims
+reproducible, independently checkable, and safe to rely on. Status is tracked
+per item; open platform verification and hardware-gated work remain explicit.
+
+| # | Step | Status | Headline Evidence |
+| :-- | :--- | :--- | :--- |
+| 41 | Define numerical contracts and error budgets | **verified (complete)** | Added `docs/accuracy.md` with backend semantics, metrics, current budgets, and explicit assurance limits |
+| 42 | Add an independent high-precision oracle | **verified (complete)** | MPFR 4.2.2 float32/float64 exp/log vectors are generated, checked in, and consumed by FastMath and batch tests |
+| 43 | Measure accuracy over adversarial domains | **verified (complete)** | Seeded stratified sweeps, reduction-boundary neighbors, subnormal ULP checks, and worst-sample reports exposed FastExpF32 accuracy defect |
+| 44 | Make backend differential tests assert numerical correctness | **verified (complete)** | Float64/fused/float32, alias/tail, and special-value assertions pass; differential fuzzing found and fixed LogDiv/LogSub edge semantics and negative-zero AbsSIMDF32 |
+| 45 | Validate the verifier and mathematical identities | **verified (complete)** | Added caller-selected domain points, deterministic mismatch diagnostics, invalid-result errors, and non-mutating defaults |
+| 46 | Strengthen JIT numerical and resource-bound assurance | **verified (complete)** | Parser input, AST depth/node count, and code size are bounded; compiled-vs-AST fuzzing and concurrent executable-memory cleanup are tested |
+| 47 | Run tests on supported execution platforms | **in progress** | JS/WASM full suite now passes locally under Node; CI is configured to execute Linux/ARM64, macOS/ARM64, and Windows/AMD64 suites, pending hosted-runner results |
+| 48 | Make benchmark evidence repeatable and comparable | **verified (complete)** | Conflicting historical performance claims are explicitly withdrawn; reproducible benchmark commands and required environment metadata are documented |
+| 49 | Gate performance regressions on stable measurements | **verified (complete)** | Pull requests compare ten repeated batch benchmark samples against their base on the same runner; deterministic bootstrap 95% lower bound gates only regressions above 10% |
+| 50 | Harden CI and release supply-chain controls | **in progress** | Actions are pinned; Go 1.26 govulncheck reports zero reachable issues (its SSA frontend panics on Go 1.27); SPDX SBOM and provenance are wired, with hosted release verification pending |
+
 ## Completed & Verified Milestones (Archived)
 
-The following 28 steps have been verified as complete in the codebase, with automated regression and fuzz tests in place, maintaining 100.0% statement coverage and zero race conditions:
+The following 28 steps are retained as completed implementation records. The
+listed regression and fuzz tests remain useful evidence, but the historical
+100% coverage summary should not be read as a current global coverage claim.
 
 | # | Step | Completed In | Result / Evidence | Verification Suite |
 | :-- | :--- | :--- | :--- | :--- |
@@ -876,9 +900,21 @@ CI, not just locally.
 
 ---
 
-## Step 40 — Immutable tuning, dead constants, and stale claims (P1)
+## Step 40 — Reconcile tuning, dead constants, and stale claims (P1)
 
-Small, mechanical, and all of it currently reads as something it is not.
+**Current status: verified complete.** The original audit below was based on an
+older tree and its claims are stale. Re-audit confirms that `SmallCutoff()` is
+backed by `atomic.Int64`, `SetSmallCutoff` is the only cutoff tuning API,
+`SetParallelism`/`Parallelism` configure and report worker count, and neither
+`L1TileSize` nor `//go:inline` remains. `internal/constants` is imported by
+`pkg/arithmetic`, `pkg/hyper`, and `pkg/logexp`. The JIT package docs and
+`functab.go` both list 25 functions. Bytecode documentation describes columnar
+chunked evaluation, not a Go auto-vectorized VM. No code change was needed for
+this step; the roadmap audit has been corrected to avoid treating old findings
+as current defects.
+
+The following records the original rationale only; do not read it as a list of
+unresolved issues in the current tree.
 
 **Evidence — `SmallCutoff` is an exported mutable `var`, read on every batch
 call.**
@@ -987,7 +1023,7 @@ to documentation.
                    ├─ 37 GA result reproducible     doc says 4.5e-13, defaults 1.9e-1
                    ├─ 38 GA throughput              1.26x at 8 workers, regresses at 16
                    ├─ 39 fix wasm/bench.html        6 undefined globals
-                   └─ 40 immutable tuning + docs    exported mutable var; 23 dead pragmas
+                   └─ 40 immutable tuning + docs    verified; stale audit claims corrected
 ```
 
 ### Why Steps 31–35 are P0 despite 100% coverage
@@ -1056,3 +1092,209 @@ all read as working features to anyone who does not run them.
               38   39   40
    hardware   10 (after 31)                      9 (after 36)
 ```
+
+---
+
+## Proposed Steps 41–50 — Accuracy, Performance & DevSecOps
+
+These are follow-on improvement tasks identified while reviewing the math
+implementations, tests, benchmark documentation, and GitHub Actions workflows.
+The completion criteria below are deliberately measurable. Numerical thresholds
+must be chosen and documented per API; the goal is not to impose one tolerance
+on exact operations, approximations, and ill-conditioned expressions alike.
+
+### Step 41 — Define numerical contracts and error budgets (P0)
+
+**Change.** Create one accuracy/semantics matrix for every public math family
+and execution path: scalar, FastMath, batch, SIMD, JIT, complex, and
+`bigmath`. For each operation, record its domain, NaN/Inf/signed-zero and
+subnormal behavior, overflow/underflow behavior, whether it delegates to Go
+`math`, and its permitted absolute, relative, or ULP error. Include conditioning
+notes for expressions such as `exp(x)-log(y)`, where relative error becomes
+misleading near cancellation. Link package docs and published performance claims
+to this matrix; remove or qualify claims that cannot be supported by it.
+
+**Verify.** Every exported operation has a stated contract and a named test
+gate. Tests assert special-value classes and signed zero where promised, and
+accuracy budgets distinguish near-zero results from ordinary relative-error
+cases. Documentation does not imply bit-exact or correctly-rounded results
+unless the relevant contract and evidence support that claim.
+
+### Step 42 — Add an independent high-precision oracle (P0)
+
+**Evidence.** `math` is a useful production baseline but is not an independent
+high-precision proof oracle. `internal/eml/bigmath` is maintained in this
+repository, so comparing it only with other emlgo paths can allow correlated
+errors to pass.
+
+**Change.** Establish a reproducible MPFR-backed reference workflow, pinned to
+a recorded MPFR version and precision, that generates checked-in golden vectors
+for representative scalar, FastMath, and batch operations. Cover rounding to
+float32/float64, domain errors, signed zero, subnormals, and overflow boundaries.
+Keep MPFR out of the runtime dependency graph; document the exact regeneration
+command and provenance of the fixtures. Independently review the existing
+`ExactLogOracle` before treating it as a general-purpose oracle.
+
+**Verify.** Golden vectors are reproducible from the documented toolchain,
+include the reference precision and rounding mode, and are consumed by tests
+without requiring MPFR on ordinary Go test runs. At least one deliberate
+off-by-budget fixture proves the gate fails.
+
+### Step 43 — Measure accuracy over adversarial domains (P0)
+
+**Evidence.** `pkg/fastmath/fast_test.go` checks `FastExpMinimax` and
+`FastLogMinimax` at a small set of hand-picked inputs. Existing dense coverage
+is useful but differs by operation and does not establish a consistent,
+full-domain accuracy envelope for all float32/float64 approximations.
+
+**Change.** Build deterministic, seeded sweeps for each approximation across
+its full finite domain, stratified by exponent and mantissa. Add `Nextafter`
+neighbors around zero, powers of two, polynomial/range-reduction boundaries,
+subnormal/normal transitions, and overflow/underflow cutoffs. Record worst
+absolute, relative, and ULP errors and the input producing each maximum.
+Exercise special-value classes separately, and keep FastMath's relaxed budget
+distinct from standard-accuracy APIs.
+
+**Verify.** CI checks each documented budget using the Step 42 vectors plus
+repeatable sweeps; failures print the operation, input bits, reference, result,
+and error metrics. A generated report must agree with the public accuracy
+claims before those claims are updated.
+
+### Step 44 — Make backend differential tests assert numerical correctness (P0)
+
+**Evidence.** Some targets in `internal/eml/fuzz_test.go` only assert output
+length, or call the operation without checking results. The dense accuracy test
+in `simd_accuracy_test.go` covers selected operations and domains, but a fuzz
+target that accepts arbitrary input bytes is only useful for numerical
+assurance when it compares the computed result to an oracle.
+
+**Change.** For every batch operation and build-tagged SIMD backend, compare
+results against the scalar contract or Step 42 oracle. Fuzz mismatched lengths,
+empty and short slices, vector-width and tail boundaries, overlapping
+source/destination buffers where supported, and exceptional values. Preserve
+and minimize failing seeds as regression cases. Make fuzz assertions check
+correctness (including NaN/Inf class), not just absence of panic or output
+shape.
+
+**Verify.** Every exported `*Batch`/`*SIMDTo` function has a direct or shared
+differential test. The suite runs with `purego` and each available SIMD path;
+recorded fuzz regressions run in normal CI. ULP comparisons use an ordered
+float-bit mapping that handles negative values and signed zero correctly.
+
+### Step 45 — Validate the verifier and mathematical identities (P1)
+
+**Evidence.** `internal/eml/bigmath/verify.go` samples only positive values in
+`(0.1, 10)`, uses a deterministic seed, and returns only `bool`. That is
+adequate as a smoke check, but does not cover function-specific domains or
+make a failed point directly reproducible to a caller.
+
+**Change.** Add a diagnostic verification API or test helper that reports the
+first failing input, both results, precision, and measured error while
+preserving the existing API if compatibility requires it. Use deterministic
+stratified points, including domain boundaries and negative/large/small values
+where valid. Validate the verifier itself against known-equivalent and
+deliberately unequal functions at multiple precisions. Add independent
+metamorphic checks for identities such as `sin²+cos²=1`, inverse pairs, and
+`exp(log(x))=x`, with conditioning-aware tolerances.
+
+**Verify.** Tests demonstrate that precision and tolerance changes affect
+acceptance as specified, invalid domains are handled explicitly, and failures
+include a replayable point. Identity tests compare implementation paths and do
+not use the same expression implementation as both sides of an assertion.
+
+### Step 46 — Strengthen JIT numerical and resource-bound assurance (P1)
+
+**Evidence.** `internal/jit` parses expressions and emits executable memory on
+supported platforms. It already has parser/evaluator fuzz tests, depth guards,
+and executable-memory error paths; these should be tied to explicit limits and
+numerical acceptance rather than panic-only checks.
+
+**Change.** Define limits for expression length, AST depth/node count, compile
+time/memory, and cache growth for untrusted or generated expressions. Extend
+fuzz/property tests to compare compiled output with the AST evaluator and
+high-precision vectors across domains, including NaN/Inf, subnormals, and
+overflow. Test all executable-memory allocation/protection/free error paths
+and verify writable memory is not left executable during code generation.
+Document that JIT compilation should not be exposed to untrusted input without
+the stated limits.
+
+**Verify.** Boundary tests prove inputs just inside limits compile and inputs
+over limits fail with errors rather than panic or unbounded work. Differential
+tests enforce per-operation budgets; platform tests confirm generated memory
+permissions and cleanup behavior.
+
+### Step 47 — Run tests on supported execution platforms (P1)
+
+**Evidence.** `.github/workflows/ci.yml` runs the test suite on Ubuntu and
+cross-builds ARM64, macOS, Windows, JS/WASM, and WASI/WASM. A successful
+cross-build does not execute assembly, feature dispatch, operating-system
+memory APIs, or WASM runtime behavior.
+
+**Change.** Add native ARM64 and macOS test jobs where runners are available,
+plus executable JS/WASM tests under a pinned runtime. Use emulation only as a
+supplement where native hardware is unavailable. Exercise `purego` and
+architecture-specific build tags explicitly. For CUDA, keep hardware tests
+opt-in but run stub/API validation on every CI build and document the
+hardware-runner acceptance process.
+
+**Verify.** CI reports separately which targets were built and which were
+executed. Each supported execution target runs correctness tests; SIMD dispatch
+reports and tests the implementation selected on that runner.
+
+### Step 48 — Make benchmark evidence repeatable and comparable (P1)
+
+**Evidence.** `docs/performance.md` reports batch speedups while
+`docs/comparison.md` describes CPU batch performance as slower and not
+accuracy-tested. The benchmark records in the docs lack a single authoritative,
+machine-readable result set and consistent environment metadata.
+
+**Change.** Standardize on Go benchmarks for measured code paths, with setup
+outside the timer, consumed results to prevent dead-code elimination, warm-up
+policy, multiple samples, `-benchmem`, and a documented `benchstat` comparison.
+Measure scalar, allocating batch, in-place batch, and fused paths separately
+across small/threshold/large inputs. Record CPU model/features, OS, Go version,
+build tags, concurrency, input distribution, and command alongside results.
+Label end-to-end GPU timing separately from kernel-only timing.
+
+**Verify.** A clean checkout can reproduce a published benchmark command and
+produce the same result schema. Both performance documents draw figures from
+the same dated source data or clearly mark historical results; contradictory
+claims are removed.
+
+### Step 49 — Gate performance regressions on stable measurements (P1)
+
+**Evidence.** `cmd/bench -regression` compares measured ratios to fixed
+emlgo-versus-`math` ratios. A single run is sensitive to host load and does
+not distinguish noise from a regression against a previous emlgo revision.
+
+**Change.** Retain comparisons against Go `math` for contextual reporting, but
+add same-runner before/after benchmarks with repeated samples and statistical
+comparison. Gate only stable, representative workloads on controlled runners;
+use per-platform baselines and generous noise-aware thresholds. Keep ordinary
+shared CI informational if hardware is not controlled, and avoid turning
+benchmark variability into flaky correctness failures.
+
+**Verify.** An intentional slowdown in a representative kernel is detected
+reliably in repeated controlled runs, while identical revisions and known
+noise do not fail. Regression output names the affected workload, baseline,
+current estimate, and uncertainty.
+
+### Step 50 — Harden CI and release supply-chain controls (P1)
+
+**Evidence.** CI runs `gosec`, but `govulncheck` is only mentioned in
+`CONTRIBUTING.md`. Workflow actions use version tags, and
+`.github/workflows/release.yml` publishes checksummed binaries without an
+SBOM or verifiable build provenance.
+
+**Change.** Add `govulncheck ./...` and dependency review or equivalent
+vulnerability checks to CI. Set explicit least-privilege permissions per
+workflow/job, pin third-party actions to reviewed immutable commit SHAs, and
+protect release jobs with tag/ref validation. Generate an SBOM and provenance
+attestation for release artifacts; publish checksums and document how
+consumers verify the release and its source tag.
+
+**Verify.** CI fails on an introduced reachable known vulnerability or
+unreviewed dependency policy violation. A release can be traced to its
+protected source tag and workflow run, its artifacts have a verifiable
+provenance attestation and SBOM, and workflow permissions grant no more than
+the job requires.

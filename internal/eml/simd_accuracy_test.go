@@ -1,6 +1,7 @@
 package eml
 
 import (
+	"fmt"
 	"math"
 	"testing"
 )
@@ -50,20 +51,27 @@ func withinBudget(err, want float64) bool {
 	return err <= budgetAbsTol+budgetRelTol*math.Abs(want)
 }
 
-// ulpDistance returns the number of representable float64 values between a and
-// b. It returns 0 for NaN/Inf pairs and for bit-identical values.
+// ulpDistance returns the number of representable float64 values between
+// finite a and b, or the maximum uint64 for non-finite arguments.
 func ulpDistance(a, b float64) uint64 {
 	if a == b {
 		return 0
 	}
 	if math.IsNaN(a) || math.IsNaN(b) || math.IsInf(a, 0) || math.IsInf(b, 0) {
-		return 0
+		return ^uint64(0)
 	}
-	x, y := math.Float64bits(a), math.Float64bits(b)
+	x, y := orderedFloat64Bits(math.Float64bits(a)), orderedFloat64Bits(math.Float64bits(b))
 	if x > y {
 		return x - y
 	}
 	return y - x
+}
+
+func orderedFloat64Bits(bits uint64) uint64 {
+	if bits&(uint64(1)<<63) != 0 {
+		return ^bits
+	}
+	return bits | (uint64(1) << 63)
 }
 
 // denseGrid returns n evenly spaced values over [lo, hi].
@@ -269,6 +277,127 @@ func TestBatchSinCosZeros(t *testing.T) {
 			worst, worstX, budgetAbsTol)
 	}
 	t.Logf("cos near ±π/2: worst absolute error %.3g at x=%.17g", worst, worstX)
+}
+
+func TestSIMDToDifferentialAndAliasing(t *testing.T) {
+	values := []float64{
+		math.Inf(-1), -1, math.Copysign(0, -1), math.SmallestNonzeroFloat64,
+		0.1, 1, 2, math.Inf(1), math.NaN(),
+	}
+	sizes := []int{0, 1, 2, 3, 4, 7, 8, 9, 15, 16, 17, 31, 32, 33}
+	unary := []struct {
+		name string
+		fn   func([]float64, []float64)
+		ref  func(float64) float64
+	}{
+		{"exp", ExpSIMDTo, math.Exp},
+		{"log", LogSIMDTo, ExactLogOracle},
+		{"log2", Log2SIMDTo, nativeLog2},
+		{"log10", Log10SIMDTo, nativeLog10},
+		{"sqrt", SqrtSIMDTo, math.Sqrt},
+		{"sin", SinSIMDTo, math.Sin},
+		{"cos", CosSIMDTo, math.Cos},
+		{"tan", TanSIMDTo, math.Tan},
+		{"abs", AbsSIMDTo, math.Abs},
+		{"neg", NegSIMDTo, func(x float64) float64 { return -x }},
+		{"inv", InvSIMDTo, func(x float64) float64 { return 1 / x }},
+	}
+	for _, n := range sizes {
+		input := make([]float64, n)
+		for i := range input {
+			input[i] = values[i%len(values)]
+		}
+		for _, op := range unary {
+			t.Run(fmt.Sprintf("%s/n=%d", op.name, n), func(t *testing.T) {
+				want := make([]float64, n)
+				for i, x := range input {
+					want[i] = op.ref(x)
+				}
+				inPlace := append([]float64(nil), input...)
+				op.fn(inPlace, inPlace)
+				for i := range want {
+					assertFuzzClose(t, op.name, inPlace[i], want[i])
+				}
+			})
+		}
+
+		sinWant, cosWant := make([]float64, n), make([]float64, n)
+		for i, x := range input {
+			sinWant[i], cosWant[i] = math.Sincos(x)
+		}
+		inPlaceSin := append([]float64(nil), input...)
+		cosOut := make([]float64, n)
+		SinCosSIMDTo(inPlaceSin, inPlaceSin, cosOut)
+		for i := range input {
+			assertFuzzClose(t, "sincos-sin alias", inPlaceSin[i], sinWant[i])
+			assertFuzzClose(t, "sincos-cos", cosOut[i], cosWant[i])
+		}
+
+		a, b := append([]float64(nil), input...), make([]float64, n)
+		for i := range b {
+			b[i] = values[(i+3)%len(values)]
+		}
+		binary := []struct {
+			name string
+			fn   func([]float64, []float64, []float64)
+			ref  func(float64, float64) float64
+		}{
+			{"add", AddSIMDTo, func(x, y float64) float64 { return x + y }},
+			{"sub", SubSIMDTo, func(x, y float64) float64 { return x - y }},
+			{"mul", MulSIMDTo, func(x, y float64) float64 { return x * y }},
+			{"div", DivSIMDTo, func(x, y float64) float64 { return x / y }},
+		}
+		for _, op := range binary {
+			want := make([]float64, n)
+			for i := range want {
+				want[i] = op.ref(a[i], b[i])
+			}
+			inPlace := append([]float64(nil), a...)
+			op.fn(inPlace, b, inPlace)
+			for i := range want {
+				assertFuzzExact(t, op.name+" alias-a", inPlace[i], want[i])
+			}
+			inPlace = append([]float64(nil), b...)
+			op.fn(a, inPlace, inPlace)
+			for i := range want {
+				assertFuzzExact(t, op.name+" alias-b", inPlace[i], want[i])
+			}
+		}
+
+		for _, op := range []struct {
+			name   string
+			fn     func([]float64, float64, []float64)
+			ref    func(float64, float64) float64
+			scalar float64
+		}{
+			{"add-scalar", AddScalarSIMDTo, func(x, y float64) float64 { return x + y }, 1.25},
+			{"mul-scalar", MulScalarSIMDTo, func(x, y float64) float64 { return x * y }, -2.5},
+		} {
+			want := make([]float64, n)
+			inPlace := append([]float64(nil), input...)
+			for i, x := range input {
+				want[i] = op.ref(x, op.scalar)
+			}
+			op.fn(inPlace, op.scalar, inPlace)
+			for i := range want {
+				assertFuzzExact(t, op.name+" alias", inPlace[i], want[i])
+			}
+		}
+
+		c := make([]float64, n)
+		for i := range c {
+			c[i] = values[(i+6)%len(values)]
+		}
+		wantFMA := make([]float64, n)
+		inPlaceFMA := append([]float64(nil), input...)
+		for i := range c {
+			wantFMA[i] = math.FMA(input[i], b[i], c[i])
+		}
+		FmaSIMDTo(inPlaceFMA, b, c, inPlaceFMA)
+		for i := range c {
+			assertFuzzClose(t, "fma alias-a", inPlaceFMA[i], wantFMA[i])
+		}
+	}
 }
 
 // TestBatchKernelMatchesScalarPath checks that the vectorised path agrees with

@@ -49,7 +49,7 @@ The `bigmath` package provides a `math/big.Float`-based backend for symbolic ver
 
 - **Taylor series** implementations of Exp, Log, Sin, Cos, Tan, Atan, Asin, Acos with range reduction
 - π is generated as `4·atan(1)` via the complex EML operator in `internal/constants.GeneratePi`
-- **IdentityVerifier**: Tests symbolic identities (e.g., sin²(x) + cos²(x) = 1) by evaluating at random high-precision points
+- **IdentityVerifier**: Tests symbolic identities at deterministic points. `VerifyIdentity` uses a reproducible positive sample set; `VerifyIdentityAt` lets callers supply domain-appropriate points and reports the first mismatch, including its input, values, relative error, and threshold.
 
 Default precision: 256 bits. All functions accept and return `*big.Float`.
 
@@ -63,6 +63,11 @@ The arena allocator provides zero-allocation paths for JIT expression parsing an
 - **Evaluation**: `EvalArena` evaluates arena-allocated trees without touching the heap
 
 This eliminates garbage collector pressure in hot paths where expressions are parsed and evaluated repeatedly.
+The parser limits source expressions to 1 MiB and bounds AST depth and node
+count; native JIT compilation additionally limits emitted code size.
+Executable code is allocated writable and then changed to read/execute before
+being exposed, and `CodeHandle.Free` releases that allocation after callers
+have stopped invoking the compiled function.
 
 ## 7. Canonical EML Tree Representation (`internal/jit/canonical.go`)
 

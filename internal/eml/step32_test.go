@@ -2,10 +2,14 @@ package eml
 
 import (
 	"math"
+	"runtime"
 	"testing"
 )
 
 func TestStep32_AllocsPerRun(t *testing.T) {
+	if runtime.GOOS == "js" {
+		t.Skip("allocation counts are not stable on js/wasm")
+	}
 	n := 1024
 	a := make([]float64, n)
 	b := make([]float64, n)
@@ -171,4 +175,3 @@ func TestStep32_LargeSliceParallelOps(t *testing.T) {
 	AddScalarSIMDTo(x, 2.0, res)
 	MulScalarSIMDTo(x, 2.0, res)
 }
-

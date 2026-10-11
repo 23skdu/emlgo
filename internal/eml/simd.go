@@ -549,19 +549,11 @@ func applyFusedOp(job parallelJob) {
 		}
 	case fusedLogDiv:
 		for j := job.start; j < job.end; j++ {
-			if a[j] > 0 && b[j] > 0 {
-				result[j] = nativeLog(a[j]) / b[j]
-			} else {
-				result[j] = nan()
-			}
+			result[j] = nativeLog(a[j]) / b[j]
 		}
 	case fusedLogSub:
 		for j := job.start; j < job.end; j++ {
-			if a[j] > 0 {
-				result[j] = nativeLog(a[j]) - b[j]
-			} else {
-				result[j] = nan()
-			}
+			result[j] = nativeLog(a[j]) - b[j]
 		}
 	}
 }

@@ -582,6 +582,9 @@ func (g *generator) genPowUint(base Node, n int, dst byte) error {
 }
 
 func compileToCode(n Node) ([]byte, error) {
+	if err := validateASTLimits(n); err != nil {
+		return nil, err
+	}
 	var g generator
 	g.used[0] = true    // xmm0 is the return register and holds initial x
 	g.used[xReg] = true // xmm15 (xReg) holds input variable x
@@ -591,5 +594,8 @@ func compileToCode(n Node) ([]byte, error) {
 	}
 	g.enc.emit(0xC3)
 	g.enc.fixupConstants()
+	if len(g.enc.code) > MaxJITCodeSize {
+		return nil, fmt.Errorf("generated code exceeds maximum size (%d bytes)", MaxJITCodeSize)
+	}
 	return g.enc.code, nil
 }

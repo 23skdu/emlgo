@@ -119,6 +119,7 @@ type parser struct {
 	peek  token
 	ready bool
 	depth int
+	nodes int
 }
 
 func newParser(input string) *parser {
@@ -165,6 +166,12 @@ func (p *parser) consume(typ tokenType) (token, error) {
 
 // Parse parses a single-variable expression using "x" as the variable name.
 func Parse(input string) (Node, error) {
+	if len(input) > MaxExpressionLength {
+		return nil, &ParseError{
+			Pos: len(input),
+			Msg: fmt.Sprintf("expression length exceeds maximum (%d bytes)", MaxExpressionLength),
+		}
+	}
 	p := newParser(input)
 	node, err := p.parseExpr()
 	if err != nil {
@@ -175,7 +182,51 @@ func Parse(input string) (Node, error) {
 		pe := &ParseError{Pos: p.l.pos, Token: p.peekToken().value, Msg: "unexpected token"}
 		return nil, pe
 	}
+	if err := validateASTLimits(node); err != nil {
+		return nil, &ParseError{Pos: p.l.pos, Msg: err.Error()}
+	}
 	return node, nil
+}
+
+func validateASTLimits(root Node) error {
+	nodes := 0
+	var visit func(Node, int) error
+	visit = func(n Node, depth int) error {
+		if n == nil {
+			return fmt.Errorf("cannot use a nil AST node")
+		}
+		if depth > MaxASTDepth {
+			return fmt.Errorf("AST depth exceeds maximum (%d)", MaxASTDepth)
+		}
+		nodes++
+		if nodes > MaxASTNodes {
+			return fmt.Errorf("AST node count exceeds maximum (%d)", MaxASTNodes)
+		}
+		switch v := n.(type) {
+		case Number, Variable:
+			return nil
+		case UnaryOp:
+			return visit(v.Operand, depth+1)
+		case BinaryOp:
+			if err := visit(v.Left, depth+1); err != nil {
+				return err
+			}
+			return visit(v.Right, depth+1)
+		case FunctionCall:
+			return visit(v.Arg, depth+1)
+		default:
+			return fmt.Errorf("unsupported AST node type %T", n)
+		}
+	}
+	return visit(root, 0)
+}
+
+func (p *parser) addNode(n Node) (Node, error) {
+	p.nodes++
+	if p.nodes > MaxASTNodes {
+		return nil, fmt.Errorf("AST node count exceeds maximum (%d)", MaxASTNodes)
+	}
+	return n, nil
 }
 
 func validateVars(n Node, allowed map[string]bool) error {
@@ -251,7 +302,10 @@ func (p *parser) parseAddSub() (Node, error) {
 		if err != nil {
 			return nil, err
 		}
-		left = BinaryOp{Left: left, Op: rune(t.value[0]), Right: right}
+		left, err = p.addNode(BinaryOp{Left: left, Op: rune(t.value[0]), Right: right})
+		if err != nil {
+			return nil, err
+		}
 	}
 	return left, nil
 }
@@ -271,7 +325,10 @@ func (p *parser) parseMulDiv() (Node, error) {
 		if err != nil {
 			return nil, err
 		}
-		left = BinaryOp{Left: left, Op: rune(t.value[0]), Right: right}
+		left, err = p.addNode(BinaryOp{Left: left, Op: rune(t.value[0]), Right: right})
+		if err != nil {
+			return nil, err
+		}
 	}
 	return left, nil
 }
@@ -287,7 +344,10 @@ func (p *parser) parsePower() (Node, error) {
 		if err != nil {
 			return nil, err
 		}
-		left = BinaryOp{Left: left, Op: '^', Right: right}
+		left, err = p.addNode(BinaryOp{Left: left, Op: '^', Right: right})
+		if err != nil {
+			return nil, err
+		}
 	}
 	return left, nil
 }
@@ -300,7 +360,7 @@ func (p *parser) parseUnary() (Node, error) {
 		if err != nil {
 			return nil, err
 		}
-		return UnaryOp{Op: '-', Operand: operand}, nil
+		return p.addNode(UnaryOp{Op: '-', Operand: operand})
 	}
 	return p.parseBase()
 }
@@ -313,9 +373,9 @@ func (p *parser) parseBase() (Node, error) {
 		if err != nil {
 			return nil, fmt.Errorf("invalid number: %s", t.value)
 		}
-		return Number{Value: val}, nil
+		return p.addNode(Number{Value: val})
 	case tokX:
-		return Variable{Name: t.value}, nil
+		return p.addNode(Variable{Name: t.value})
 	case tokLParen:
 		node, err := p.parseExpr()
 		if err != nil {
@@ -339,7 +399,7 @@ func (p *parser) parseBase() (Node, error) {
 		if err != nil {
 			return nil, fmt.Errorf("missing ) after function argument")
 		}
-		return FunctionCall{Name: t.value, Arg: arg}, nil
+		return p.addNode(FunctionCall{Name: t.value, Arg: arg})
 	default:
 		return nil, fmt.Errorf("unexpected token: %s", t.value)
 	}

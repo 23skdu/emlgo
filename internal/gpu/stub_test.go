@@ -4,11 +4,15 @@
 package gpu
 
 import (
+	"runtime"
 	"strings"
 	"testing"
 )
 
 func TestStubGetDevices(t *testing.T) {
+	if runtime.GOOS == "js" {
+		t.Skip("GPU support is unavailable on js/wasm")
+	}
 	devices, err := GetDevices()
 	if err != nil {
 		t.Fatalf("GetDevices() should not error on linux/windows: %v", err)
@@ -33,6 +37,9 @@ func TestStubGetDevicesUnsupportedOS(t *testing.T) {
 }
 
 func TestStubStatus(t *testing.T) {
+	if runtime.GOOS == "js" {
+		t.Skip("GPU support is unavailable on js/wasm")
+	}
 	s := Status()
 	if s == "" {
 		t.Fatal("Status() returned empty string")

@@ -1,5 +1,33 @@
 # Comprehensive Performance Benchmark: emlgo vs Go math Library
 
+> **Status: historical, not current performance evidence.** The numerical
+> claims and tables below were recorded without retained raw benchmark output
+> and conflict with [comparison.md](comparison.md). Do not use them as
+> release claims or regression baselines. No cross-platform speedup is
+> currently certified by these documents.
+
+## Reproducing measurements
+
+Run repeated samples on an otherwise idle machine, on the same commit and
+machine for each implementation being compared:
+
+```sh
+go version
+go env GOOS GOARCH
+go test -run='^$' -bench='^(BenchmarkSIMD|BenchmarkExpSIMD|BenchmarkLogSIMD|BenchmarkAddSIMD)$' -benchmem -count=10 ./internal/eml
+```
+
+Record the commit, CPU model, OS/kernel, Go version, `GOMAXPROCS`, and raw
+output. Compare only results with matching benchmark names, input sizes, build
+tags, and runner configuration. Treat one machine's result as platform-specific;
+do not aggregate across architectures or compare isolated one-shot ratios. Library
+
+Pull requests additionally run the selected batch benchmarks against the base
+revision on the same GitHub-hosted runner. The gate uses ten samples and a
+deterministic bootstrap 95% lower confidence bound, failing only when that
+bound exceeds a 10% slowdown. See
+[`scripts/check_bench_regression.py`](../scripts/check_bench_regression.py). Library
+
 ## Executive Summary
 
 This document provides a cross-platform performance comparison between the `emlgo` library and the Go standard `math` library. Tests were conducted on both Apple Silicon (`darwin/arm64`) and Intel/AMD (`linux/amd64` AVX2 + FMA, 16 logical cores) architectures.
