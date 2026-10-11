@@ -84,3 +84,7 @@ bin/
 *.lib
 *.so.*
 
+# Python artifacts
+__pycache__/
+*.pyc
+
