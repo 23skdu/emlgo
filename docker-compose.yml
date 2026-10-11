@@ -6,7 +6,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.cpu
-    image: emlgo:cpu-avx2
+    image: ghcr.io/23skdu/emlgo:cpu
     container_name: emlgo-cpu
     command: ["demo"]
 
@@ -14,7 +14,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.cpu
-    image: emlgo:cpu-avx2
+    image: ghcr.io/23skdu/emlgo:cpu
     container_name: emlgo-cpu-bench
     entrypoint: ["bench"]
     command: ["-device", "cpu", "-n", "100000"]
@@ -24,7 +24,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.cpu
-    image: emlgo:cpu-avx2
+    image: ghcr.io/23skdu/emlgo:cpu
     container_name: emlgo-cpu-validate
     entrypoint: ["validate"]
     profiles: ["validate"]
@@ -38,7 +38,7 @@ services:
       dockerfile: Dockerfile.cuda
       args:
         CUDA_ARCH: ${CUDA_ARCH:-sm_89}
-    image: emlgo:cuda
+    image: ghcr.io/23skdu/emlgo:cuda
     container_name: emlgo-cuda
     command: ["gpu-status"]
     deploy:
@@ -55,7 +55,7 @@ services:
       dockerfile: Dockerfile.cuda
       args:
         CUDA_ARCH: ${CUDA_ARCH:-sm_89}
-    image: emlgo:cuda
+    image: ghcr.io/23skdu/emlgo:cuda
     container_name: emlgo-cuda-bench
     entrypoint: ["bench"]
     command: ["-device", "gpu", "-n", "100000"]
@@ -74,7 +74,7 @@ services:
       dockerfile: Dockerfile.cuda
       args:
         CUDA_ARCH: ${CUDA_ARCH:-sm_89}
-    image: emlgo:cuda
+    image: ghcr.io/23skdu/emlgo:cuda
     container_name: emlgo-cuda-verify
     command: ["gpu-verify"]
     deploy:

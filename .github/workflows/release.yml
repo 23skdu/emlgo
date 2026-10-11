@@ -74,10 +74,9 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push Docker images to GHCR
-        env:
-          IMAGE_REPO: ghcr.io/${{ github.repository }}
-          TAG: ${{ github.ref_name }}
         run: |
+          IMAGE_REPO="ghcr.io/$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')"
+          TAG="${{ github.ref_name }}"
           make docker-build-cpu TAG="${TAG}" IMAGE_REPO="${IMAGE_REPO}"
           make docker-build-cuda TAG="${TAG}" IMAGE_REPO="${IMAGE_REPO}"
           make docker-push TAG="${TAG}" IMAGE_REPO="${IMAGE_REPO}"
