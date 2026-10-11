@@ -1,5 +1,5 @@
 module github.com/emlgo/eml
 
-go 1.26.0
+go 1.27.2
 
-require golang.org/x/sys v0.48.0
+require golang.org/x/sys v0.49.0

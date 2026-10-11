@@ -1,4 +1,4 @@
-.PHONY: build test test-race test-cover bench lint vet fuzz clean wasm
+.PHONY: build test test-race test-cover bench lint vet fuzz clean wasm gosec govulncheck docker docker-build docker-build-cpu docker-build-cuda
 
 build:
 	go build ./...
@@ -50,6 +50,33 @@ fuzz:
 
 gosec:
 	gosec -exclude-generated -tags purego ./...
+
+govulncheck:
+	govulncheck ./... || go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
+IMAGE_REPO ?= ghcr.io/23skdu/emlgo
+TAG ?= 0.6
+CUDA_ARCH ?= sm_89
+
+docker-build-cpu:
+	docker build -f Dockerfile.cpu \
+		-t $(IMAGE_REPO)-cpu:$(TAG) \
+		-t $(IMAGE_REPO)-cpu:latest \
+		-t $(IMAGE_REPO):$(TAG)-cpu \
+		-t $(IMAGE_REPO):latest-cpu \
+		-t $(IMAGE_REPO):$(TAG) \
+		-t $(IMAGE_REPO):latest .
+
+docker-build-cuda:
+	docker build -f Dockerfile.cuda --build-arg CUDA_ARCH=$(CUDA_ARCH) \
+		-t $(IMAGE_REPO)-cuda:$(TAG) \
+		-t $(IMAGE_REPO)-cuda:latest \
+		-t $(IMAGE_REPO):$(TAG)-cuda \
+		-t $(IMAGE_REPO):latest-cuda .
+
+docker-build: docker-build-cpu docker-build-cuda
+
+docker: docker-build
 
 clean:
 	rm -f bench validate emlcli wasmbench coverage.out *.out *.test *.prof *.cov

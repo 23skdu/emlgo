@@ -116,7 +116,7 @@ func (c *jitCache) getShard(key string) *cacheShard {
 	if c.numShards == 1 {
 		return c.shards[0]
 	}
-	return c.shards[hashKey(key)%uint32(c.numShards)]
+	return c.shards[hashKey(key)%uint32(c.numShards)] // #nosec G115 -- numShards is bounded positive shard count
 }
 
 func (c *jitCache) get(key string) (Func, bool) {

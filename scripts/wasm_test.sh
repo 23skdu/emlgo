@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Build and run WASM SIMD tests with Node.js.
-# Requires: Go 1.21+, Node.js 16+ (for WASM SIMD support)
+# Requires: Go 1.27.2+, Node.js 16+ (for WASM SIMD support)
 #
 # Usage:
 #   ./scripts/wasm_test.sh            # build + test

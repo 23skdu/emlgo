@@ -395,7 +395,7 @@ func Search(cfg Config, dataset Dataset, fitness Fitness) (Result, error) {
 				var evalsTotal atomic.Int64
 				pool.parallelFor(cfg.Elitism, cfg.Workers, 1, func(start, end int) {
 					for i := start; i < end; i++ {
-						workerRng := rand.New(rand.NewSource(seed + int64(gen)*10007 + int64(i)*1009))
+						workerRng := rand.New(rand.NewSource(seed + int64(gen)*10007 + int64(i)*1009)) // #nosec G404 -- reproducible worker RNG for genetic optimization
 						evals := tuneConstants(elites[i], dataset, fitness, workerRng, cfg.LocalSearchSteps)
 						evalsTotal.Add(int64(evals))
 						if cfg.Optimize {
@@ -406,7 +406,7 @@ func Search(cfg Config, dataset Dataset, fitness Fitness) (Result, error) {
 				evaluations += int(evalsTotal.Load())
 			} else {
 				for i := 0; i < cfg.Elitism; i++ {
-					workerRng := rand.New(rand.NewSource(seed + int64(gen)*10007 + int64(i)*1009))
+					workerRng := rand.New(rand.NewSource(seed + int64(gen)*10007 + int64(i)*1009)) // #nosec G404 -- reproducible worker RNG for genetic optimization
 					evals := tuneConstants(elites[i], dataset, fitness, workerRng, cfg.LocalSearchSteps)
 					evaluations += evals
 					if cfg.Optimize {

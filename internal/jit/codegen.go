@@ -197,7 +197,7 @@ func (e *encoder) saveXMM(reg byte, offset int32) {
 		e.emit(0x44)
 	}
 	e.emit(0x0F, 0x11, e.modrm(2, reg&7, rsp), e.sib(0, 4, rsp))
-	e.emit32(uint32(offset))
+	e.emit32(uint32(offset)) // #nosec G115 -- signed displacement encoded as 32-bit two's complement
 }
 
 func (e *encoder) restoreXMM(reg byte, offset int32) {
@@ -206,7 +206,7 @@ func (e *encoder) restoreXMM(reg byte, offset int32) {
 		e.emit(0x44)
 	}
 	e.emit(0x0F, 0x10, e.modrm(2, reg&7, rsp), e.sib(0, 4, rsp))
-	e.emit32(uint32(offset))
+	e.emit32(uint32(offset)) // #nosec G115 -- signed displacement encoded as 32-bit two's complement
 }
 
 func (e *encoder) push16(reg byte) {

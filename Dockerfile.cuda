@@ -1,0 +1,89 @@
+# ==============================================================================
+# Dockerfile.cuda: EMLGo CUDA GPU Build
+#
+# Multi-stage container build targeting NVIDIA GPUs (sm_70 through sm_90).
+# Uses Go 1.27.2 toolchain + CUDA 12.6 devel compiler to build libeml_capi.so
+# and link the Go bridge via CGO.
+# ==============================================================================
+
+ARG CUDA_VERSION=12.6.3
+ARG GO_VERSION=1.27.2
+ARG CUDA_ARCH=sm_89
+
+# Stage 1: Go Toolchain provider
+FROM golang:${GO_VERSION}-bookworm AS go-toolchain
+
+# Stage 2: CUDA & CGO Builder
+FROM nvidia/cuda:${CUDA_VERSION}-devel-ubuntu24.04 AS builder
+
+ARG CUDA_ARCH
+ENV CUDA_ARCH=${CUDA_ARCH}
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Copy standalone Go distribution from toolchain stage
+COPY --from=go-toolchain /usr/local/go /usr/local/go
+ENV PATH="/usr/local/go/bin:${PATH}"
+
+WORKDIR /src
+
+# Install C/C++ compilation tools
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Cache dependency layer
+COPY go.mod go.sum* ./
+RUN go mod download
+
+# Copy source tree
+COPY . .
+
+# Compile CUDA shared library
+WORKDIR /src/cuda
+RUN make clean && make ARCH=${CUDA_ARCH}
+
+# Compile Go binaries with CGO and CUDA build tags
+WORKDIR /src
+ENV CGO_ENABLED=1
+ENV GOAMD64=v3
+ENV GOOS=linux
+ENV GOARCH=amd64
+ENV LIBRARY_PATH="/usr/local/cuda/lib64:/usr/local/cuda/lib64/stubs:${LIBRARY_PATH}"
+ENV LD_LIBRARY_PATH="/usr/local/cuda/lib64:/usr/local/cuda/lib64/stubs:/src/cuda:${LD_LIBRARY_PATH}"
+ENV CGO_LDFLAGS="-L/usr/local/cuda/lib64 -L/usr/local/cuda/lib64/stubs"
+
+RUN mkdir -p /out && \
+    go build -tags cuda -trimpath -ldflags="-s -w" -o /out/emlcli ./cmd/emlcli && \
+    go build -tags cuda -trimpath -ldflags="-s -w" -o /out/bench ./cmd/bench && \
+    go build -tags cuda -trimpath -ldflags="-s -w" -o /out/validate ./cmd/validate && \
+    cp /src/cuda/libeml_capi.so /out/libeml_capi.so
+
+# ==============================================================================
+# Stage 3: Minimal CUDA Runtime
+# ==============================================================================
+FROM nvidia/cuda:${CUDA_VERSION}-runtime-ubuntu24.04 AS runtime
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN groupadd -r emlgo && useradd -r -g emlgo -m -d /home/emlgo emlgo
+
+# Install CUDA shared library into system library directory
+COPY --from=builder /out/libeml_capi.so /usr/local/lib/libeml_capi.so
+RUN ldconfig
+
+# Copy compiled binaries
+COPY --from=builder /out/emlcli /usr/local/bin/emlcli
+COPY --from=builder /out/bench /usr/local/bin/bench
+COPY --from=builder /out/validate /usr/local/bin/validate
+
+# Configure NVIDIA container toolkit environment
+ENV NVIDIA_VISIBLE_DEVICES=all
+ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
+ENV LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH}"
+
+WORKDIR /home/emlgo
+USER emlgo:emlgo
+
+ENTRYPOINT ["emlcli"]
+CMD ["gpu-status"]

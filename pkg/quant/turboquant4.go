@@ -132,7 +132,7 @@ func EncodeTurboQuant4(vec []float32, pow2 int) ([]byte, error) {
 			theta := math.Atan2(float64(y), float64(x))
 
 			bin := clampAngleBin(int(math.Round(((theta + math.Pi) / (2 * math.Pi)) * 15.0)))
-			qIndices[angleOffset+i] = byte(bin)
+			qIndices[angleOffset+i] = byte(bin) // #nosec G115 -- clampAngleBin guarantees 0 <= bin <= 15
 			nextRadii[i] = r
 		}
 		angleOffset += halfLen
