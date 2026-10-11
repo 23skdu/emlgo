@@ -201,11 +201,7 @@ func DivSIMDF32(a, b []float32) []float32 {
 func AbsSIMDF32(x []float32) []float32 {
 	dst := make([]float32, len(x))
 	for i, v := range x {
-		if v < 0 {
-			dst[i] = -v
-		} else {
-			dst[i] = v
-		}
+		dst[i] = math.Float32frombits(math.Float32bits(v) & 0x7fffffff)
 	}
 	return dst
 }

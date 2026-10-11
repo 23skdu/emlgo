@@ -1,5 +1,5 @@
-//go:build (!arm64 && !wasm) || purego
-// +build !arm64,!wasm purego
+//go:build !arm64 || purego || wasm
+// +build !arm64 purego wasm
 
 package eml
 
@@ -24,4 +24,3 @@ func addSVE(a, b, result []float64) {
 func detectARM64SIMD() {
 	_ = 0
 }
-

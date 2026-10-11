@@ -115,3 +115,49 @@ func FuzzEval(f *testing.F) {
 		}
 	})
 }
+
+func FuzzCompileMatchesEval(f *testing.F) {
+	for _, expr := range []string{
+		"x", "x + 1", "x^2 - 3*x + 2", "sin(x)", "exp(x)", "log(x+2)",
+		"sqrt(abs(x))", "x^3 + 2*x + 1", "x^0.5",
+	} {
+		f.Add(expr)
+	}
+	f.Fuzz(func(t *testing.T, expr string) {
+		if len(expr) > 4096 || strings.ContainsAny(expr, "\x00\n\r\t") {
+			t.Skip()
+		}
+		ast, err := Parse(expr)
+		if err != nil {
+			return
+		}
+		fn, handle, err := NewCompiler().CompileAST(ast)
+		if err != nil {
+			return
+		}
+		defer func() {
+			if err := handle.Free(); err != nil {
+				t.Errorf("Free() error = %v", err)
+			}
+		}()
+		for _, x := range []float64{-2, -0.5, 0, 0.5, 2} {
+			want, got := Eval(ast, x), fn(x)
+			if math.IsNaN(want) || math.IsNaN(got) {
+				if math.IsNaN(want) && math.IsNaN(got) {
+					continue
+				}
+				t.Fatalf("Compile(%q)(%g) = %g; Eval = %g", expr, x, got, want)
+			}
+			if math.IsInf(want, 0) || math.IsInf(got, 0) {
+				if want == got {
+					continue
+				}
+				t.Fatalf("Compile(%q)(%g) = %g; Eval = %g", expr, x, got, want)
+			}
+			scale := math.Max(1, math.Abs(want))
+			if math.Abs(got-want) > 1e-10*scale {
+				t.Fatalf("Compile(%q)(%g) = %.17g; Eval = %.17g", expr, x, got, want)
+			}
+		}
+	})
+}

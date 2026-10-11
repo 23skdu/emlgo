@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	"sync"
 	"testing"
 )
 
@@ -36,6 +37,51 @@ func TestJITSimple(t *testing.T) {
 		got := f(tc.x)
 		if math.Abs(got-tc.want) > 1e-14 {
 			t.Errorf("%s at x=%v: f = %v, want %v", tc.expr, tc.x, got, tc.want)
+		}
+	}
+}
+
+func TestCompileASTEnforcesResourceLimits(t *testing.T) {
+	if _, err := compileToCode(nil); err == nil {
+		t.Error("compileToCode(nil) unexpectedly succeeded")
+	}
+	var balanced func(int) Node
+	balanced = func(leaves int) Node {
+		if leaves == 1 {
+			return Number{Value: 1}
+		}
+		left := leaves / 2
+		return BinaryOp{
+			Left:  balanced(left),
+			Op:    '+',
+			Right: balanced(leaves - left),
+		}
+	}
+	if _, err := compileToCode(balanced(MaxASTNodes/2 + 1)); err == nil {
+		t.Errorf("compileToCode() accepted more than %d AST nodes", MaxASTNodes)
+	}
+}
+
+func TestCodeHandleFreeConcurrent(t *testing.T) {
+	_, handle, err := NewCompiler().CompileWithHandle("x + 1")
+	if err != nil {
+		t.Fatalf("CompileWithHandle() error = %v", err)
+	}
+	const callers = 16
+	var wg sync.WaitGroup
+	errs := make(chan error, callers)
+	for range callers {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			errs <- handle.Free()
+		}()
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		if err != nil {
+			t.Errorf("Free() error = %v", err)
 		}
 	}
 }

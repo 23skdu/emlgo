@@ -1,5 +1,11 @@
 # Performance Comparison: emlgo vs Go math Library
 
+> **Status: historical, not current performance evidence.** The estimates in
+> this report conflict with [performance.md](performance.md), and the raw
+> benchmark output and complete environment metadata are unavailable. Treat
+> every numeric performance claim below as withdrawn; use the reproduction
+> procedure in `performance.md` for new measurements.
+
 ## Executive Summary
 
 This document provides detailed benchmark results comparing `emlgo` (EML-based mathematical library) against Go's standard `math` library across multiple architectures.

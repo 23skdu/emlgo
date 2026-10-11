@@ -344,6 +344,7 @@ Arbitrary-precision EML operations using `math/big.Float`.
 | Float64 | `func Float64(x *big.Float) float64` | Convert big.Float to float64 |
 | DefaultVerifier | `func DefaultVerifier() *IdentityVerifier` | Identity verifier with default settings |
 | VerifyIdentity | `func (v *IdentityVerifier) VerifyIdentity(expr1, expr2 func(*big.Float) *big.Float) bool` | Test symbolic identity at high precision |
+| VerifyIdentityAt | `func (v *IdentityVerifier) VerifyIdentityAt(expr1, expr2 func(*big.Float) *big.Float, points []*big.Float) (IdentityVerificationResult, error)` | Verify caller-selected domain points and report the first mismatch |
 
 ---
 

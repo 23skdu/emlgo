@@ -4,6 +4,7 @@ import (
 	"io"
 	"math"
 	"os"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -119,6 +120,9 @@ func TestGpuOpsCPUScalarMatchesBatch(t *testing.T) {
 // TestPrintUsageListsAllCommands captures the usage text and checks that every
 // command main dispatches on is documented, and vice versa.
 func TestPrintUsageListsAllCommands(t *testing.T) {
+	if runtime.GOOS == "js" {
+		t.Skip("os.Pipe is not implemented on js/wasm")
+	}
 	out := captureStdout(t, printUsage)
 
 	commands := []string{"demo", "gpu-status", "gpu-bench", "gpu-verify", "jit-test", "decompile"}

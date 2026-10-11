@@ -40,8 +40,9 @@ func FastExpMinimax(x float64) float64 {
 	if x < -745.133224101734 {
 		return 0.0
 	}
-	if x > 709.782712893384 {
-		return math.Inf(1)
+	if x >= 709.7827128933839 {
+		// The final finite exp boundary can differ across math backends.
+		return math.Exp(x)
 	}
 
 	// Range reduction: x = k*ln(2) + r
@@ -80,7 +81,7 @@ func FastExp(x float64) float64 {
 	return FastExpMinimax(x)
 }
 
-// FastExpF32 computes e^x for float32 using Cody-Waite range reduction and a degree-3 polynomial.
+// FastExpF32 computes e^x for float32 using Cody-Waite range reduction and a degree-5 polynomial.
 func FastExpF32(x float32) float32 {
 	if math.IsNaN(float64(x)) {
 		return float32(math.NaN())
@@ -93,17 +94,20 @@ func FastExpF32(x float32) float32 {
 	}
 
 	const (
-		invLn2F = 1.44269504
-		ln2F    = 0.6931472
-		c2F     = 0.5
-		c3F     = 0.16666667
+		invLn2F64 = 1.4426950408889634
+		ln2HiF64  = 0.6931471803691238
+		ln2LoF64  = 1.9082149292705877e-10
+		c2F       = float32(0.5)
+		c3F       = float32(1.0 / 6.0)
+		c4F       = float32(1.0 / 24.0)
+		c5F       = float32(1.0 / 120.0)
 	)
 
-	kFloat := float32(math.Floor(float64(x*invLn2F + 0.5)))
+	kFloat := math.Floor(float64(x)*invLn2F64 + 0.5)
 	k := int(kFloat)
-	r := x - kFloat*ln2F
+	r := float32((float64(x) - kFloat*ln2HiF64) - kFloat*ln2LoF64)
 
-	p := 1.0 + r*(1.0+r*(c2F+r*c3F))
+	p := 1.0 + r*(1.0+r*(c2F+r*(c3F+r*(c4F+r*c5F))))
 	if k < -126 {
 		// Subnormal range for float32: split exponent scaling
 		scale1 := math.Float32frombits(uint32(127+k+100) << 23)

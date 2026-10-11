@@ -4,6 +4,7 @@ package jit
 
 import (
 	"fmt"
+	"sync"
 	"unsafe"
 )
 
@@ -17,18 +18,29 @@ func NewCompiler() *Compiler {
 
 // CodeHandle manages the lifecycle of native executable code memory allocated for JIT functions.
 type CodeHandle struct {
+	mu   sync.Mutex
 	ptr  unsafe.Pointer
 	size int
 	free bool
 }
 
-// Free releases the executable memory held by this handle.
+// Free releases the executable memory held by this handle. Callers must ensure
+// no compiled function using the memory is currently executing.
 func (h *CodeHandle) Free() error {
-	if h == nil || h.free || h.ptr == nil {
+	if h == nil {
 		return nil
 	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.free || h.ptr == nil {
+		return nil
+	}
+	if err := FreeExecutableMemory(h.ptr, h.size); err != nil {
+		return err
+	}
 	h.free = true
-	return FreeExecutableMemory(h.ptr, h.size)
+	h.ptr = nil
+	return nil
 }
 
 // CompileAST compiles an expression AST directly into executable machine code, returning a CodeHandle.

@@ -44,9 +44,16 @@ func (n *EMLNode) String() string {
 	return "?"
 }
 
-// MaxASTDepth defines the maximum allowable recursion depth for AST traversals
-// to prevent goroutine stack exhaustion on deeply nested expressions.
-const MaxASTDepth = 1000
+const (
+	// MaxASTDepth bounds recursive parser and AST traversals.
+	MaxASTDepth = 1000
+	// MaxExpressionLength limits source text accepted by the expression parser.
+	MaxExpressionLength = 1 << 20
+	// MaxASTNodes bounds the work and code size generated from a parsed tree.
+	MaxASTNodes = 10000
+	// MaxJITCodeSize limits executable code generated for a single expression.
+	MaxJITCodeSize = 16 << 20
+)
 
 // EMLSize returns the total number of nodes in the expression tree rooted at n.
 func EMLSize(n *EMLNode) int {

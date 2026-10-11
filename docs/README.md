@@ -16,6 +16,7 @@ Welcome to the emlgo documentation. This directory contains detailed documentati
 | [performance.md](performance.md) | Performance benchmarks and analysis |
 | [comparison.md](comparison.md) | Detailed emlgo vs math library comparison |
 | [wasm.md](wasm.md) | WebAssembly SIMD support and testing |
+| [accuracy.md](accuracy.md) | Numerical accuracy contracts and validation limits |
 | [nextsteps.md](nextsteps.md) | The next 10 measured changes, prioritised |
 
 ## Quick Links

@@ -3,6 +3,7 @@ package jit
 import (
 	"errors"
 	"math"
+	"strings"
 	"testing"
 )
 
@@ -21,6 +22,27 @@ func TestRoundFunction(t *testing.T) {
 		if got != tc.want {
 			t.Errorf("round(%v) = %v, want %v", tc.in, got, tc.want)
 		}
+	}
+}
+
+func TestParseRejectsOversizedExpression(t *testing.T) {
+	_, err := Parse(strings.Repeat("x", MaxExpressionLength+1))
+	if err == nil || !strings.Contains(err.Error(), "expression length exceeds maximum") {
+		t.Fatalf("Parse(oversized input) error = %v, want expression length limit", err)
+	}
+}
+
+func TestParseRejectsASTResourceExcess(t *testing.T) {
+	tooManyNodes := "x" + strings.Repeat("+x", MaxASTNodes)
+	if _, err := Parse(tooManyNodes); err == nil ||
+		!strings.Contains(err.Error(), "AST node count exceeds maximum") {
+		t.Fatalf("Parse(over-limit AST) error = %v, want AST node limit", err)
+	}
+
+	tooDeep := "x" + strings.Repeat("+x", MaxASTDepth+1)
+	if _, err := Parse(tooDeep); err == nil ||
+		!strings.Contains(err.Error(), "AST depth exceeds maximum") {
+		t.Fatalf("Parse(over-depth AST) error = %v, want AST depth limit", err)
 	}
 }
 

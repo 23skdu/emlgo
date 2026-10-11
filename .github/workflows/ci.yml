@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -13,8 +16,10 @@ jobs:
       matrix:
         go-version: ['1.26', '1.27']
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
+      - uses: actions/checkout@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           go-version: ${{ matrix.go-version }}
       - name: Build
@@ -28,7 +33,7 @@ jobs:
         run: go test -coverprofile=coverage.out -covermode=atomic ./...
       - name: Upload coverage
         if: matrix.go-version == '1.27'
-        uses: codecov/codecov-action@v7
+        uses: codecov/codecov-action@efb35369e0ad2afab669f228072c1b0d510eae64 # v7
         with:
           files: coverage.out
           fail_ci_if_error: false
@@ -37,6 +42,7 @@ jobs:
         run: |
           go test -run='^$' -fuzz='^FuzzParseNoPanic$' -fuzztime=10s ./internal/jit/...
           go test -run='^$' -fuzz='^FuzzEval$' -fuzztime=10s ./internal/jit/...
+          go test -run='^$' -fuzz='^FuzzCompileMatchesEval$' -fuzztime=10s ./internal/jit/...
           go test -run='^$' -fuzz='^FuzzExpSIMD$' -fuzztime=10s ./internal/eml
           go test -run='^$' -fuzz='^FuzzSinSIMD$' -fuzztime=10s ./internal/eml
           go test -run='^$' -fuzz='^FuzzPow$' -fuzztime=10s ./pkg/arithmetic
@@ -44,38 +50,115 @@ jobs:
         run: |
           go install github.com/securego/gosec/v2/cmd/gosec@v2.29.0
           gosec -exclude-generated -tags purego ./...
+      - name: Govulncheck
+        run: |
+          # v1.1.4's SSA frontend does not yet support the Go 1.27 parser.
+          GOTOOLCHAIN=go1.26.0 go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./...
 
   cross-build:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        target:
-          - linux/amd64
-          - linux/arm64
-          - darwin/arm64
-          - darwin/amd64
-          - windows/amd64
-          - js/wasm
-          - wasip1/wasm
+        include:
+          - target: linux/amd64
+            goos: linux
+            goarch: amd64
+          - target: linux/arm64
+            goos: linux
+            goarch: arm64
+          - target: darwin/arm64
+            goos: darwin
+            goarch: arm64
+          - target: darwin/amd64
+            goos: darwin
+            goarch: amd64
+          - target: windows/amd64
+            goos: windows
+            goarch: amd64
+          - target: js/wasm
+            goos: js
+            goarch: wasm
+          - target: wasip1/wasm
+            goos: wasip1
+            goarch: wasm
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
+      - uses: actions/checkout@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           go-version: '1.27'
       - name: Build ${{ matrix.target }}
         env:
-          GOOS: ${{ matrix.target.split('/')[0] }}
-          GOARCH: ${{ matrix.target.split('/')[1] }}
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
         run: go build ./...
 
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
+      - uses: actions/checkout@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           go-version: '1.27'
       - name: Golangci-lint
-        uses: golangci/golangci-lint-action@v9
+        uses: golangci/golangci-lint-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v9
         with:
           version: v2.14.0
+
+  platform-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux/arm64
+            runner: ubuntu-24.04-arm
+          - name: darwin/arm64
+            runner: macos-14
+          - name: windows/amd64
+            runner: windows-latest
+          - name: js/wasm
+            runner: ubuntu-latest
+    name: Test (${{ matrix.name }})
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          go-version: '1.27'
+      - name: Run platform tests
+        if: matrix.name != 'js/wasm'
+        run: go test -count=1 ./...
+      - name: Run WebAssembly tests
+        if: matrix.name == 'js/wasm'
+        env:
+          GOOS: js
+          GOARCH: wasm
+        run: go test -exec="$(go env GOROOT)/lib/wasm/go_js_wasm_exec" -count=1 ./...
+
+  benchmark-regression:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v7
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v7
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: baseline
+      - uses: actions/setup-go@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          go-version: '1.27'
+      - name: Benchmark base revision
+        working-directory: baseline
+        run: go test -run='^$' -bench='^(BenchmarkSIMD|BenchmarkExpSIMD|BenchmarkLogSIMD|BenchmarkAddSIMD)$' -benchmem -benchtime=250ms -count=10 ./internal/eml > "$RUNNER_TEMP/bench-base.txt"
+      - name: Benchmark pull request revision
+        run: go test -run='^$' -bench='^(BenchmarkSIMD|BenchmarkExpSIMD|BenchmarkLogSIMD|BenchmarkAddSIMD)$' -benchmem -benchtime=250ms -count=10 ./internal/eml > "$RUNNER_TEMP/bench-current.txt"
+      - name: Check statistically significant regressions
+        run: python3 scripts/check_bench_regression.py "$RUNNER_TEMP/bench-base.txt" "$RUNNER_TEMP/bench-current.txt" --max-regression 0.10

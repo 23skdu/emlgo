@@ -140,6 +140,15 @@ func TestLogDivBatch(t *testing.T) {
 	}
 }
 
+func TestLogDivBatchIEEE754Domains(t *testing.T) {
+	a := []float64{0, 0, 1, 1, -1, math.NaN()}
+	b := []float64{1, -1, 0, -2, 1, 1}
+	got := LogDivBatch(a, b)
+	for i := range got {
+		assertFuzzClose(t, "LogDivBatch", got[i], nativeLog(a[i])/b[i])
+	}
+}
+
 func TestLogSubBatch(t *testing.T) {
 	a := []float64{1, math.E, 10}
 	b := []float64{1, 1, 2}
@@ -150,6 +159,15 @@ func TestLogSubBatch(t *testing.T) {
 		if !approximatelyEqual(result[i], expected[i], 1e-10) {
 			t.Errorf("LogSubBatch[%d]: got %v, want %v", i, result[i], expected[i])
 		}
+	}
+}
+
+func TestLogSubBatchIEEE754Domains(t *testing.T) {
+	a := []float64{0, 1, -1, math.NaN()}
+	b := []float64{1, math.Inf(1), 1, 1}
+	got := LogSubBatch(a, b)
+	for i := range got {
+		assertFuzzClose(t, "LogSubBatch", got[i], nativeLog(a[i])-b[i])
 	}
 }
 
