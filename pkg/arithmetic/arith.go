@@ -440,7 +440,7 @@ func AbsBatch(x []float64) []float64 {
 		return x
 	}
 	result := make([]float64, n)
-	parallelMap(x, result, Abs)
+	eml.AbsSIMDTo(x, result)
 	return result
 }
 
@@ -450,7 +450,7 @@ func NegBatch(x []float64) []float64 {
 		return x
 	}
 	result := make([]float64, n)
-	parallelMap(x, result, Neg)
+	eml.NegSIMDTo(x, result)
 	return result
 }
 
@@ -460,7 +460,7 @@ func InvBatch(x []float64) []float64 {
 		return x
 	}
 	result := make([]float64, n)
-	parallelMap(x, result, Inv)
+	eml.InvSIMDTo(x, result)
 	return result
 }
 

@@ -165,3 +165,20 @@ func BenchmarkTurboQuant4Distance(b *testing.B) {
 		_, _ = TurboQuant4Distance(query, tqData, dim, pow2)
 	}
 }
+
+func TestDotProductInt8(t *testing.T) {
+	for _, n := range []int{0, 1, 15, 63, 64, 65, 128, 200} {
+		a := make([]uint8, n)
+		b := make([]int8, n)
+		var want int32
+		for i := 0; i < n; i++ {
+			a[i] = uint8((i * 7) % 256)
+			b[i] = int8((i*11)%256 - 128)
+			want += int32(a[i]) * int32(b[i])
+		}
+		got := DotProductInt8(a, b)
+		if got != want {
+			t.Fatalf("DotProductInt8 n=%d: got %d, want %d", n, got, want)
+		}
+	}
+}

@@ -36,11 +36,27 @@ func sinAVX2(a, result []float64) { _, _ = a, result }
 func cosAVX2(a, result []float64) { _, _ = a, result }
 func tanAVX2(a, result []float64) { _, _ = a, result }
 
+func expAVX512(a, result []float64) { _, _ = a, result }
+func logAVX512(a, result []float64) { _, _ = a, result }
+func sinAVX512(a, result []float64) { _, _ = a, result }
+func cosAVX512(a, result []float64) { _, _ = a, result }
+func tanAVX512(a, result []float64) { _, _ = a, result }
+
 func fmaAVX2(a, b, c, result []float64)   { _, _, _, _ = a, b, c, result }
 func fmaAVX512(a, b, c, result []float64) { _, _, _, _ = a, b, c, result }
 
+func addAVX512F32(a, b, result []float32) { _, _, _ = a, b, result }
+func subAVX512F32(a, b, result []float32) { _, _, _ = a, b, result }
+func mulAVX512F32(a, b, result []float32) { _, _, _ = a, b, result }
+func divAVX512F32(a, b, result []float32) { _, _, _ = a, b, result }
+func sqrtAVX512F32(a, result []float32)   { _, _ = a, result }
+
 func addSatInt8AVX2(a, b, result []int8) { _, _, _ = a, b, result }
 func subSatInt8AVX2(a, b, result []int8) { _, _, _ = a, b, result }
+
+func addSatInt8AVX512(a, b, result []int8)           { _, _, _ = a, b, result }
+func subSatInt8AVX512(a, b, result []int8)           { _, _, _ = a, b, result }
+func dotInt8AVX512VNNI(a []uint8, b []int8) int32     { _, _ = a, b; return 0 }
 
 func cpuid(op, op2 uint32) (eax, ebx, ecx, edx uint32) {
 	_, _ = op, op2

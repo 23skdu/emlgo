@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"math"
 	"sync"
+
+	"github.com/emlgo/eml/internal/eml"
 )
 
 // TQ4Lookup is the precomputed (cos, sin) table for 4-bit (16 bins) quantization.
@@ -296,3 +298,10 @@ func TurboQuant4DistanceScratch(query []float32, tqData []byte, dim int, pow2 in
 
 	return float32(math.Sqrt(float64(sum))), nil
 }
+
+// DotProductInt8 computes the accelerated dot product between unsigned byte codebook weights
+// and signed int8 activations using AVX-512 VNNI hardware acceleration when available.
+func DotProductInt8(a []uint8, b []int8) int32 {
+	return eml.DotInt8SIMD(a, b)
+}
+

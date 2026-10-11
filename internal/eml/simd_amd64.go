@@ -41,11 +41,27 @@ func sinAVX2(a, result []float64)
 func cosAVX2(a, result []float64)
 func tanAVX2(a, result []float64)
 
+func expAVX512(a, result []float64)
+func logAVX512(a, result []float64)
+func sinAVX512(a, result []float64)
+func cosAVX512(a, result []float64)
+func tanAVX512(a, result []float64)
+
 func fmaAVX2(a, b, c, result []float64)
 func fmaAVX512(a, b, c, result []float64)
 
+func addAVX512F32(a, b, result []float32)
+func subAVX512F32(a, b, result []float32)
+func mulAVX512F32(a, b, result []float32)
+func divAVX512F32(a, b, result []float32)
+func sqrtAVX512F32(a, result []float32)
+
 func addSatInt8AVX2(a, b, result []int8)
 func subSatInt8AVX2(a, b, result []int8)
+
+func addSatInt8AVX512(a, b, result []int8)
+func subSatInt8AVX512(a, b, result []int8)
+func dotInt8AVX512VNNI(a []uint8, b []int8) int32
 
 func sqrtScalar(x float64) float64
 func fmaScalar(a, b, c float64) float64
@@ -68,12 +84,13 @@ func detectAMD64SIMD() {
 
 	hasFMA = (ecx&(1<<12)) != 0 && osAVX
 
-	_, ebx, _, _ := cpuid(7, 0)
+	_, ebx, ecx7, _ := cpuid(7, 0)
 	hasAVX2 = (ebx&(1<<5)) != 0 && osAVX
 	hasAVX512 = (ebx&(1<<16)) != 0 && osAVX512
+	hasAVX512VNNI = (ecx7&(1<<11)) != 0 && osAVX512
 
 	// CPUID.7.1:EAX
 	eax71, _, _, _ := cpuid(7, 1)
-	hasAVXVNNI = (eax71&(1<<4)) != 0 && osAVX
+	hasAVXVNNI = ((eax71&(1<<4)) != 0 && osAVX) || hasAVX512VNNI
 }
 

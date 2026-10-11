@@ -66,6 +66,19 @@ func TestAVX512KernelsEmitVzeroupper(t *testing.T) {
 		{"absAVX512", absAVX512},
 		{"negAVX512", negAVX512},
 		{"invAVX512", invAVX512},
+		{"expAVX512", expAVX512},
+		{"logAVX512", logAVX512},
+		{"sinAVX512", sinAVX512},
+		{"cosAVX512", cosAVX512},
+		{"tanAVX512", tanAVX512},
+		{"addAVX512F32", addAVX512F32},
+		{"subAVX512F32", subAVX512F32},
+		{"mulAVX512F32", mulAVX512F32},
+		{"divAVX512F32", divAVX512F32},
+		{"sqrtAVX512F32", sqrtAVX512F32},
+		{"addSatInt8AVX512", addSatInt8AVX512},
+		{"subSatInt8AVX512", subSatInt8AVX512},
+		{"dotInt8AVX512VNNI", dotInt8AVX512VNNI},
 	}
 
 	for _, k := range kernels {

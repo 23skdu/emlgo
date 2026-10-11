@@ -15,6 +15,16 @@ package eml
 
 func dispatchExpSIMDTo(x, result []float64) {
 	n := len(x)
+	if hasAVX512 {
+		simdLen := (n / 8) * 8
+		if simdLen > 0 {
+			expAVX512(x[:simdLen], result[:simdLen])
+		}
+		for i := simdLen; i < n; i++ {
+			result[i] = nativeExp(x[i])
+		}
+		return
+	}
 	if hasAVX2 {
 		simdLen := (n / 4) * 4
 		expAVX2(x[:simdLen], result[:simdLen])
@@ -28,6 +38,16 @@ func dispatchExpSIMDTo(x, result []float64) {
 
 func dispatchLogSIMDTo(x, result []float64) {
 	n := len(x)
+	if hasAVX512 {
+		simdLen := (n / 8) * 8
+		if simdLen > 0 {
+			logAVX512(x[:simdLen], result[:simdLen])
+		}
+		for i := simdLen; i < n; i++ {
+			result[i] = nativeLog(x[i])
+		}
+		return
+	}
 	if hasAVX2 {
 		simdLen := (n / 4) * 4
 		logAVX2(x[:simdLen], result[:simdLen])
@@ -41,6 +61,16 @@ func dispatchLogSIMDTo(x, result []float64) {
 
 func dispatchSinSIMDTo(x, result []float64) {
 	n := len(x)
+	if hasAVX512 {
+		simdLen := (n / 8) * 8
+		if simdLen > 0 {
+			sinAVX512(x[:simdLen], result[:simdLen])
+		}
+		for i := simdLen; i < n; i++ {
+			result[i] = nativeSin(x[i])
+		}
+		return
+	}
 	if hasAVX2 {
 		simdLen := (n / 4) * 4
 		sinAVX2(x[:simdLen], result[:simdLen])
@@ -54,6 +84,16 @@ func dispatchSinSIMDTo(x, result []float64) {
 
 func dispatchCosSIMDTo(x, result []float64) {
 	n := len(x)
+	if hasAVX512 {
+		simdLen := (n / 8) * 8
+		if simdLen > 0 {
+			cosAVX512(x[:simdLen], result[:simdLen])
+		}
+		for i := simdLen; i < n; i++ {
+			result[i] = nativeCos(x[i])
+		}
+		return
+	}
 	if hasAVX2 {
 		simdLen := (n / 4) * 4
 		cosAVX2(x[:simdLen], result[:simdLen])
@@ -67,6 +107,16 @@ func dispatchCosSIMDTo(x, result []float64) {
 
 func dispatchTanSIMDTo(x, result []float64) {
 	n := len(x)
+	if hasAVX512 {
+		simdLen := (n / 8) * 8
+		if simdLen > 0 {
+			tanAVX512(x[:simdLen], result[:simdLen])
+		}
+		for i := simdLen; i < n; i++ {
+			result[i] = nativeTan(x[i])
+		}
+		return
+	}
 	if hasAVX2 {
 		simdLen := (n / 4) * 4
 		tanAVX2(x[:simdLen], result[:simdLen])

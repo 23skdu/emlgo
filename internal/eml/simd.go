@@ -14,9 +14,10 @@ var (
 	hasNeon     bool
 	hasNeonDot  bool
 	hasSVE      bool
-	hasFMA      bool
-	hasAVXVNNI  bool
-	hasWasmSIMD bool
+	hasFMA         bool
+	hasAVXVNNI     bool
+	hasAVX512VNNI  bool
+	hasWasmSIMD    bool
 )
 
 func init() {
@@ -63,6 +64,9 @@ func HasFMA() bool { return hasFMA }
 
 // HasAVXVNNI reports whether the CPU supports AVX-VNNI instructions.
 func HasAVXVNNI() bool { return hasAVXVNNI }
+
+// HasAVX512VNNI reports whether the CPU supports AVX-512 VNNI instructions.
+func HasAVX512VNNI() bool { return hasAVX512VNNI }
 
 // HasWasmSIMD reports whether WASM SIMD is available.
 func HasWasmSIMD() bool { return hasWasmSIMD }
@@ -827,4 +831,12 @@ func SubSatInt8SIMDTo(a, b, result []int8) {
 		panic("slice length mismatch")
 	}
 	dispatchSubSatInt8SIMD(a, b, result)
+}
+
+// DotInt8SIMD computes the dot product sum(a[i]*b[i]) of unsigned and signed byte slices.
+func DotInt8SIMD(a []uint8, b []int8) int32 {
+	if len(a) != len(b) {
+		panic("slice length mismatch")
+	}
+	return dispatchDotInt8SIMD(a, b)
 }

@@ -3,6 +3,8 @@
 
 package eml
 
+import "math"
+
 func amd64AddSIMD(a, b, result []float64) {
 	n := len(a)
 	if hasAVX512 {
@@ -293,6 +295,20 @@ func dispatchMulScalarSIMD(a []float64, b float64, result []float64) {
 
 func dispatchAddSatInt8SIMD(a, b, result []int8) {
 	n := len(a)
+	if hasAVX512 && n >= 64 {
+		simdLen := (n / 64) * 64
+		addSatInt8AVX512(a[:simdLen], b[:simdLen], result[:simdLen])
+		for i := simdLen; i < n; i++ {
+			v := int32(a[i]) + int32(b[i])
+			if v > 127 {
+				v = 127
+			} else if v < -128 {
+				v = -128
+			}
+			result[i] = int8(v)
+		}
+		return
+	}
 	if hasAVX2 && n >= 32 {
 		simdLen := (n / 32) * 32
 		addSatInt8AVX2(a[:simdLen], b[:simdLen], result[:simdLen])
@@ -320,6 +336,20 @@ func dispatchAddSatInt8SIMD(a, b, result []int8) {
 
 func dispatchSubSatInt8SIMD(a, b, result []int8) {
 	n := len(a)
+	if hasAVX512 && n >= 64 {
+		simdLen := (n / 64) * 64
+		subSatInt8AVX512(a[:simdLen], b[:simdLen], result[:simdLen])
+		for i := simdLen; i < n; i++ {
+			v := int32(a[i]) - int32(b[i])
+			if v > 127 {
+				v = 127
+			} else if v < -128 {
+				v = -128
+			}
+			result[i] = int8(v)
+		}
+		return
+	}
 	if hasAVX2 && n >= 32 {
 		simdLen := (n / 32) * 32
 		subSatInt8AVX2(a[:simdLen], b[:simdLen], result[:simdLen])
@@ -344,3 +374,124 @@ func dispatchSubSatInt8SIMD(a, b, result []int8) {
 		result[i] = int8(v)
 	}
 }
+
+func dispatchDotInt8SIMD(a []uint8, b []int8) int32 {
+	n := len(a)
+	var sum int32
+	i := 0
+	if hasAVX512 && hasAVX512VNNI && n >= 64 {
+		simdLen := (n / 64) * 64
+		sum = dotInt8AVX512VNNI(a[:simdLen], b[:simdLen])
+		i = simdLen
+	}
+	for ; i < n; i++ {
+		sum += int32(a[i]) * int32(b[i])
+	}
+	return sum
+}
+
+func dispatchAddSIMDF32To(a, b, dst []float32) {
+	n := len(a)
+	i := 0
+	if hasAVX512 && n >= 16 {
+		simdLen := (n / 16) * 16
+		addAVX512F32(a[:simdLen], b[:simdLen], dst[:simdLen])
+		i = simdLen
+	}
+	for ; i+7 < n; i += 8 {
+		dst[i] = a[i] + b[i]
+		dst[i+1] = a[i+1] + b[i+1]
+		dst[i+2] = a[i+2] + b[i+2]
+		dst[i+3] = a[i+3] + b[i+3]
+		dst[i+4] = a[i+4] + b[i+4]
+		dst[i+5] = a[i+5] + b[i+5]
+		dst[i+6] = a[i+6] + b[i+6]
+		dst[i+7] = a[i+7] + b[i+7]
+	}
+	for ; i < n; i++ {
+		dst[i] = a[i] + b[i]
+	}
+}
+
+func dispatchSubSIMDF32To(a, b, dst []float32) {
+	n := len(a)
+	i := 0
+	if hasAVX512 && n >= 16 {
+		simdLen := (n / 16) * 16
+		subAVX512F32(a[:simdLen], b[:simdLen], dst[:simdLen])
+		i = simdLen
+	}
+	for ; i+7 < n; i += 8 {
+		dst[i] = a[i] - b[i]
+		dst[i+1] = a[i+1] - b[i+1]
+		dst[i+2] = a[i+2] - b[i+2]
+		dst[i+3] = a[i+3] - b[i+3]
+		dst[i+4] = a[i+4] - b[i+4]
+		dst[i+5] = a[i+5] - b[i+5]
+		dst[i+6] = a[i+6] - b[i+6]
+		dst[i+7] = a[i+7] - b[i+7]
+	}
+	for ; i < n; i++ {
+		dst[i] = a[i] - b[i]
+	}
+}
+
+func dispatchMulSIMDF32To(a, b, dst []float32) {
+	n := len(a)
+	i := 0
+	if hasAVX512 && n >= 16 {
+		simdLen := (n / 16) * 16
+		mulAVX512F32(a[:simdLen], b[:simdLen], dst[:simdLen])
+		i = simdLen
+	}
+	for ; i+7 < n; i += 8 {
+		dst[i] = a[i] * b[i]
+		dst[i+1] = a[i+1] * b[i+1]
+		dst[i+2] = a[i+2] * b[i+2]
+		dst[i+3] = a[i+3] * b[i+3]
+		dst[i+4] = a[i+4] * b[i+4]
+		dst[i+5] = a[i+5] * b[i+5]
+		dst[i+6] = a[i+6] * b[i+6]
+		dst[i+7] = a[i+7] * b[i+7]
+	}
+	for ; i < n; i++ {
+		dst[i] = a[i] * b[i]
+	}
+}
+
+func dispatchDivSIMDF32To(a, b, dst []float32) {
+	n := len(a)
+	i := 0
+	if hasAVX512 && n >= 16 {
+		simdLen := (n / 16) * 16
+		divAVX512F32(a[:simdLen], b[:simdLen], dst[:simdLen])
+		i = simdLen
+	}
+	for ; i+7 < n; i += 8 {
+		dst[i] = a[i] / b[i]
+		dst[i+1] = a[i+1] / b[i+1]
+		dst[i+2] = a[i+2] / b[i+2]
+		dst[i+3] = a[i+3] / b[i+3]
+		dst[i+4] = a[i+4] / b[i+4]
+		dst[i+5] = a[i+5] / b[i+5]
+		dst[i+6] = a[i+6] / b[i+6]
+		dst[i+7] = a[i+7] / b[i+7]
+	}
+	for ; i < n; i++ {
+		dst[i] = a[i] / b[i]
+	}
+}
+
+func dispatchSqrtSIMDF32To(src, dst []float32) {
+	n := len(src)
+	i := 0
+	if hasAVX512 && n >= 16 {
+		simdLen := (n / 16) * 16
+		sqrtAVX512F32(src[:simdLen], dst[:simdLen])
+		i = simdLen
+	}
+	for ; i < n; i++ {
+		dst[i] = float32(math.Sqrt(float64(src[i])))
+	}
+}
+
