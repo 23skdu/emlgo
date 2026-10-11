@@ -4,12 +4,14 @@ on:
   push:
     tags:
       - 'v*'
+      - '[0-9]+.*'
 
 permissions:
   contents: write
   id-token: write
   attestations: write
   artifact-metadata: write
+  packages: write
 
 jobs:
   release:
@@ -63,3 +65,19 @@ jobs:
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
         with:
           subject-path: 'dist/*'
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker images to GHCR
+        env:
+          IMAGE_REPO: ghcr.io/${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          make docker-build-cpu TAG="${TAG}" IMAGE_REPO="${IMAGE_REPO}"
+          make docker-build-cuda TAG="${TAG}" IMAGE_REPO="${IMAGE_REPO}"
+          make docker-push TAG="${TAG}" IMAGE_REPO="${IMAGE_REPO}"
