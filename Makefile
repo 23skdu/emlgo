@@ -1,4 +1,4 @@
-.PHONY: build test test-race test-cover bench lint vet fuzz clean wasm gosec govulncheck docker docker-build docker-build-cpu docker-build-cuda docker-push docker-push-cpu docker-push-cuda
+.PHONY: build test test-short test-race test-docker test-scripts test-cover bench lint vet fuzz clean wasm gosec govulncheck docker docker-build docker-build-cpu docker-build-cuda docker-push docker-push-cpu docker-push-cuda
 
 build:
 	go build ./...
@@ -17,6 +17,12 @@ test-short:
 
 test-race:
 	go test -race -count=1 ./...
+
+test-docker:
+	go test -v -run 'TestDocker.*' ./test/...
+
+test-scripts:
+	go test -v -run 'Test(CheckBenchRegression|RunBenchmark|RunValidation|BenchCompare|WasmTest|GenerateMPFR).*' ./test/...
 
 test-cover:
 	go test -coverprofile=coverage.out -covermode=atomic ./...
