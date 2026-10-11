@@ -63,10 +63,10 @@ exp/log points. The Go `math` package remains the practical reference for many
 other tests, but it is not an independent arbitrary-precision oracle. Existing
 dense SIMD checks cover selected functions and input ranges; they do not certify
 all inputs, all architectures, or all possible backends. FastMath sweeps and
-golden vectors likewise do not prove global worst-case bounds. See
-[nextsteps.md](nextsteps.md) Steps 41–50 for the remaining work to expand
-reference coverage, domain testing, cross-platform execution, and
-reproducibility.
+golden vectors likewise do not prove global worst-case bounds. The remaining
+verification gaps are tracked in [nextsteps.md](nextsteps.md), including hosted
+cross-platform and release-workflow results (Steps 47 and 50) and hardware-gated
+ARM64 JIT/AVX-512 work (Steps 9 and 10).
 
 Published accuracy numbers must identify the operation, precision, input
 domain, backend, reference, error metric, sample method, and Go/architecture

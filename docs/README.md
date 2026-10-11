@@ -2,6 +2,9 @@
 
 Welcome to the emlgo documentation. This directory contains detailed documentation for the library.
 
+Examples and references for packages under `internal/` describe implementation
+components only; Go prevents downstream modules from importing those packages.
+
 ## Table of Contents
 
 | Document | Description |
@@ -9,15 +12,15 @@ Welcome to the emlgo documentation. This directory contains detailed documentati
 | [../README.md](../README.md) | Project overview, features, and quick start |
 | [architecture.md](architecture.md) | System architecture and design principles |
 | [EML.md](EML.md) | EML operator theory (Odrzywołek, arXiv:2603.21852) |
-| [FUNCTIONS.md](FUNCTIONS.md) | Complete function reference for all packages |
+| [FUNCTIONS.md](FUNCTIONS.md) | Function reference for public packages and selected internal APIs |
 | [JIT.md](JIT.md) | JIT compiler, arena allocator, canonical trees, Diff/Simplify/Decompile |
 | [COMPLEX.md](COMPLEX.md) | Complex128 number support |
 | [USAGE.md](USAGE.md) | Practical usage examples |
-| [performance.md](performance.md) | Performance benchmarks and analysis |
-| [comparison.md](comparison.md) | Detailed emlgo vs math library comparison |
-| [wasm.md](wasm.md) | WebAssembly SIMD support and testing |
+| [performance.md](performance.md) | Reproducible benchmark methodology and regression gate |
+| [comparison.md](comparison.md) | Status of historical emlgo vs math performance claims |
+| [wasm.md](wasm.md) | WebAssembly targets, batch kernels, and test harness |
 | [accuracy.md](accuracy.md) | Numerical accuracy contracts and validation limits |
-| [nextsteps.md](nextsteps.md) | The next 10 measured changes, prioritised |
+| [nextsteps.md](nextsteps.md) | Roadmap and verification status |
 
 ## Quick Links
 
