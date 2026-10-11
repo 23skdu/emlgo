@@ -60,37 +60,33 @@ CUDA_ARCH ?= sm_89
 
 docker-build-cpu:
 	docker build -f Dockerfile.cpu \
-		-t $(IMAGE_REPO)-cpu:$(TAG) \
-		-t $(IMAGE_REPO)-cpu:latest \
+		-t $(IMAGE_REPO):$(TAG) \
+		-t $(IMAGE_REPO):latest \
 		-t $(IMAGE_REPO):$(TAG)-cpu \
 		-t $(IMAGE_REPO):latest-cpu \
-		-t $(IMAGE_REPO):$(TAG) \
-		-t $(IMAGE_REPO):latest .
+		-t $(IMAGE_REPO):cpu .
 
 docker-build-cuda:
 	docker build -f Dockerfile.cuda --build-arg CUDA_ARCH=$(CUDA_ARCH) \
-		-t $(IMAGE_REPO)-cuda:$(TAG) \
-		-t $(IMAGE_REPO)-cuda:latest \
 		-t $(IMAGE_REPO):$(TAG)-cuda \
-		-t $(IMAGE_REPO):latest-cuda .
+		-t $(IMAGE_REPO):latest-cuda \
+		-t $(IMAGE_REPO):cuda .
 
 docker-build: docker-build-cpu docker-build-cuda
 
 docker: docker-build
 
 docker-push-cpu:
-	docker push $(IMAGE_REPO)-cpu:$(TAG)
-	docker push $(IMAGE_REPO)-cpu:latest
-	docker push $(IMAGE_REPO):$(TAG)-cpu
-	docker push $(IMAGE_REPO):latest-cpu
 	docker push $(IMAGE_REPO):$(TAG)
 	docker push $(IMAGE_REPO):latest
+	docker push $(IMAGE_REPO):$(TAG)-cpu
+	docker push $(IMAGE_REPO):latest-cpu
+	docker push $(IMAGE_REPO):cpu
 
 docker-push-cuda:
-	docker push $(IMAGE_REPO)-cuda:$(TAG)
-	docker push $(IMAGE_REPO)-cuda:latest
 	docker push $(IMAGE_REPO):$(TAG)-cuda
 	docker push $(IMAGE_REPO):latest-cuda
+	docker push $(IMAGE_REPO):cuda
 
 docker-push: docker-push-cpu docker-push-cuda
 
