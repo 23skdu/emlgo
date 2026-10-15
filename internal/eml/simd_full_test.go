@@ -285,3 +285,116 @@ func BenchmarkMulSIMD(b *testing.B) {
 		MulSIMD(a, c)
 	}
 }
+
+func TestAVX512RoundingAndMinMax(t *testing.T) {
+	sizes := []int{0, 1, 3, 7, 8, 9, 15, 16, 17, 31, 32, 33, 63, 64, 65, 128}
+	values := []float64{-3.7, -3.5, -3.2, math.Copysign(0, -1), 0.0, 1.2, 2.5, 3.8, math.Inf(-1), math.Inf(1)}
+
+	for _, n := range sizes {
+		x := make([]float64, n)
+		y := make([]float64, n)
+		for i := 0; i < n; i++ {
+			x[i] = values[i%len(values)]
+			y[i] = values[(i+3)%len(values)]
+		}
+
+		// Floor
+		gotFloor := FloorSIMD(x)
+		for i := 0; i < n; i++ {
+			want := math.Floor(x[i])
+			if math.IsInf(x[i], 0) {
+				if gotFloor[i] != want {
+					t.Fatalf("FloorSIMD n=%d i=%d got %v want %v", n, i, gotFloor[i], want)
+				}
+			} else if gotFloor[i] != want {
+				t.Fatalf("FloorSIMD n=%d i=%d got %v want %v", n, i, gotFloor[i], want)
+			}
+		}
+
+		// Ceil
+		gotCeil := CeilSIMD(x)
+		for i := 0; i < n; i++ {
+			want := math.Ceil(x[i])
+			if gotCeil[i] != want {
+				t.Fatalf("CeilSIMD n=%d i=%d got %v want %v", n, i, gotCeil[i], want)
+			}
+		}
+
+		// Trunc
+		gotTrunc := TruncSIMD(x)
+		for i := 0; i < n; i++ {
+			want := math.Trunc(x[i])
+			if gotTrunc[i] != want {
+				t.Fatalf("TruncSIMD n=%d i=%d got %v want %v", n, i, gotTrunc[i], want)
+			}
+		}
+
+		// Round
+		gotRound := RoundSIMD(x)
+		for i := 0; i < n; i++ {
+			want := math.RoundToEven(x[i])
+			if gotRound[i] != want {
+				t.Fatalf("RoundSIMD n=%d i=%d got %v want %v", n, i, gotRound[i], want)
+			}
+		}
+
+		// Max
+		gotMax := MaxSIMD(x, y)
+		for i := 0; i < n; i++ {
+			var want float64
+			if x[i] > y[i] {
+				want = x[i]
+			} else {
+				want = y[i]
+			}
+			if gotMax[i] != want {
+				t.Fatalf("MaxSIMD n=%d i=%d got %v want %v", n, i, gotMax[i], want)
+			}
+		}
+
+		// Min
+		gotMin := MinSIMD(x, y)
+		for i := 0; i < n; i++ {
+			var want float64
+			if x[i] < y[i] {
+				want = x[i]
+			} else {
+				want = y[i]
+			}
+			if gotMin[i] != want {
+				t.Fatalf("MinSIMD n=%d i=%d got %v want %v", n, i, gotMin[i], want)
+			}
+		}
+	}
+}
+
+func BenchmarkFloorSIMD(b *testing.B) {
+	n := 4096
+	a := make([]float64, n)
+	for i := 0; i < n; i++ {
+		a[i] = float64(i) * 0.123
+	}
+	res := make([]float64, n)
+	b.ResetTimer()
+	b.ReportAllocs()
+	for b.Loop() {
+		FloorSIMDTo(a, res)
+	}
+}
+
+func BenchmarkMaxSIMD(b *testing.B) {
+	n := 4096
+	a := make([]float64, n)
+	c := make([]float64, n)
+	for i := 0; i < n; i++ {
+		a[i] = float64(i)
+		c[i] = float64(n - i)
+	}
+	res := make([]float64, n)
+	b.ResetTimer()
+	b.ReportAllocs()
+	for b.Loop() {
+		MaxSIMDTo(a, c, res)
+	}
+}
+

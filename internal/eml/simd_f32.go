@@ -89,21 +89,33 @@ func MulSIMDF32(a, b []float32) []float32 {
 	return dst
 }
 
+// AddScalarSIMDF32To adds scalar b to each element of a and stores into dst.
+func AddScalarSIMDF32To(a []float32, b float32, dst []float32) {
+	if len(a) != len(dst) {
+		panic("slice length mismatch")
+	}
+	dispatchAddScalarSIMDF32To(a, b, dst)
+}
+
 // AddScalarSIMDF32 adds scalar b to each element of a.
 func AddScalarSIMDF32(a []float32, b float32) []float32 {
 	dst := make([]float32, len(a))
-	for i, v := range a {
-		dst[i] = v + b
-	}
+	AddScalarSIMDF32To(a, b, dst)
 	return dst
+}
+
+// MulScalarSIMDF32To multiplies each element of a by scalar b and stores into dst.
+func MulScalarSIMDF32To(a []float32, b float32, dst []float32) {
+	if len(a) != len(dst) {
+		panic("slice length mismatch")
+	}
+	dispatchMulScalarSIMDF32To(a, b, dst)
 }
 
 // MulScalarSIMDF32 multiplies each element of a by scalar b.
 func MulScalarSIMDF32(a []float32, b float32) []float32 {
 	dst := make([]float32, len(a))
-	for i, v := range a {
-		dst[i] = v * b
-	}
+	MulScalarSIMDF32To(a, b, dst)
 	return dst
 }
 
@@ -145,30 +157,66 @@ func DivSIMDF32(a, b []float32) []float32 {
 	return dst
 }
 
+// AbsSIMDF32To computes element-wise abs(x) storing into dst.
+func AbsSIMDF32To(x, dst []float32) {
+	if len(x) != len(dst) {
+		panic("slice length mismatch")
+	}
+	dispatchAbsSIMDF32To(x, dst)
+}
+
 // AbsSIMDF32 computes element-wise abs(x) for float32 slices.
 func AbsSIMDF32(x []float32) []float32 {
 	dst := make([]float32, len(x))
-	for i, v := range x {
-		dst[i] = math.Float32frombits(math.Float32bits(v) & 0x7fffffff)
-	}
+	AbsSIMDF32To(x, dst)
 	return dst
+}
+
+// NegSIMDF32To computes element-wise -x storing into dst.
+func NegSIMDF32To(x, dst []float32) {
+	if len(x) != len(dst) {
+		panic("slice length mismatch")
+	}
+	dispatchNegSIMDF32To(x, dst)
 }
 
 // NegSIMDF32 computes element-wise -x for float32 slices.
 func NegSIMDF32(x []float32) []float32 {
 	dst := make([]float32, len(x))
-	for i, v := range x {
-		dst[i] = -v
-	}
+	NegSIMDF32To(x, dst)
 	return dst
+}
+
+// InvSIMDF32To computes element-wise 1/x storing into dst.
+func InvSIMDF32To(x, dst []float32) {
+	if len(x) != len(dst) {
+		panic("slice length mismatch")
+	}
+	dispatchInvSIMDF32To(x, dst)
 }
 
 // InvSIMDF32 computes element-wise 1/x for float32 slices.
 func InvSIMDF32(x []float32) []float32 {
 	dst := make([]float32, len(x))
-	for i, v := range x {
-		dst[i] = 1.0 / v
+	InvSIMDF32To(x, dst)
+	return dst
+}
+
+// FmaSIMDF32To computes element-wise a[i]*b[i] + c[i] storing into dst.
+func FmaSIMDF32To(a, b, c, dst []float32) {
+	if len(a) != len(b) || len(a) != len(c) || len(a) != len(dst) {
+		panic("slice length mismatch")
 	}
+	dispatchFmaSIMDF32To(a, b, c, dst)
+}
+
+// FmaSIMDF32 returns a new slice containing a[i]*b[i] + c[i].
+func FmaSIMDF32(a, b, c []float32) []float32 {
+	if len(a) != len(b) || len(a) != len(c) {
+		panic(fmt.Sprintf("FmaSIMDF32: length mismatch %d, %d, %d", len(a), len(b), len(c)))
+	}
+	dst := make([]float32, len(a))
+	FmaSIMDF32To(a, b, c, dst)
 	return dst
 }
 

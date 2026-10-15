@@ -56,6 +56,20 @@ func mulAVX512F32(a, b, result []float32)
 func divAVX512F32(a, b, result []float32)
 func sqrtAVX512F32(a, result []float32)
 
+func addScalarAVX512F32(a []float32, b float32, result []float32)
+func mulScalarAVX512F32(a []float32, b float32, result []float32)
+func absAVX512F32(a, result []float32)
+func negAVX512F32(a, result []float32)
+func invAVX512F32(a, result []float32)
+func fmaAVX512F32(a, b, c, result []float32)
+
+func floorAVX512(a, result []float64)
+func ceilAVX512(a, result []float64)
+func truncAVX512(a, result []float64)
+func roundAVX512(a, result []float64)
+func maxAVX512(a, b, result []float64)
+func minAVX512(a, b, result []float64)
+
 func addSatInt8AVX2(a, b, result []int8)
 func subSatInt8AVX2(a, b, result []int8)
 

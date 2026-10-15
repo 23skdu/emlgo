@@ -221,3 +221,92 @@ func BenchmarkExpSIMDF32VsF64(b *testing.B) {
 		}
 	})
 }
+
+func TestAVX512F32ExtendedKernels(t *testing.T) {
+	testSizes := []int{0, 1, 3, 7, 15, 16, 17, 31, 32, 33, 63, 64, 65, 127, 128, 137}
+	for _, n := range testSizes {
+		a := make([]float32, n)
+		b := make([]float32, n)
+		c := make([]float32, n)
+		for i := 0; i < n; i++ {
+			a[i] = float32(i)*1.5 - 20.0
+			b[i] = float32(i%7) + 0.5
+			c[i] = float32(i*2) - 10.0
+		}
+
+		// AddScalar
+		gotAddScalar := AddScalarSIMDF32(a, 3.25)
+		for i := 0; i < n; i++ {
+			want := a[i] + 3.25
+			if gotAddScalar[i] != want {
+				t.Fatalf("AddScalarSIMDF32 n=%d i=%d got %v want %v", n, i, gotAddScalar[i], want)
+			}
+		}
+
+		// MulScalar
+		gotMulScalar := MulScalarSIMDF32(a, -2.5)
+		for i := 0; i < n; i++ {
+			want := a[i] * -2.5
+			if gotMulScalar[i] != want {
+				t.Fatalf("MulScalarSIMDF32 n=%d i=%d got %v want %v", n, i, gotMulScalar[i], want)
+			}
+		}
+
+		// Abs
+		gotAbs := AbsSIMDF32(a)
+		for i := 0; i < n; i++ {
+			want := float32(math.Abs(float64(a[i])))
+			if gotAbs[i] != want {
+				t.Fatalf("AbsSIMDF32 n=%d i=%d got %v want %v", n, i, gotAbs[i], want)
+			}
+		}
+
+		// Neg
+		gotNeg := NegSIMDF32(a)
+		for i := 0; i < n; i++ {
+			want := -a[i]
+			if gotNeg[i] != want {
+				t.Fatalf("NegSIMDF32 n=%d i=%d got %v want %v", n, i, gotNeg[i], want)
+			}
+		}
+
+		// Inv
+		gotInv := InvSIMDF32(b)
+		for i := 0; i < n; i++ {
+			want := 1.0 / b[i]
+			if !f32Close(gotInv[i], want, 1e-6) {
+				t.Fatalf("InvSIMDF32 n=%d i=%d got %v want %v", n, i, gotInv[i], want)
+			}
+		}
+
+		// Fma
+		gotFma := FmaSIMDF32(a, b, c)
+		for i := 0; i < n; i++ {
+			want := float32(math.FMA(float64(a[i]), float64(b[i]), float64(c[i])))
+			if !f32Close(gotFma[i], want, 1e-5) {
+				t.Fatalf("FmaSIMDF32 n=%d i=%d got %v want %v", n, i, gotFma[i], want)
+			}
+		}
+	}
+}
+
+func TestAVX512F32Panics(t *testing.T) {
+	mustPanic := func(name string, fn func()) {
+		t.Helper()
+		defer func() {
+			if r := recover(); r == nil {
+				t.Errorf("%s: expected panic on slice length mismatch", name)
+			}
+		}()
+		fn()
+	}
+
+	mustPanic("AddScalarSIMDF32To", func() { AddScalarSIMDF32To([]float32{1, 2}, 1, []float32{1}) })
+	mustPanic("MulScalarSIMDF32To", func() { MulScalarSIMDF32To([]float32{1, 2}, 1, []float32{1}) })
+	mustPanic("AbsSIMDF32To", func() { AbsSIMDF32To([]float32{1, 2}, []float32{1}) })
+	mustPanic("NegSIMDF32To", func() { NegSIMDF32To([]float32{1, 2}, []float32{1}) })
+	mustPanic("InvSIMDF32To", func() { InvSIMDF32To([]float32{1, 2}, []float32{1}) })
+	mustPanic("FmaSIMDF32To", func() { FmaSIMDF32To([]float32{1, 2}, []float32{1, 2}, []float32{1}, []float32{1, 2}) })
+	mustPanic("FmaSIMDF32", func() { FmaSIMDF32([]float32{1, 2}, []float32{1}, []float32{1, 2}) })
+}
+

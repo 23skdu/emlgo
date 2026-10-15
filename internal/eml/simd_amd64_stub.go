@@ -51,6 +51,20 @@ func mulAVX512F32(a, b, result []float32) { _, _, _ = a, b, result }
 func divAVX512F32(a, b, result []float32) { _, _, _ = a, b, result }
 func sqrtAVX512F32(a, result []float32)   { _, _ = a, result }
 
+func addScalarAVX512F32(a []float32, b float32, result []float32) { _, _, _ = a, b, result }
+func mulScalarAVX512F32(a []float32, b float32, result []float32) { _, _, _ = a, b, result }
+func absAVX512F32(a, result []float32)                            { _, _ = a, result }
+func negAVX512F32(a, result []float32)                            { _, _ = a, result }
+func invAVX512F32(a, result []float32)                            { _, _ = a, result }
+func fmaAVX512F32(a, b, c, result []float32)                     { _, _, _, _ = a, b, c, result }
+
+func floorAVX512(a, result []float64)        { _, _ = a, result }
+func ceilAVX512(a, result []float64)         { _, _ = a, result }
+func truncAVX512(a, result []float64)        { _, _ = a, result }
+func roundAVX512(a, result []float64)        { _, _ = a, result }
+func maxAVX512(a, b, result []float64)       { _, _, _ = a, b, result }
+func minAVX512(a, b, result []float64)       { _, _, _ = a, b, result }
+
 func addSatInt8AVX2(a, b, result []int8) { _, _, _ = a, b, result }
 func subSatInt8AVX2(a, b, result []int8) { _, _, _ = a, b, result }
 

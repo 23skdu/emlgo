@@ -2424,4 +2424,464 @@ zero_vnni:
 	VZEROUPPER
 	RET
 
+// func addScalarAVX512F32(a []float32, b float32, result []float32)
+TEXT ·addScalarAVX512F32(SB), NOSPLIT, $0-56
+	MOVQ a_len+8(FP), CX
+	MOVQ CX, AX
+	TESTQ CX, CX
+	JZ done_add_scalar512_f32
+
+	MOVQ a_base+0(FP), SI
+	MOVSS b+24(FP), X0
+	MOVQ result_base+32(FP), DX
+	VBROADCASTSS X0, Z0
+
+	SHRQ $5, CX // n / 32
+	JZ tail_add_scalar512_f32
+
+loop_add_scalar512_f32_32:
+	VMOVUPS (SI), Z1
+	VMOVUPS 64(SI), Z2
+	VADDPS Z0, Z1, Z3
+	VADDPS Z0, Z2, Z4
+	VMOVUPS Z3, (DX)
+	VMOVUPS Z4, 64(DX)
+	ADDQ $128, SI
+	ADDQ $128, DX
+	DECQ CX
+	JNZ loop_add_scalar512_f32_32
+
+tail_add_scalar512_f32:
+	TESTQ $16, AX
+	JZ done_add_scalar512_f32
+	VMOVUPS (SI), Z1
+	VADDPS Z0, Z1, Z2
+	VMOVUPS Z2, (DX)
+
+done_add_scalar512_f32:
+	VZEROUPPER
+	RET
+
+// func mulScalarAVX512F32(a []float32, b float32, result []float32)
+TEXT ·mulScalarAVX512F32(SB), NOSPLIT, $0-56
+	MOVQ a_len+8(FP), CX
+	MOVQ CX, AX
+	TESTQ CX, CX
+	JZ done_mul_scalar512_f32
+
+	MOVQ a_base+0(FP), SI
+	MOVSS b+24(FP), X0
+	MOVQ result_base+32(FP), DX
+	VBROADCASTSS X0, Z0
+
+	SHRQ $5, CX // n / 32
+	JZ tail_mul_scalar512_f32
+
+loop_mul_scalar512_f32_32:
+	VMOVUPS (SI), Z1
+	VMOVUPS 64(SI), Z2
+	VMULPS Z0, Z1, Z3
+	VMULPS Z0, Z2, Z4
+	VMOVUPS Z3, (DX)
+	VMOVUPS Z4, 64(DX)
+	ADDQ $128, SI
+	ADDQ $128, DX
+	DECQ CX
+	JNZ loop_mul_scalar512_f32_32
+
+tail_mul_scalar512_f32:
+	TESTQ $16, AX
+	JZ done_mul_scalar512_f32
+	VMOVUPS (SI), Z1
+	VMULPS Z0, Z1, Z2
+	VMOVUPS Z2, (DX)
+
+done_mul_scalar512_f32:
+	VZEROUPPER
+	RET
+
+// func absAVX512F32(a, result []float32)
+TEXT ·absAVX512F32(SB), NOSPLIT, $0-48
+	MOVQ a_len+8(FP), CX
+	TESTQ CX, CX
+	JZ done_abs512_f32
+
+	MOVL $0x7fffffff, AX
+	MOVL AX, X15
+	VBROADCASTSS X15, Z15
+
+	MOVQ a_base+0(FP), SI
+	MOVQ result_base+24(FP), DX
+
+	MOVQ CX, AX
+	SHRQ $5, CX // n / 32
+	JZ tail_abs512_f32
+
+loop_abs512_f32_32:
+	VMOVUPS (SI), Z0
+	VMOVUPS 64(SI), Z1
+	VPANDD Z15, Z0, Z0
+	VPANDD Z15, Z1, Z1
+	VMOVUPS Z0, (DX)
+	VMOVUPS Z1, 64(DX)
+	ADDQ $128, SI
+	ADDQ $128, DX
+	DECQ CX
+	JNZ loop_abs512_f32_32
+
+tail_abs512_f32:
+	TESTQ $16, AX
+	JZ done_abs512_f32
+	VMOVUPS (SI), Z0
+	VPANDD Z15, Z0, Z0
+	VMOVUPS Z0, (DX)
+
+done_abs512_f32:
+	VZEROUPPER
+	RET
+
+// func negAVX512F32(a, result []float32)
+TEXT ·negAVX512F32(SB), NOSPLIT, $0-48
+	MOVQ a_len+8(FP), CX
+	TESTQ CX, CX
+	JZ done_neg512_f32
+
+	MOVL $0x80000000, AX
+	MOVL AX, X15
+	VBROADCASTSS X15, Z15
+
+	MOVQ a_base+0(FP), SI
+	MOVQ result_base+24(FP), DX
+
+	MOVQ CX, AX
+	SHRQ $5, CX // n / 32
+	JZ tail_neg512_f32
+
+loop_neg512_f32_32:
+	VMOVUPS (SI), Z0
+	VMOVUPS 64(SI), Z1
+	VPXORD Z15, Z0, Z0
+	VPXORD Z15, Z1, Z1
+	VMOVUPS Z0, (DX)
+	VMOVUPS Z1, 64(DX)
+	ADDQ $128, SI
+	ADDQ $128, DX
+	DECQ CX
+	JNZ loop_neg512_f32_32
+
+tail_neg512_f32:
+	TESTQ $16, AX
+	JZ done_neg512_f32
+	VMOVUPS (SI), Z0
+	VPXORD Z15, Z0, Z0
+	VMOVUPS Z0, (DX)
+
+done_neg512_f32:
+	VZEROUPPER
+	RET
+
+// func invAVX512F32(a, result []float32)
+TEXT ·invAVX512F32(SB), NOSPLIT, $0-48
+	MOVQ a_len+8(FP), CX
+	TESTQ CX, CX
+	JZ done_inv512_f32
+
+	MOVL $0x3f800000, AX // 1.0f
+	MOVL AX, X15
+	VBROADCASTSS X15, Z15
+
+	MOVQ a_base+0(FP), SI
+	MOVQ result_base+24(FP), DX
+
+	MOVQ CX, AX
+	SHRQ $5, CX // n / 32
+	JZ tail_inv512_f32
+
+loop_inv512_f32_32:
+	VMOVUPS (SI), Z0
+	VMOVUPS 64(SI), Z1
+	VDIVPS Z0, Z15, Z2
+	VDIVPS Z1, Z15, Z3
+	VMOVUPS Z2, (DX)
+	VMOVUPS Z3, 64(DX)
+	ADDQ $128, SI
+	ADDQ $128, DX
+	DECQ CX
+	JNZ loop_inv512_f32_32
+
+tail_inv512_f32:
+	TESTQ $16, AX
+	JZ done_inv512_f32
+	VMOVUPS (SI), Z0
+	VDIVPS Z0, Z15, Z1
+	VMOVUPS Z1, (DX)
+
+done_inv512_f32:
+	VZEROUPPER
+	RET
+
+// func fmaAVX512F32(a, b, c, result []float32)
+TEXT ·fmaAVX512F32(SB), NOSPLIT, $0-96
+	MOVQ a_base+0(FP), SI
+	MOVQ b_base+24(FP), DI
+	MOVQ c_base+48(FP), BX
+	MOVQ result_base+72(FP), DX
+	MOVQ a_len+8(FP), CX
+
+	MOVQ CX, AX
+	SHRQ $5, CX // n / 32
+	JZ tail_fma512_f32
+
+loop_fma512_f32_32:
+	VMOVUPS (SI), Z0
+	VMOVUPS 64(SI), Z1
+	VMOVUPS (DI), Z2
+	VMOVUPS 64(DI), Z3
+	VMOVUPS (BX), Z4
+	VMOVUPS 64(BX), Z5
+	VFMADD213PS Z4, Z2, Z0
+	VFMADD213PS Z5, Z3, Z1
+	VMOVUPS Z0, (DX)
+	VMOVUPS Z1, 64(DX)
+
+	ADDQ $128, SI
+	ADDQ $128, DI
+	ADDQ $128, BX
+	ADDQ $128, DX
+	DECQ CX
+	JNZ loop_fma512_f32_32
+
+tail_fma512_f32:
+	TESTQ $16, AX
+	JZ done_fma512_f32
+	VMOVUPS (SI), Z0
+	VMOVUPS (DI), Z1
+	VMOVUPS (BX), Z2
+	VFMADD213PS Z2, Z1, Z0
+	VMOVUPS Z0, (DX)
+
+done_fma512_f32:
+	VZEROUPPER
+	RET
+
+// func floorAVX512(a, result []float64)
+TEXT ·floorAVX512(SB), NOSPLIT, $0-48
+	MOVQ a_len+8(FP), CX
+	TESTQ CX, CX
+	JZ done_floor512
+
+	MOVQ a_base+0(FP), SI
+	MOVQ result_base+24(FP), DX
+
+	MOVQ CX, AX
+	SHRQ $4, CX // n / 16
+	JZ tail_floor512
+
+loop_floor512_16:
+	VMOVUPD (SI), Z0
+	VMOVUPD 64(SI), Z1
+	VRNDSCALEPD $1, Z0, Z2
+	VRNDSCALEPD $1, Z1, Z3
+	VMOVUPD Z2, (DX)
+	VMOVUPD Z3, 64(DX)
+	ADDQ $128, SI
+	ADDQ $128, DX
+	DECQ CX
+	JNZ loop_floor512_16
+
+tail_floor512:
+	TESTQ $8, AX
+	JZ done_floor512
+	VMOVUPD (SI), Z0
+	VRNDSCALEPD $1, Z0, Z1
+	VMOVUPD Z1, (DX)
+
+done_floor512:
+	VZEROUPPER
+	RET
+
+// func ceilAVX512(a, result []float64)
+TEXT ·ceilAVX512(SB), NOSPLIT, $0-48
+	MOVQ a_len+8(FP), CX
+	TESTQ CX, CX
+	JZ done_ceil512
+
+	MOVQ a_base+0(FP), SI
+	MOVQ result_base+24(FP), DX
+
+	MOVQ CX, AX
+	SHRQ $4, CX // n / 16
+	JZ tail_ceil512
+
+loop_ceil512_16:
+	VMOVUPD (SI), Z0
+	VMOVUPD 64(SI), Z1
+	VRNDSCALEPD $2, Z0, Z2
+	VRNDSCALEPD $2, Z1, Z3
+	VMOVUPD Z2, (DX)
+	VMOVUPD Z3, 64(DX)
+	ADDQ $128, SI
+	ADDQ $128, DX
+	DECQ CX
+	JNZ loop_ceil512_16
+
+tail_ceil512:
+	TESTQ $8, AX
+	JZ done_ceil512
+	VMOVUPD (SI), Z0
+	VRNDSCALEPD $2, Z0, Z1
+	VMOVUPD Z1, (DX)
+
+done_ceil512:
+	VZEROUPPER
+	RET
+
+// func truncAVX512(a, result []float64)
+TEXT ·truncAVX512(SB), NOSPLIT, $0-48
+	MOVQ a_len+8(FP), CX
+	TESTQ CX, CX
+	JZ done_trunc512
+
+	MOVQ a_base+0(FP), SI
+	MOVQ result_base+24(FP), DX
+
+	MOVQ CX, AX
+	SHRQ $4, CX // n / 16
+	JZ tail_trunc512
+
+loop_trunc512_16:
+	VMOVUPD (SI), Z0
+	VMOVUPD 64(SI), Z1
+	VRNDSCALEPD $3, Z0, Z2
+	VRNDSCALEPD $3, Z1, Z3
+	VMOVUPD Z2, (DX)
+	VMOVUPD Z3, 64(DX)
+	ADDQ $128, SI
+	ADDQ $128, DX
+	DECQ CX
+	JNZ loop_trunc512_16
+
+tail_trunc512:
+	TESTQ $8, AX
+	JZ done_trunc512
+	VMOVUPD (SI), Z0
+	VRNDSCALEPD $3, Z0, Z1
+	VMOVUPD Z1, (DX)
+
+done_trunc512:
+	VZEROUPPER
+	RET
+
+// func roundAVX512(a, result []float64)
+TEXT ·roundAVX512(SB), NOSPLIT, $0-48
+	MOVQ a_len+8(FP), CX
+	TESTQ CX, CX
+	JZ done_round512
+
+	MOVQ a_base+0(FP), SI
+	MOVQ result_base+24(FP), DX
+
+	MOVQ CX, AX
+	SHRQ $4, CX // n / 16
+	JZ tail_round512
+
+loop_round512_16:
+	VMOVUPD (SI), Z0
+	VMOVUPD 64(SI), Z1
+	VRNDSCALEPD $0, Z0, Z2
+	VRNDSCALEPD $0, Z1, Z3
+	VMOVUPD Z2, (DX)
+	VMOVUPD Z3, 64(DX)
+	ADDQ $128, SI
+	ADDQ $128, DX
+	DECQ CX
+	JNZ loop_round512_16
+
+tail_round512:
+	TESTQ $8, AX
+	JZ done_round512
+	VMOVUPD (SI), Z0
+	VRNDSCALEPD $0, Z0, Z1
+	VMOVUPD Z1, (DX)
+
+done_round512:
+	VZEROUPPER
+	RET
+
+// func maxAVX512(a, b, result []float64)
+TEXT ·maxAVX512(SB), NOSPLIT, $0-72
+	MOVQ a_base+0(FP), SI
+	MOVQ b_base+24(FP), DI
+	MOVQ result_base+48(FP), DX
+	MOVQ a_len+8(FP), CX
+
+	MOVQ CX, AX
+	SHRQ $4, CX // n / 16
+	JZ tail_max512
+
+loop_max512_16:
+	VMOVUPD (SI), Z0
+	VMOVUPD 64(SI), Z1
+	VMOVUPD (DI), Z2
+	VMOVUPD 64(DI), Z3
+	VMAXPD Z2, Z0, Z0
+	VMAXPD Z3, Z1, Z1
+	VMOVUPD Z0, (DX)
+	VMOVUPD Z1, 64(DX)
+	ADDQ $128, SI
+	ADDQ $128, DI
+	ADDQ $128, DX
+	DECQ CX
+	JNZ loop_max512_16
+
+tail_max512:
+	TESTQ $8, AX
+	JZ done_max512
+	VMOVUPD (SI), Z0
+	VMOVUPD (DI), Z1
+	VMAXPD Z1, Z0, Z2
+	VMOVUPD Z2, (DX)
+
+done_max512:
+	VZEROUPPER
+	RET
+
+// func minAVX512(a, b, result []float64)
+TEXT ·minAVX512(SB), NOSPLIT, $0-72
+	MOVQ a_base+0(FP), SI
+	MOVQ b_base+24(FP), DI
+	MOVQ result_base+48(FP), DX
+	MOVQ a_len+8(FP), CX
+
+	MOVQ CX, AX
+	SHRQ $4, CX // n / 16
+	JZ tail_min512
+
+loop_min512_16:
+	VMOVUPD (SI), Z0
+	VMOVUPD 64(SI), Z1
+	VMOVUPD (DI), Z2
+	VMOVUPD 64(DI), Z3
+	VMINPD Z2, Z0, Z0
+	VMINPD Z3, Z1, Z1
+	VMOVUPD Z0, (DX)
+	VMOVUPD Z1, 64(DX)
+	ADDQ $128, SI
+	ADDQ $128, DI
+	ADDQ $128, DX
+	DECQ CX
+	JNZ loop_min512_16
+
+tail_min512:
+	TESTQ $8, AX
+	JZ done_min512
+	VMOVUPD (SI), Z0
+	VMOVUPD (DI), Z1
+	VMINPD Z1, Z0, Z2
+	VMOVUPD Z2, (DX)
+
+done_min512:
+	VZEROUPPER
+	RET
+
 

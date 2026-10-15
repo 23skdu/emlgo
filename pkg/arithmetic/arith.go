@@ -470,7 +470,7 @@ func FloorBatch(x []float64) []float64 {
 		return x
 	}
 	result := make([]float64, n)
-	parallelMap(x, result, Floor)
+	eml.FloorSIMDTo(x, result)
 	return result
 }
 
@@ -480,7 +480,7 @@ func CeilBatch(x []float64) []float64 {
 		return x
 	}
 	result := make([]float64, n)
-	parallelMap(x, result, Ceil)
+	eml.CeilSIMDTo(x, result)
 	return result
 }
 
@@ -490,7 +490,7 @@ func TruncBatch(x []float64) []float64 {
 		return x
 	}
 	result := make([]float64, n)
-	parallelMap(x, result, Trunc)
+	eml.TruncSIMDTo(x, result)
 	return result
 }
 

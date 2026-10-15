@@ -413,3 +413,131 @@ func bytesToFloat32(b []byte) []float32 {
 	}
 	return res
 }
+
+func FuzzFloorSIMD(f *testing.F) {
+	f.Add([]byte{0, 0, 0, 0, 0, 0, 0xf0, 0x3f})
+	f.Fuzz(func(t *testing.T, a []byte) {
+		fa := bytesToFloat64(a)
+		got := FloorSIMD(fa)
+		if len(got) != len(fa) {
+			t.Fatalf("length mismatch: got %d, want %d", len(got), len(fa))
+		}
+		for i := range got {
+			assertFuzzExact(t, "floor", got[i], math.Floor(fa[i]))
+		}
+	})
+}
+
+func FuzzCeilSIMD(f *testing.F) {
+	f.Add([]byte{0, 0, 0, 0, 0, 0, 0xf0, 0x3f})
+	f.Fuzz(func(t *testing.T, a []byte) {
+		fa := bytesToFloat64(a)
+		got := CeilSIMD(fa)
+		if len(got) != len(fa) {
+			t.Fatalf("length mismatch: got %d, want %d", len(got), len(fa))
+		}
+		for i := range got {
+			assertFuzzExact(t, "ceil", got[i], math.Ceil(fa[i]))
+		}
+	})
+}
+
+func FuzzTruncSIMD(f *testing.F) {
+	f.Add([]byte{0, 0, 0, 0, 0, 0, 0xf0, 0x3f})
+	f.Fuzz(func(t *testing.T, a []byte) {
+		fa := bytesToFloat64(a)
+		got := TruncSIMD(fa)
+		if len(got) != len(fa) {
+			t.Fatalf("length mismatch: got %d, want %d", len(got), len(fa))
+		}
+		for i := range got {
+			assertFuzzExact(t, "trunc", got[i], math.Trunc(fa[i]))
+		}
+	})
+}
+
+func FuzzRoundSIMD(f *testing.F) {
+	f.Add([]byte{0, 0, 0, 0, 0, 0, 0xf0, 0x3f})
+	f.Fuzz(func(t *testing.T, a []byte) {
+		fa := bytesToFloat64(a)
+		got := RoundSIMD(fa)
+		if len(got) != len(fa) {
+			t.Fatalf("length mismatch: got %d, want %d", len(got), len(fa))
+		}
+		for i := range got {
+			assertFuzzExact(t, "round", got[i], math.RoundToEven(fa[i]))
+		}
+	})
+}
+
+func FuzzMaxSIMD(f *testing.F) {
+	f.Add([]byte{0, 0, 0, 0, 0, 0, 0xf0, 0x3f}, []byte{0, 0, 0, 0, 0, 0, 0, 0x40})
+	f.Fuzz(func(t *testing.T, a, b []byte) {
+		fa, fb := bytesToFloat64(a), bytesToFloat64(b)
+		if len(fa) != len(fb) {
+			return
+		}
+		got := MaxSIMD(fa, fb)
+		for i := range got {
+			var want float64
+			if math.IsNaN(fa[i]) || math.IsNaN(fb[i]) {
+				want = math.NaN()
+			} else if fa[i] > fb[i] {
+				want = fa[i]
+			} else {
+				want = fb[i]
+			}
+			assertFuzzExact(t, "max", got[i], want)
+		}
+	})
+}
+
+func FuzzMinSIMD(f *testing.F) {
+	f.Add([]byte{0, 0, 0, 0, 0, 0, 0xf0, 0x3f}, []byte{0, 0, 0, 0, 0, 0, 0, 0x40})
+	f.Fuzz(func(t *testing.T, a, b []byte) {
+		fa, fb := bytesToFloat64(a), bytesToFloat64(b)
+		if len(fa) != len(fb) {
+			return
+		}
+		got := MinSIMD(fa, fb)
+		for i := range got {
+			var want float64
+			if math.IsNaN(fa[i]) || math.IsNaN(fb[i]) {
+				want = math.NaN()
+			} else if fa[i] < fb[i] {
+				want = fa[i]
+			} else {
+				want = fb[i]
+			}
+			assertFuzzExact(t, "min", got[i], want)
+		}
+	})
+}
+
+func FuzzFmaSIMDF32(f *testing.F) {
+	f.Add(
+		[]byte{0, 0, 0x80, 0x3f},
+		[]byte{0, 0, 0, 0x40},
+		[]byte{0, 0, 0x80, 0xbf},
+	)
+	f.Fuzz(func(t *testing.T, a, b, c []byte) {
+		fa, fb, fc := bytesToFloat32(a), bytesToFloat32(b), bytesToFloat32(c)
+		if len(fa) != len(fb) || len(fa) != len(fc) {
+			return
+		}
+		got := FmaSIMDF32(fa, fb, fc)
+		for i := range got {
+			want := float32(math.FMA(float64(fa[i]), float64(fb[i]), float64(fc[i])))
+			if math.IsNaN(float64(got[i])) && math.IsNaN(float64(want)) {
+				continue
+			}
+			if math.IsInf(float64(got[i]), 0) && math.IsInf(float64(want), 0) && math.Signbit(float64(got[i])) == math.Signbit(float64(want)) {
+				continue
+			}
+			if !f32Close(got[i], want, 1e-4) {
+				t.Fatalf("fma32 i=%d got %v want %v", i, got[i], want)
+			}
+		}
+	})
+}
+
