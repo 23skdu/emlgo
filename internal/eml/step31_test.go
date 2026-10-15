@@ -21,12 +21,12 @@ func getFunctionBytes(fn any) []byte {
 	}
 	ef := (*eface)(unsafe.Pointer(&fn))
 	codePtr := *(*unsafe.Pointer)(ef.data)
-	wrapperBytes := unsafe.Slice((*byte)(codePtr), 256)
+	wrapperBytes := unsafe.Slice((*byte)(codePtr), 512)
 
 	// Check if this is an ABIInternal stub: "push rbp; mov rbp, rsp" (0x55 0x48 0x89 0xE5)
 	if len(wrapperBytes) > 10 && wrapperBytes[0] == 0x55 && wrapperBytes[1] == 0x48 && wrapperBytes[2] == 0x89 && wrapperBytes[3] == 0xE5 {
 		// Scan for 0xE8 (CALL rel32)
-		for i := 0; i < 128; i++ {
+		for i := 0; i < len(wrapperBytes)-5; i++ {
 			if wrapperBytes[i] == 0xE8 {
 				rel := int32(binary.LittleEndian.Uint32(wrapperBytes[i+1 : i+5]))
 				targetPtr := unsafe.Add(codePtr, int(i+5)+int(rel))
@@ -76,6 +76,18 @@ func TestAVX512KernelsEmitVzeroupper(t *testing.T) {
 		{"mulAVX512F32", mulAVX512F32},
 		{"divAVX512F32", divAVX512F32},
 		{"sqrtAVX512F32", sqrtAVX512F32},
+		{"addScalarAVX512F32", addScalarAVX512F32},
+		{"mulScalarAVX512F32", mulScalarAVX512F32},
+		{"absAVX512F32", absAVX512F32},
+		{"negAVX512F32", negAVX512F32},
+		{"invAVX512F32", invAVX512F32},
+		{"fmaAVX512F32", fmaAVX512F32},
+		{"floorAVX512", floorAVX512},
+		{"ceilAVX512", ceilAVX512},
+		{"truncAVX512", truncAVX512},
+		{"roundAVX512", roundAVX512},
+		{"maxAVX512", maxAVX512},
+		{"minAVX512", minAVX512},
 		{"addSatInt8AVX512", addSatInt8AVX512},
 		{"subSatInt8AVX512", subSatInt8AVX512},
 		{"dotInt8AVX512VNNI", dotInt8AVX512VNNI},

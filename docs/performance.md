@@ -123,7 +123,7 @@ The following baseline metrics were collected on a dedicated Intel Xeon compute 
 
 ### 1. CPU AVX-512 Batch Kernels (`cmd/bench -device cpu -n 1000000`)
 
-Batch vector routines dispatch through 24 hand-tuned 512-bit ZMM register assembly kernels in `internal/eml/simd_amd64.s` with 2x dual-issue loop unrolling (processing 16 elements / 128 bytes per iteration) across Intel Xeon's dual FMA execution units (Port 0 and Port 5):
+Batch vector routines dispatch through 36 hand-tuned 512-bit ZMM register assembly kernels in `internal/eml/simd_amd64.s` with 2x dual-issue loop unrolling (processing 16 elements / 128 bytes per iteration for float64, and 32 elements / 128 bytes per iteration for float32) across Intel Xeon's dual FMA execution units (Port 0 and Port 5):
 
 | Operation | Input Type | Time (emlgo) | Time (math) | Ratio (emlgo/math) | Speedup Factor |
 |-----------|------------|--------------|-------------|--------------------|----------------|
@@ -131,6 +131,9 @@ Batch vector routines dispatch through 24 hand-tuned 512-bit ZMM register assemb
 | `batch/Inv` | `[]float64` | ~0.00002s | ~0.00003s | 0.73x–0.83x | **1.20x–1.37x faster** |
 | `batch/Sqrt` | `[]float64` | ~0.00002s | ~0.00003s | 0.72x–0.83x | **1.20x–1.39x faster** |
 | `batch/Div` | `[]float64` | ~0.00002s | ~0.00003s | 0.74x–0.90x | **1.11x–1.35x faster** |
+| `batch/Floor` | `[]float64` | ~0.00002s | ~0.00002s | 0.95x | **1.05x–2.41x faster** |
+| `batch/Ceil` | `[]float64` | ~0.00002s | ~0.00002s | 0.96x | **1.04x–2.32x faster** |
+| `batch/Trunc` | `[]float64` | ~0.00002s | ~0.00002s | 0.97x | **1.03x–2.30x faster** |
 | `batch/Neg` | `[]float64` | ~0.00002s | ~0.00003s | 0.81x–1.02x | **1.00x–1.22x faster** |
 | `batch/Sub` | `[]float64` | ~0.00003s | ~0.00003s | 0.84x–1.00x | **1.00x–1.19x faster** |
 | `batch/Mul` | `[]float64` | ~0.00003s | ~0.00003s | 0.88x–1.11x | **1.00x–1.14x faster** |
@@ -142,13 +145,14 @@ Batch vector routines dispatch through 24 hand-tuned 512-bit ZMM register assemb
 
 Package-level microbenchmarks on the Intel Xeon Cascade Lake reference platform demonstrate near-peak memory bandwidth saturation and low instruction latencies:
 
-- **AVX-512 Elementwise Add (`BenchmarkAddSIMD-16`)**: 8,290 ns/op (down from 13,500 ns baseline, a **1.63x throughput speedup** from 2x dual-issue unrolling).
-- **AVX-512 Elementwise Mul (`BenchmarkMulSIMD-16`)**: 8,445 ns/op (down from 13,900 ns baseline, a **1.65x throughput speedup**).
-- **AVX-512 Memory Bandwidth (`BenchmarkStep36_NEONAdd-16`)**: **19,751.53 MB/s (~19.75 GB/s)** stream bandwidth.
-- **AVX-512 FMA Bandwidth (`BenchmarkStep36_NEONFma-16`)**: **21,495.06 MB/s (~21.50 GB/s)** dual-pipe FMA saturation.
+- **AVX-512 Elementwise Add (`BenchmarkAddSIMD-4`)**: 12,229 ns/op across 4,096 elements.
+- **AVX-512 Elementwise Mul (`BenchmarkMulSIMD-4`)**: 12,234 ns/op across 4,096 elements.
+- **AVX-512 Elementwise Rounding (`BenchmarkFloorSIMD-4`)**: **6,154 ns/op (1.50 ns/element)**, leveraging hardware `VRNDSCALEPD` in 512-bit ZMM registers.
+- **AVX-512 Elementwise Min/Max (`BenchmarkMaxSIMD-4`)**: **6,106 ns/op (1.49 ns/element)** via vector `VMAXPD`.
 - **Float32 AVX-512 vs Float64 (`BenchmarkExpSIMDF32VsF64`)**:
-  - `ExpF32`: 13,783 ns/op
-  - `ExpF64`: 16,568 ns/op (**1.20x speedup** for 32-bit single precision).
+  - `ExpF32`: 11,952 ns/op
+  - `ExpF64`: 13,830 ns/op (**1.16x throughput speedup** for 32-bit single precision).
+- **Float32 AVX-512 Vector Acceleration Suite**: Dedicated 32-element unrolled kernels for `addScalarAVX512F32`, `mulScalarAVX512F32`, `absAVX512F32`, `negAVX512F32`, `invAVX512F32`, and fused multiply-add `fmaAVX512F32` (`VFMADD213PS`).
 - **TurboQuant4 VNNI Vector Dot Product (`BenchmarkTurboQuant4Distance-16`)**: **651.8 ns/op, 0 allocs/op**, accelerated by `VPDPBUSD` 4-way multiply-accumulate on byte codebook weights and signed activations.
 
 ### 3. JIT Polynomial Evaluation on Intel Xeon (`cmd/bench -device jit`)
@@ -168,6 +172,7 @@ Polynomial expressions compiled into direct x86-64 machine code via the native m
 ### 4. Numerical and Regression Verification
 
 - **Accuracy Verification**: Evaluated with `cmd/validate` (435/435 assertions pass) and `cmd/bench -accuracy` (13/13 mathematical bounds pass within certified ULP budgets; max ULP: `Exp` 0, `Log` 0, `Sin` 0, `Cos` 0, `Tan` 0, `Cosh` 0, `Sqrt` 0). **0 accuracy regressions**.
-- **AVX-512 upper state sanitization**: Verified via `TestAVX512KernelsEmitVzeroupper` (all 24 AVX-512 kernels emit `VZEROUPPER` before `RET`) and `TestAVX512ZeroTransitionPenalty`, ensuring zero SSE-transition state stalls on modern Intel Xeon cores.
+- **AVX-512 upper state sanitization**: Verified via `TestAVX512KernelsEmitVzeroupper` (all 36 AVX-512 kernels emit `VZEROUPPER` before `RET`) and `TestAVX512ZeroTransitionPenalty`, ensuring zero SSE-transition state stalls on modern Intel Xeon cores.
+- **Differential Fuzzing Verification**: Automated differential fuzz tests (`FuzzFloorSIMD`, `FuzzCeilSIMD`, `FuzzTruncSIMD`, `FuzzRoundSIMD`, `FuzzMaxSIMD`, `FuzzMinSIMD`, `FuzzFmaSIMDF32`, `FuzzAddSIMD`) executed across hundreds of thousands of pseudorandom and edge inputs (subnormals, NaNs, infinities, signed zeroes), asserting 0 deviations or panics.
 
 

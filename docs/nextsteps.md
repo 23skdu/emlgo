@@ -112,12 +112,12 @@ All prior roadmap steps (1–8, 11–30, 31–50, and AVX-512 optimization items
 - **v0.5**: JIT register clobber fixes, 100% statement coverage across packages, `purego` portability across all architectures, subnormal accuracy oracles, 14 native ARM64 NEON kernels, and WebAssembly browser benchmark harness (`cmd/wasmbench`).
 - **v0.6**: Automated GHCR package publishing, Go 1.27.2 toolchain, CPU AVX2 & CUDA multi-stage Docker containers, supply chain security attestations (SLSA provenance, SPDX SBOM, Govulncheck).
 - **v0.7 (AVX-512 & VNNI Optimization)**:
-  - **24 AVX-512 Assembly Kernels in `simd_amd64.s`**:
-    - 11 elementwise float64 kernels (`add`, `sub`, `mul`, `div`, `addScalar`, `mulScalar`, `sqrt`, `fma`, `abs`, `neg`, `inv`) unrolled 2x (16 elements / 128 bytes per iteration) with 8-element odd tail.
+  - **36 AVX-512 Assembly Kernels in `simd_amd64.s`**:
+    - 17 elementwise float64 kernels (`add`, `sub`, `mul`, `div`, `addScalar`, `mulScalar`, `sqrt`, `fma`, `abs`, `neg`, `inv`, `floor`, `ceil`, `trunc`, `round`, `max`, `min`) unrolled 2x (16 elements / 128 bytes per iteration) with 8-element odd tail.
     - 5 transcendental kernels (`expAVX512`, `logAVX512`, `sinAVX512`, `cosAVX512`, `tanAVX512`) with loop-invariant minimax polynomial coefficients hoisted to dedicated registers `Z16–Z31`.
-    - 5 float32 kernels (`addAVX512F32`, `mulAVX512F32`, `subAVX512F32`, `divAVX512F32`, `sqrtAVX512F32`) processing 16 elements per instruction.
+    - 11 float32 kernels (`addAVX512F32`, `mulAVX512F32`, `subAVX512F32`, `divAVX512F32`, `sqrtAVX512F32`, `addScalarAVX512F32`, `mulScalarAVX512F32`, `absAVX512F32`, `negAVX512F32`, `invAVX512F32`, `fmaAVX512F32`) processing 16–32 elements per iteration (128 bytes per loop).
     - 2 saturated int8 kernels (`addSatInt8AVX512`, `subSatInt8AVX512`) processing 64 bytes per iteration.
     - 1 VNNI dot product kernel (`dotInt8AVX512VNNI`) using `VPDPBUSD` 4-way multiply-accumulate on byte codebook weights and signed activations in `pkg/quant` (TurboQuant4).
-  - All 24 AVX-512 kernels emit `VZEROUPPER` before `RET` (`TestAVX512KernelsEmitVzeroupper` passes 24/24).
+  - All 36 AVX-512 kernels emit `VZEROUPPER` before `RET` (`TestAVX512KernelsEmitVzeroupper` passes 36/36).
   - Verified on dedicated Intel Xeon Cascade Lake AVX-512 reference platform: `cmd/validate` (435/435 pass), `cmd/bench -accuracy` (13/13 bounds pass), and full project test suites pass with 0 regressions.
 

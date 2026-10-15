@@ -3,6 +3,10 @@
 
 package eml
 
+import (
+	"math"
+)
+
 func arm64AddSIMD(a, b, result []float64) {
 	n := len(a)
 	simdLen := (n / 2) * 2
@@ -291,5 +295,89 @@ func dispatchDivSIMDF32To(a, b, dst []float32) {
 func dispatchSqrtSIMDF32To(src, dst []float32) {
 	for i := range src {
 		dst[i] = float32(nativeSqrt(float64(src[i])))
+	}
+}
+
+func dispatchAddScalarSIMDF32To(a []float32, b float32, dst []float32) {
+	for i := range a {
+		dst[i] = a[i] + b
+	}
+}
+
+func dispatchMulScalarSIMDF32To(a []float32, b float32, dst []float32) {
+	for i := range a {
+		dst[i] = a[i] * b
+	}
+}
+
+func dispatchAbsSIMDF32To(src, dst []float32) {
+	for i := range src {
+		dst[i] = math.Float32frombits(math.Float32bits(src[i]) & 0x7fffffff)
+	}
+}
+
+func dispatchNegSIMDF32To(src, dst []float32) {
+	for i := range src {
+		dst[i] = -src[i]
+	}
+}
+
+func dispatchInvSIMDF32To(src, dst []float32) {
+	for i := range src {
+		dst[i] = 1.0 / src[i]
+	}
+}
+
+func dispatchFmaSIMDF32To(a, b, c, dst []float32) {
+	for i := range a {
+		dst[i] = float32(math.FMA(float64(a[i]), float64(b[i]), float64(c[i])))
+	}
+}
+
+func dispatchFloorSIMDTo(src, dst []float64) {
+	for i := range src {
+		dst[i] = math.Floor(src[i])
+	}
+}
+
+func dispatchCeilSIMDTo(src, dst []float64) {
+	for i := range src {
+		dst[i] = math.Ceil(src[i])
+	}
+}
+
+func dispatchTruncSIMDTo(src, dst []float64) {
+	for i := range src {
+		dst[i] = math.Trunc(src[i])
+	}
+}
+
+func dispatchRoundSIMDTo(src, dst []float64) {
+	for i := range src {
+		dst[i] = math.RoundToEven(src[i])
+	}
+}
+
+func dispatchMaxSIMDTo(a, b, dst []float64) {
+	for i := range a {
+		if math.IsNaN(a[i]) || math.IsNaN(b[i]) {
+			dst[i] = math.NaN()
+		} else if a[i] > b[i] {
+			dst[i] = a[i]
+		} else {
+			dst[i] = b[i]
+		}
+	}
+}
+
+func dispatchMinSIMDTo(a, b, dst []float64) {
+	for i := range a {
+		if math.IsNaN(a[i]) || math.IsNaN(b[i]) {
+			dst[i] = math.NaN()
+		} else if a[i] < b[i] {
+			dst[i] = a[i]
+		} else {
+			dst[i] = b[i]
+		}
 	}
 }

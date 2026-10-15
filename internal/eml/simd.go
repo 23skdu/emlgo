@@ -415,6 +415,138 @@ func invSIMD(x, result []float64) {
 	})
 }
 
+// FloorSIMD returns a new slice containing the floor of each element in x.
+func FloorSIMD(x []float64) []float64 {
+	result := make([]float64, len(x))
+	FloorSIMDTo(x, result)
+	return result
+}
+
+// FloorSIMDTo computes the floor of each element in x and stores it in result.
+func FloorSIMDTo(x, result []float64) {
+	if len(x) != len(result) {
+		panic("slice length mismatch")
+	}
+	n := len(x)
+	if n < SmallCutoff() || poolClosed.Load() {
+		dispatchFloorSIMDTo(x, result)
+		return
+	}
+	ForEachChunk(n, func(start, end int) {
+		dispatchFloorSIMDTo(x[start:end], result[start:end])
+	})
+}
+
+// CeilSIMD returns a new slice containing the ceil of each element in x.
+func CeilSIMD(x []float64) []float64 {
+	result := make([]float64, len(x))
+	CeilSIMDTo(x, result)
+	return result
+}
+
+// CeilSIMDTo computes the ceil of each element in x and stores it in result.
+func CeilSIMDTo(x, result []float64) {
+	if len(x) != len(result) {
+		panic("slice length mismatch")
+	}
+	n := len(x)
+	if n < SmallCutoff() || poolClosed.Load() {
+		dispatchCeilSIMDTo(x, result)
+		return
+	}
+	ForEachChunk(n, func(start, end int) {
+		dispatchCeilSIMDTo(x[start:end], result[start:end])
+	})
+}
+
+// TruncSIMD returns a new slice containing the truncated value of each element in x.
+func TruncSIMD(x []float64) []float64 {
+	result := make([]float64, len(x))
+	TruncSIMDTo(x, result)
+	return result
+}
+
+// TruncSIMDTo computes the truncation of each element in x and stores it in result.
+func TruncSIMDTo(x, result []float64) {
+	if len(x) != len(result) {
+		panic("slice length mismatch")
+	}
+	n := len(x)
+	if n < SmallCutoff() || poolClosed.Load() {
+		dispatchTruncSIMDTo(x, result)
+		return
+	}
+	ForEachChunk(n, func(start, end int) {
+		dispatchTruncSIMDTo(x[start:end], result[start:end])
+	})
+}
+
+// RoundSIMD returns a new slice containing the rounded value (round-to-even) of each element in x.
+func RoundSIMD(x []float64) []float64 {
+	result := make([]float64, len(x))
+	RoundSIMDTo(x, result)
+	return result
+}
+
+// RoundSIMDTo computes the round-to-even of each element in x and stores it in result.
+func RoundSIMDTo(x, result []float64) {
+	if len(x) != len(result) {
+		panic("slice length mismatch")
+	}
+	n := len(x)
+	if n < SmallCutoff() || poolClosed.Load() {
+		dispatchRoundSIMDTo(x, result)
+		return
+	}
+	ForEachChunk(n, func(start, end int) {
+		dispatchRoundSIMDTo(x[start:end], result[start:end])
+	})
+}
+
+// MaxSIMD returns a new slice containing the element-wise maximum of a and b.
+func MaxSIMD(a, b []float64) []float64 {
+	result := make([]float64, len(a))
+	MaxSIMDTo(a, b, result)
+	return result
+}
+
+// MaxSIMDTo computes the element-wise maximum of a and b and stores it in result.
+func MaxSIMDTo(a, b, result []float64) {
+	if len(a) != len(b) || len(a) != len(result) {
+		panic("slice length mismatch")
+	}
+	n := len(a)
+	if n < SmallCutoff() || poolClosed.Load() {
+		dispatchMaxSIMDTo(a, b, result)
+		return
+	}
+	ForEachChunk(n, func(start, end int) {
+		dispatchMaxSIMDTo(a[start:end], b[start:end], result[start:end])
+	})
+}
+
+// MinSIMD returns a new slice containing the element-wise minimum of a and b.
+func MinSIMD(a, b []float64) []float64 {
+	result := make([]float64, len(a))
+	MinSIMDTo(a, b, result)
+	return result
+}
+
+// MinSIMDTo computes the element-wise minimum of a and b and stores it in result.
+func MinSIMDTo(a, b, result []float64) {
+	if len(a) != len(b) || len(a) != len(result) {
+		panic("slice length mismatch")
+	}
+	n := len(a)
+	if n < SmallCutoff() || poolClosed.Load() {
+		dispatchMinSIMDTo(a, b, result)
+		return
+	}
+	ForEachChunk(n, func(start, end int) {
+		dispatchMinSIMDTo(a[start:end], b[start:end], result[start:end])
+	})
+}
+
 
 // SinhBatch returns a new slice containing the hyperbolic sine of each element in x.
 func SinhBatch(x []float64) []float64 {
