@@ -1,4 +1,4 @@
-.PHONY: build test test-short test-race test-docker test-scripts test-cover bench lint vet fuzz clean wasm gosec govulncheck docker docker-build docker-build-cpu docker-build-cuda docker-push docker-push-cpu docker-push-cuda
+.PHONY: build test test-short test-race test-docker test-scripts test-cover bench lint vet fuzz clean wasm gosec govulncheck oracle-gate accuracy-gate check install-hooks docker docker-build docker-build-cpu docker-build-cuda docker-push docker-push-cpu docker-push-cuda
 
 build:
 	go build ./...
@@ -22,7 +22,7 @@ test-docker:
 	go test -v -run 'TestDocker.*' ./test/...
 
 test-scripts:
-	go test -v -run 'Test(CheckBenchRegression|RunBenchmark|RunValidation|BenchCompare|WasmTest|GenerateMPFR).*' ./test/...
+	go test -v -run 'Test(CheckBenchRegression|RunBenchmark|RunValidation|BenchCompare|WasmTest|GenerateMPFR|OracleAccuracyGate|PreCommit).*' ./test/...
 
 test-cover:
 	go test -coverprofile=coverage.out -covermode=atomic ./...
@@ -51,14 +51,33 @@ fuzz:
 	go test -run='^$$' -fuzz='^FuzzExpSIMD$$' -fuzztime=$(FUZZTIME) ./internal/eml
 	go test -run='^$$' -fuzz='^FuzzLogSIMD$$' -fuzztime=$(FUZZTIME) ./internal/eml
 	go test -run='^$$' -fuzz='^FuzzSinSIMD$$' -fuzztime=$(FUZZTIME) ./internal/eml
+	go test -run='^$$' -fuzz='^FuzzExpLnRoundtrip$$' -fuzztime=$(FUZZTIME) ./internal/eml/bigmath
+	go test -run='^$$' -fuzz='^FuzzLaunchConfig$$' -fuzztime=$(FUZZTIME) ./internal/gpu
 	go test -run='^$$' -fuzz='^FuzzPow$$' -fuzztime=$(FUZZTIME) ./pkg/arithmetic
 	go test -run='^$$' -fuzz='^FuzzAdd$$' -fuzztime=$(FUZZTIME) ./pkg/arithmetic
+	go test -run='^$$' -fuzz='^FuzzOptimizerDifferential$$' -fuzztime=$(FUZZTIME) ./pkg/bytecode
+	go test -run='^$$' -fuzz='^FuzzFastMathDifferential$$' -fuzztime=$(FUZZTIME) ./pkg/fastmath
+	go test -run='^$$' -fuzz='^FuzzHyperbolicAccuracy$$' -fuzztime=$(FUZZTIME) ./pkg/hyper
+	go test -run='^$$' -fuzz='^FuzzLogExpDifferential$$' -fuzztime=$(FUZZTIME) ./pkg/logexp
+	go test -run='^$$' -fuzz='^FuzzPackUnpack4Bit$$' -fuzztime=$(FUZZTIME) ./pkg/quant
+	go test -run='^$$' -fuzz='^FuzzTrigPythagoreanIdentity$$' -fuzztime=$(FUZZTIME) ./pkg/trig
 
 gosec:
-	gosec -exclude-generated -tags purego ./...
+	golangci-lint run --enable-only=gosec ./...
 
 govulncheck:
 	govulncheck ./... || go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
+oracle-gate:
+	./scripts/oracle_accuracy_gate.sh
+
+accuracy-gate: oracle-gate
+
+check: vet lint gosec govulncheck oracle-gate test-cover
+
+install-hooks:
+	cp scripts/pre-commit.sh .git/hooks/pre-commit
+	chmod +x .git/hooks/pre-commit
 
 IMAGE_REPO ?= ghcr.io/23skdu/emlgo
 TAG ?= 0.6

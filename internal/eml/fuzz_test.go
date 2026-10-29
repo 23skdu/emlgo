@@ -540,4 +540,3 @@ func FuzzFmaSIMDF32(f *testing.F) {
 		}
 	})
 }
-

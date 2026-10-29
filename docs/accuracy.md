@@ -56,6 +56,16 @@ exponential reduction boundaries. It logs the worst observed finite error and
 its input when run with `-v`; the MPFR fixtures independently anchor selected
 normal and subnormal cases.
 
+## Oracle accuracy gate
+
+`scripts/oracle_accuracy_gate.sh` (invoked via `make oracle-gate` or `make check`) enforces a 5-stage numerical accuracy gate across the repository:
+
+1. **MPFR 4.2.2 Provenance & Golden Vectors**: Verifies the `# MPFR 4.2.2; MPFR_RNDN; exact binary inputs; result precision 53/24 bits` provenance header in `internal/accuracyvectors/mpfr-vectors.csv`, optionally recompiles `scripts/generate_mpfr_vectors.c` (`--regen-check`), and runs `TestLoadVectors` and `TestMPFR*` across `internal/accuracyvectors`, `internal/eml`, and `pkg/fastmath`.
+2. **Arbitrary-Precision `bigmath` & SIMD Differential Suite**: Runs 256/512-bit `big.Float` identity tests and `ExactLogOracle` / SIMD batch kernel differential suites (`TestBatchKernelAccuracy`, `TestBatchKernelTailLoopAccuracy`, `TestBatchTrigIdentities`, `TestBatchSinCosZeros`, `TestSubnormal*`).
+3. **JIT vs AST Canonical Differential Gate**: Verifies native JIT codegen parity against the AST interpreter in `internal/jit`.
+4. **Full Type & Domain Validation**: Runs `cmd/validate` across all 435 type, precision, quantization, and batch validation checks.
+5. **Feature Parity & ULP Accuracy Bounds**: Runs `cmd/bench -compare` and `cmd/bench -accuracy`.
+
 ## Current validation limits
 
 MPFR vectors provide an independent high-precision reference for the included
@@ -64,9 +74,7 @@ other tests, but it is not an independent arbitrary-precision oracle. Existing
 dense SIMD checks cover selected functions and input ranges; they do not certify
 all inputs, all architectures, or all possible backends. FastMath sweeps and
 golden vectors likewise do not prove global worst-case bounds. The remaining
-verification gaps are tracked in [nextsteps.md](nextsteps.md), including hosted
-cross-platform and release-workflow results (Steps 47 and 50) and hardware-gated
-ARM64 JIT/AVX-512 work (Steps 9 and 10).
+verification gaps and P0 blockers are tracked in [roadmap.md](roadmap.md) and [nextsteps.md](nextsteps.md).
 
 Published accuracy numbers must identify the operation, precision, input
 domain, backend, reference, error metric, sample method, and Go/architecture

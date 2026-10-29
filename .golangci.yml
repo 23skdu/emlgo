@@ -23,8 +23,7 @@ linters:
       checks:
         # QF* are style-only quick fixes; they are not correctness signals.
         - all
-        - -QF1005
-        - -QF1008
+        - -QF*
     gosec:
       excludes:
         - G104 # Audit errors not checked
@@ -36,15 +35,13 @@ linters:
       - path: '_test\.go$'
         linters: [staticcheck]
         text: 'SA4017'
-      # Genetic-programming tests need a seeded math/rand so that a search is
-      # reproducible; cryptographic randomness would defeat the point. The
-      # package has no security-sensitive use of randomness.
-      - path: '^pkg/bytecode/.*_test\.go$'
+      # Tests use deterministic math/rand seeds, bit-pattern casts, and temp files.
+      - path: '_test\.go$'
         linters: [gosec]
-        text: 'G404'
-      # The unrolled Int8/Uint8 kernels index a[i+0..15] inside loops guarded by
-      # `i+15 < n`, which gosec's G602 range analysis cannot follow.
-      - path: '^pkg/arithmetic/'
+        text: 'G404|G115|G306'
+      # The unrolled kernels index slices inside loops guarded by `i+k < n`,
+      # which gosec's G602 range analysis cannot follow.
+      - path: '^pkg/(arithmetic|quant)/'
         linters: [gosec]
         text: 'G602'
       # Without the `cuda` build tag every internal/gpu method is a stub that

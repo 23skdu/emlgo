@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	maxCacheEntries = 1024
+	maxCacheEntries  = 1024
 	defaultNumShards = 16
 )
 

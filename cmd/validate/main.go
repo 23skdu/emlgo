@@ -1399,4 +1399,3 @@ func testBatch() []ValidationResult {
 
 	return results
 }
-

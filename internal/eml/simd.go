@@ -7,17 +7,17 @@ import (
 )
 
 var (
-	cpuNum      = runtime.NumCPU()
-	hasSSE4     bool
-	hasAVX2     bool
-	hasAVX512   bool
-	hasNeon     bool
-	hasNeonDot  bool
-	hasSVE      bool
-	hasFMA         bool
-	hasAVXVNNI     bool
-	hasAVX512VNNI  bool
-	hasWasmSIMD    bool
+	cpuNum        = runtime.NumCPU()
+	hasSSE4       bool
+	hasAVX2       bool
+	hasAVX512     bool
+	hasNeon       bool
+	hasNeonDot    bool
+	hasSVE        bool
+	hasFMA        bool
+	hasAVXVNNI    bool
+	hasAVX512VNNI bool
+	hasWasmSIMD   bool
 )
 
 func init() {
@@ -105,8 +105,6 @@ func SIMD(x, y, result []float64) {
 		emlSIMD(x[start:end], y[start:end], result[start:end])
 	})
 }
-
-
 
 // ExpSIMD returns a new slice containing the exponential of each element in x.
 func ExpSIMD(x []float64) []float64 {
@@ -547,7 +545,6 @@ func MinSIMDTo(a, b, result []float64) {
 	})
 }
 
-
 // SinhBatch returns a new slice containing the hyperbolic sine of each element in x.
 func SinhBatch(x []float64) []float64 {
 	res := make([]float64, len(x))
@@ -947,7 +944,6 @@ func MulScalarSIMDTo(a []float64, b float64, result []float64) {
 		dispatchMulScalarSIMD(a[start:end], b, result[start:end])
 	})
 }
-
 
 // AddSatInt8SIMDTo computes saturating addition of int8 slices element-wise into result.
 func AddSatInt8SIMDTo(a, b, result []int8) {

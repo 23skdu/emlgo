@@ -610,4 +610,3 @@ func AddScalarBatch(x []float64, y float64) []float64 {
 func MulScalarBatch(x []float64, y float64) []float64 {
 	return eml.MulScalarSIMD(x, y)
 }
-

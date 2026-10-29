@@ -143,7 +143,7 @@ func TestEmlCli100PercentCoverage(t *testing.T) {
 				copy(res, x)
 				return res, nil
 			},
-			CPU: func(x float64) float64 { return x },
+			CPU:      func(x float64) float64 { return x },
 			CPUBatch: func(x []float64) []float64 { return x },
 		},
 	}
@@ -160,7 +160,7 @@ func TestEmlCli100PercentCoverage(t *testing.T) {
 				}
 				return res, nil
 			},
-			CPU: func(x float64) float64 { return x },
+			CPU:      func(x float64) float64 { return x },
 			CPUBatch: func(x []float64) []float64 { return x },
 		},
 	}

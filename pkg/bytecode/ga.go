@@ -513,7 +513,7 @@ func tuneConstants(p *Program, d Dataset, fitness Fitness, rng *rand.Rand, sweep
 			if step < 1e-12 {
 				if rng != nil && stallCount >= 4 && math.Abs(best) > 1e-6 {
 					for i := range p.Consts {
-						p.Consts[i] = bestConsts[i] + (rng.Float64()*2 - 1)*0.5
+						p.Consts[i] = bestConsts[i] + (rng.Float64()*2-1)*0.5
 					}
 					got := fitness(p, d)
 					evals++

@@ -171,4 +171,3 @@ func dispatchMinSIMDTo(a, b, dst []float64) {
 }
 
 var _ = parallelizeSinCos
-

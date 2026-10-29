@@ -32,5 +32,3 @@ func FmaSIMDTo(a, b, c, result []float64) {
 		fmaSIMD(a[start:end], b[start:end], c[start:end], result[start:end])
 	})
 }
-
-

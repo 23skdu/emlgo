@@ -202,3 +202,28 @@ func TestExpStabilityNearZero(t *testing.T) {
 		}
 	}
 }
+
+func FuzzLogExpDifferential(f *testing.F) {
+	f.Add(0.5)
+	f.Add(1.0)
+	f.Add(10.0)
+	f.Fuzz(func(t *testing.T, x float64) {
+		if math.IsNaN(x) || math.IsInf(x, 0) {
+			return
+		}
+		if x >= -50 && x <= 50 {
+			got := Exp(x)
+			want := math.Exp(x)
+			if math.Abs(got-want) > 1e-12*math.Max(1, math.Abs(want)) {
+				t.Fatalf("Exp(%g) = %g, want %g", x, got, want)
+			}
+		}
+		if x > 0 {
+			got := Log(x)
+			want := math.Log(x)
+			if math.Abs(got-want) > 1e-12*math.Max(1, math.Abs(want)) {
+				t.Fatalf("Log(%g) = %g, want %g", x, got, want)
+			}
+		}
+	})
+}

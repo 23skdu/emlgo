@@ -394,3 +394,117 @@ func TestGenerateMPFRVectorsSource(t *testing.T) {
 		}
 	})
 }
+
+// TestOracleAccuracyGateScript tests scripts/oracle_accuracy_gate.sh.
+func TestOracleAccuracyGateScript(t *testing.T) {
+	root := getRepoRoot(t)
+	scriptPath := filepath.Join(root, "scripts", "oracle_accuracy_gate.sh")
+
+	bashPath, err := exec.LookPath("bash")
+	if err != nil {
+		t.Skip("bash not found; skipping bash script tests")
+	}
+
+	t.Run("BashSyntaxCheck", func(t *testing.T) {
+		cmd := exec.Command(bashPath, "-n", scriptPath)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("Syntax check for oracle_accuracy_gate.sh failed: %v\nOutput: %s", err, string(out))
+		}
+	})
+
+	t.Run("HelpOption", func(t *testing.T) {
+		cmd := exec.Command(bashPath, scriptPath, "-h")
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("oracle_accuracy_gate.sh -h failed: %v\nOutput: %s", err, string(out))
+		}
+		if !strings.Contains(string(out), "Oracle Accuracy Gate") || !strings.Contains(string(out), "--quick") {
+			t.Errorf("Expected usage instructions in output, got:\n%s", string(out))
+		}
+	})
+
+	t.Run("InvalidOption", func(t *testing.T) {
+		cmd := exec.Command(bashPath, scriptPath, "--invalid-flag")
+		out, err := cmd.CombinedOutput()
+		if err == nil {
+			t.Fatalf("Expected non-zero exit for invalid option --invalid-flag, got success:\n%s", string(out))
+		}
+		if !strings.Contains(string(out), "Invalid option") {
+			t.Errorf("Expected Invalid option error in output, got:\n%s", string(out))
+		}
+	})
+
+	t.Run("QuickModeExecution", func(t *testing.T) {
+		if testing.Short() {
+			t.Skip("Skipping full quick-mode oracle gate execution under -short")
+		}
+		cmd := exec.Command(bashPath, scriptPath, "--quick")
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("oracle_accuracy_gate.sh --quick failed: %v\nOutput: %s", err, string(out))
+		}
+		if !strings.Contains(string(out), "ORACLE ACCURACY GATE PASSED") {
+			t.Errorf("Expected pass banner in output, got:\n%s", string(out))
+		}
+	})
+}
+
+// TestPreCommitHookScript tests scripts/pre-commit.sh and .git/hooks/pre-commit synchronization.
+func TestPreCommitHookScript(t *testing.T) {
+	root := getRepoRoot(t)
+	scriptPath := filepath.Join(root, "scripts", "pre-commit.sh")
+	hookPath := filepath.Join(root, ".git", "hooks", "pre-commit")
+
+	bashPath, err := exec.LookPath("bash")
+	if err != nil {
+		t.Skip("bash not found; skipping bash script tests")
+	}
+
+	t.Run("BashSyntaxCheck", func(t *testing.T) {
+		cmd := exec.Command(bashPath, "-n", scriptPath)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("Syntax check for pre-commit.sh failed: %v\nOutput: %s", err, string(out))
+		}
+	})
+
+	t.Run("HelpOption", func(t *testing.T) {
+		cmd := exec.Command(bashPath, scriptPath, "-h")
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("pre-commit.sh -h failed: %v\nOutput: %s", err, string(out))
+		}
+		if !strings.Contains(string(out), "--min-coverage") || !strings.Contains(string(out), "linting, and code coverage") {
+			t.Errorf("Expected usage instructions in output, got:\n%s", string(out))
+		}
+	})
+
+	t.Run("InvalidOption", func(t *testing.T) {
+		cmd := exec.Command(bashPath, scriptPath, "--unknown-flag")
+		out, err := cmd.CombinedOutput()
+		if err == nil {
+			t.Fatalf("Expected non-zero exit for invalid option, got success:\n%s", string(out))
+		}
+		if !strings.Contains(string(out), "Invalid option") {
+			t.Errorf("Expected Invalid option error in output, got:\n%s", string(out))
+		}
+	})
+
+	t.Run("GitHookInstalledAndSynced", func(t *testing.T) {
+		if _, err := os.Stat(filepath.Join(root, ".git")); os.IsNotExist(err) {
+			t.Skip(".git directory not present")
+		}
+		scriptBytes, err := os.ReadFile(scriptPath)
+		if err != nil {
+			t.Fatalf("Failed to read %s: %v", scriptPath, err)
+		}
+		hookBytes, err := os.ReadFile(hookPath)
+		if err != nil {
+			t.Fatalf("Failed to read %s: %v", hookPath, err)
+		}
+		if string(scriptBytes) != string(hookBytes) {
+			t.Errorf(".git/hooks/pre-commit differs from scripts/pre-commit.sh; run 'make install-hooks'")
+		}
+	})
+}

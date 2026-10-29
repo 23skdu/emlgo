@@ -200,6 +200,5 @@ func TestAVX512ZeroTransitionPenalty(t *testing.T) {
 	}
 }
 
-
 // suppress unused reflect import
 var _ = reflect.TypeOf

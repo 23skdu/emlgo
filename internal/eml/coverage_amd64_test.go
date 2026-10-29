@@ -4,27 +4,41 @@
 package eml
 
 import (
+	"math"
 	"testing"
 )
 
 func TestAMD64DispatchBranches(t *testing.T) {
 	old512 := hasAVX512
+	old512VNNI := hasAVX512VNNI
 	old2 := hasAVX2
 	oldFMA := hasFMA
 	defer func() {
 		hasAVX512 = old512
+		hasAVX512VNNI = old512VNNI
 		hasAVX2 = old2
 		hasFMA = oldFMA
 	}()
 
+	_ = HasAVX512VNNI()
+
 	const n = 7
-	a := []float64{1, 2, 3, 4, 5, 6, 7}
-	b := []float64{2, 3, 4, 5, 6, 7, 8}
+	a := []float64{1, 2, 3, 4, 5, 6, math.NaN()}
+	b := []float64{2, 1, 4, 3, 6, 5, 8}
 	c := []float64{1, 1, 1, 1, 1, 1, 1}
 	res := make([]float64, n)
 
+	af32 := []float32{1, 2, 3, 4, 5, 6, 7}
+	bf32 := []float32{2, 3, 4, 5, 6, 7, 8}
+	cf32 := []float32{1, 1, 1, 1, 1, 1, 1}
+	resf32 := make([]float32, n)
+
+	u8 := []uint8{1, 2, 3, 4, 5, 6, 7}
+	i8 := []int8{1, -2, 3, -4, 5, -6, 7}
+
 	// Mode 1: AVX-512 enabled (simdLen=0 for n=7, tests AVX-512 branch and tail scalar loop)
 	hasAVX512 = true
+	hasAVX512VNNI = true
 	hasAVX2 = true
 	hasFMA = true
 
@@ -39,9 +53,29 @@ func TestAMD64DispatchBranches(t *testing.T) {
 	amd64NegSIMD(a, res)
 	amd64InvSIMD(a, res)
 	fmaSIMD(a, b, c, res)
+	dispatchFloorSIMDTo(a, res)
+	dispatchCeilSIMDTo(a, res)
+	dispatchTruncSIMDTo(a, res)
+	dispatchRoundSIMDTo(a, res)
+	dispatchMaxSIMDTo(a, b, res)
+	dispatchMinSIMDTo(a, b, res)
+
+	dispatchAddSIMDF32To(af32, bf32, resf32)
+	dispatchSubSIMDF32To(af32, bf32, resf32)
+	dispatchMulSIMDF32To(af32, bf32, resf32)
+	dispatchDivSIMDF32To(af32, bf32, resf32)
+	dispatchSqrtSIMDF32To(af32, resf32)
+	dispatchAddScalarSIMDF32To(af32, 2.0, resf32)
+	dispatchMulScalarSIMDF32To(af32, 2.0, resf32)
+	dispatchAbsSIMDF32To(af32, resf32)
+	dispatchNegSIMDF32To(af32, resf32)
+	dispatchInvSIMDF32To(af32, resf32)
+	dispatchFmaSIMDF32To(af32, bf32, cf32, resf32)
+	_ = dispatchDotInt8SIMD(u8, i8)
 
 	// Mode 2: AVX-512 disabled, AVX2 enabled (simdLen=4 for n=7, tests AVX2 branch and tail scalar loop)
 	hasAVX512 = false
+	hasAVX512VNNI = false
 	hasAVX2 = true
 	hasFMA = true
 
@@ -76,8 +110,12 @@ func TestAMD64DispatchBranches(t *testing.T) {
 }
 
 func TestInt8SatSIMD(t *testing.T) {
+	old512 := hasAVX512
 	old2 := hasAVX2
-	defer func() { hasAVX2 = old2 }()
+	defer func() {
+		hasAVX512 = old512
+		hasAVX2 = old2
+	}()
 
 	const n = 35
 	a := make([]int8, n)
@@ -102,7 +140,14 @@ func TestInt8SatSIMD(t *testing.T) {
 	subA[34] = 20
 	subB[34] = 10
 
+	// With AVX512 (simdLen=0 for n=35, tests AVX512 tail clamping)
+	hasAVX512 = true
+	hasAVX2 = true
+	dispatchAddSatInt8SIMD(a, b, res)
+	dispatchSubSatInt8SIMD(subA, subB, res)
+
 	// With AVX2
+	hasAVX512 = false
 	hasAVX2 = true
 	dispatchAddSatInt8SIMD(a, b, res)
 	dispatchSubSatInt8SIMD(subA, subB, res)
@@ -128,4 +173,48 @@ func TestInt8SatSIMD(t *testing.T) {
 		defer func() { _ = recover() }()
 		SubSatInt8SIMDTo(a, b[:10], res)
 	}()
+	func() {
+		defer func() { _ = recover() }()
+		_ = DotInt8SIMD(make([]uint8, 2), make([]int8, 3))
+	}()
+	func() {
+		defer func() { _ = recover() }()
+		SqrtSIMDF32To(make([]float32, 2), make([]float32, 3))
+	}()
+	func() {
+		defer func() { _ = recover() }()
+		FloorSIMDTo(make([]float64, 2), make([]float64, 3))
+	}()
+	func() {
+		defer func() { _ = recover() }()
+		CeilSIMDTo(make([]float64, 2), make([]float64, 3))
+	}()
+	func() {
+		defer func() { _ = recover() }()
+		TruncSIMDTo(make([]float64, 2), make([]float64, 3))
+	}()
+	func() {
+		defer func() { _ = recover() }()
+		RoundSIMDTo(make([]float64, 2), make([]float64, 3))
+	}()
+	func() {
+		defer func() { _ = recover() }()
+		MaxSIMDTo(make([]float64, 2), make([]float64, 3), make([]float64, 2))
+	}()
+	func() {
+		defer func() { _ = recover() }()
+		MinSIMDTo(make([]float64, 2), make([]float64, 3), make([]float64, 2))
+	}()
+
+	// Multi-chunk ForEachChunk branch for Floor/Ceil/Trunc/Round/Max/Min (n >= SmallCutoff)
+	largeN := SmallCutoff() * 2
+	la := make([]float64, largeN)
+	lb := make([]float64, largeN)
+	lres := make([]float64, largeN)
+	FloorSIMDTo(la, lres)
+	CeilSIMDTo(la, lres)
+	TruncSIMDTo(la, lres)
+	RoundSIMDTo(la, lres)
+	MaxSIMDTo(la, lb, lres)
+	MinSIMDTo(la, lb, lres)
 }

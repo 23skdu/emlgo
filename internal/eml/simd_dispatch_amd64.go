@@ -295,7 +295,7 @@ func dispatchMulScalarSIMD(a []float64, b float64, result []float64) {
 
 func dispatchAddSatInt8SIMD(a, b, result []int8) {
 	n := len(a)
-	if hasAVX512 && n >= 64 {
+	if hasAVX512 {
 		simdLen := (n / 64) * 64
 		addSatInt8AVX512(a[:simdLen], b[:simdLen], result[:simdLen])
 		for i := simdLen; i < n; i++ {
@@ -309,7 +309,7 @@ func dispatchAddSatInt8SIMD(a, b, result []int8) {
 		}
 		return
 	}
-	if hasAVX2 && n >= 32 {
+	if hasAVX2 {
 		simdLen := (n / 32) * 32
 		addSatInt8AVX2(a[:simdLen], b[:simdLen], result[:simdLen])
 		for i := simdLen; i < n; i++ {
@@ -336,7 +336,7 @@ func dispatchAddSatInt8SIMD(a, b, result []int8) {
 
 func dispatchSubSatInt8SIMD(a, b, result []int8) {
 	n := len(a)
-	if hasAVX512 && n >= 64 {
+	if hasAVX512 {
 		simdLen := (n / 64) * 64
 		subSatInt8AVX512(a[:simdLen], b[:simdLen], result[:simdLen])
 		for i := simdLen; i < n; i++ {
@@ -350,7 +350,7 @@ func dispatchSubSatInt8SIMD(a, b, result []int8) {
 		}
 		return
 	}
-	if hasAVX2 && n >= 32 {
+	if hasAVX2 {
 		simdLen := (n / 32) * 32
 		subSatInt8AVX2(a[:simdLen], b[:simdLen], result[:simdLen])
 		for i := simdLen; i < n; i++ {
@@ -379,7 +379,7 @@ func dispatchDotInt8SIMD(a []uint8, b []int8) int32 {
 	n := len(a)
 	var sum int32
 	i := 0
-	if hasAVX512 && hasAVX512VNNI && n >= 64 {
+	if hasAVX512 && hasAVX512VNNI {
 		simdLen := (n / 64) * 64
 		sum = dotInt8AVX512VNNI(a[:simdLen], b[:simdLen])
 		i = simdLen
@@ -393,7 +393,7 @@ func dispatchDotInt8SIMD(a []uint8, b []int8) int32 {
 func dispatchAddSIMDF32To(a, b, dst []float32) {
 	n := len(a)
 	i := 0
-	if hasAVX512 && n >= 16 {
+	if hasAVX512 {
 		simdLen := (n / 16) * 16
 		addAVX512F32(a[:simdLen], b[:simdLen], dst[:simdLen])
 		i = simdLen
@@ -416,7 +416,7 @@ func dispatchAddSIMDF32To(a, b, dst []float32) {
 func dispatchSubSIMDF32To(a, b, dst []float32) {
 	n := len(a)
 	i := 0
-	if hasAVX512 && n >= 16 {
+	if hasAVX512 {
 		simdLen := (n / 16) * 16
 		subAVX512F32(a[:simdLen], b[:simdLen], dst[:simdLen])
 		i = simdLen
@@ -439,7 +439,7 @@ func dispatchSubSIMDF32To(a, b, dst []float32) {
 func dispatchMulSIMDF32To(a, b, dst []float32) {
 	n := len(a)
 	i := 0
-	if hasAVX512 && n >= 16 {
+	if hasAVX512 {
 		simdLen := (n / 16) * 16
 		mulAVX512F32(a[:simdLen], b[:simdLen], dst[:simdLen])
 		i = simdLen
@@ -462,7 +462,7 @@ func dispatchMulSIMDF32To(a, b, dst []float32) {
 func dispatchDivSIMDF32To(a, b, dst []float32) {
 	n := len(a)
 	i := 0
-	if hasAVX512 && n >= 16 {
+	if hasAVX512 {
 		simdLen := (n / 16) * 16
 		divAVX512F32(a[:simdLen], b[:simdLen], dst[:simdLen])
 		i = simdLen
@@ -485,7 +485,7 @@ func dispatchDivSIMDF32To(a, b, dst []float32) {
 func dispatchSqrtSIMDF32To(src, dst []float32) {
 	n := len(src)
 	i := 0
-	if hasAVX512 && n >= 16 {
+	if hasAVX512 {
 		simdLen := (n / 16) * 16
 		sqrtAVX512F32(src[:simdLen], dst[:simdLen])
 		i = simdLen
@@ -498,7 +498,7 @@ func dispatchSqrtSIMDF32To(src, dst []float32) {
 func dispatchAddScalarSIMDF32To(a []float32, b float32, dst []float32) {
 	n := len(a)
 	i := 0
-	if hasAVX512 && n >= 16 {
+	if hasAVX512 {
 		simdLen := (n / 16) * 16
 		addScalarAVX512F32(a[:simdLen], b, dst[:simdLen])
 		i = simdLen
@@ -511,7 +511,7 @@ func dispatchAddScalarSIMDF32To(a []float32, b float32, dst []float32) {
 func dispatchMulScalarSIMDF32To(a []float32, b float32, dst []float32) {
 	n := len(a)
 	i := 0
-	if hasAVX512 && n >= 16 {
+	if hasAVX512 {
 		simdLen := (n / 16) * 16
 		mulScalarAVX512F32(a[:simdLen], b, dst[:simdLen])
 		i = simdLen
@@ -524,7 +524,7 @@ func dispatchMulScalarSIMDF32To(a []float32, b float32, dst []float32) {
 func dispatchAbsSIMDF32To(src, dst []float32) {
 	n := len(src)
 	i := 0
-	if hasAVX512 && n >= 16 {
+	if hasAVX512 {
 		simdLen := (n / 16) * 16
 		absAVX512F32(src[:simdLen], dst[:simdLen])
 		i = simdLen
@@ -537,7 +537,7 @@ func dispatchAbsSIMDF32To(src, dst []float32) {
 func dispatchNegSIMDF32To(src, dst []float32) {
 	n := len(src)
 	i := 0
-	if hasAVX512 && n >= 16 {
+	if hasAVX512 {
 		simdLen := (n / 16) * 16
 		negAVX512F32(src[:simdLen], dst[:simdLen])
 		i = simdLen
@@ -550,7 +550,7 @@ func dispatchNegSIMDF32To(src, dst []float32) {
 func dispatchInvSIMDF32To(src, dst []float32) {
 	n := len(src)
 	i := 0
-	if hasAVX512 && n >= 16 {
+	if hasAVX512 {
 		simdLen := (n / 16) * 16
 		invAVX512F32(src[:simdLen], dst[:simdLen])
 		i = simdLen
@@ -563,7 +563,7 @@ func dispatchInvSIMDF32To(src, dst []float32) {
 func dispatchFmaSIMDF32To(a, b, c, dst []float32) {
 	n := len(a)
 	i := 0
-	if hasAVX512 && n >= 16 {
+	if hasAVX512 {
 		simdLen := (n / 16) * 16
 		fmaAVX512F32(a[:simdLen], b[:simdLen], c[:simdLen], dst[:simdLen])
 		i = simdLen
@@ -576,7 +576,7 @@ func dispatchFmaSIMDF32To(a, b, c, dst []float32) {
 func dispatchFloorSIMDTo(src, dst []float64) {
 	n := len(src)
 	i := 0
-	if hasAVX512 && n >= 8 {
+	if hasAVX512 {
 		simdLen := (n / 8) * 8
 		floorAVX512(src[:simdLen], dst[:simdLen])
 		i = simdLen
@@ -589,7 +589,7 @@ func dispatchFloorSIMDTo(src, dst []float64) {
 func dispatchCeilSIMDTo(src, dst []float64) {
 	n := len(src)
 	i := 0
-	if hasAVX512 && n >= 8 {
+	if hasAVX512 {
 		simdLen := (n / 8) * 8
 		ceilAVX512(src[:simdLen], dst[:simdLen])
 		i = simdLen
@@ -602,7 +602,7 @@ func dispatchCeilSIMDTo(src, dst []float64) {
 func dispatchTruncSIMDTo(src, dst []float64) {
 	n := len(src)
 	i := 0
-	if hasAVX512 && n >= 8 {
+	if hasAVX512 {
 		simdLen := (n / 8) * 8
 		truncAVX512(src[:simdLen], dst[:simdLen])
 		i = simdLen
@@ -615,7 +615,7 @@ func dispatchTruncSIMDTo(src, dst []float64) {
 func dispatchRoundSIMDTo(src, dst []float64) {
 	n := len(src)
 	i := 0
-	if hasAVX512 && n >= 8 {
+	if hasAVX512 {
 		simdLen := (n / 8) * 8
 		roundAVX512(src[:simdLen], dst[:simdLen])
 		i = simdLen
@@ -628,7 +628,7 @@ func dispatchRoundSIMDTo(src, dst []float64) {
 func dispatchMaxSIMDTo(a, b, dst []float64) {
 	n := len(a)
 	i := 0
-	if hasAVX512 && n >= 8 {
+	if hasAVX512 {
 		simdLen := (n / 8) * 8
 		maxAVX512(a[:simdLen], b[:simdLen], dst[:simdLen])
 		i = simdLen
@@ -647,7 +647,7 @@ func dispatchMaxSIMDTo(a, b, dst []float64) {
 func dispatchMinSIMDTo(a, b, dst []float64) {
 	n := len(a)
 	i := 0
-	if hasAVX512 && n >= 8 {
+	if hasAVX512 {
 		simdLen := (n / 8) * 8
 		minAVX512(a[:simdLen], b[:simdLen], dst[:simdLen])
 		i = simdLen
@@ -662,4 +662,3 @@ func dispatchMinSIMDTo(a, b, dst []float64) {
 		}
 	}
 }
-

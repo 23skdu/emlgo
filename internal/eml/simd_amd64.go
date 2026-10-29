@@ -107,4 +107,3 @@ func detectAMD64SIMD() {
 	eax71, _, _, _ := cpuid(7, 1)
 	hasAVXVNNI = ((eax71&(1<<4)) != 0 && osAVX) || hasAVX512VNNI
 }
-

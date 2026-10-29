@@ -66,4 +66,3 @@ func TestAmd64DispatchStubs(t *testing.T) {
 	_, _ = xgetbv(0)
 	detectAMD64SIMD()
 }
-

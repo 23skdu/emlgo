@@ -397,4 +397,3 @@ func BenchmarkMaxSIMD(b *testing.B) {
 		MaxSIMDTo(a, c, res)
 	}
 }
-
