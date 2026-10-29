@@ -222,7 +222,7 @@ func Sin(x *big.Float) *big.Float {
 		prec = Prec
 	}
 
-	if x.Sign() == 0 {
+	if x.Sign() == 0 || x.IsInf() {
 		return new(big.Float).SetPrec(prec)
 	}
 
@@ -240,6 +240,10 @@ func Cos(x *big.Float) *big.Float {
 	prec := x.Prec()
 	if prec == 0 {
 		prec = Prec
+	}
+
+	if x.IsInf() {
+		return new(big.Float).SetPrec(prec)
 	}
 
 	wprec := prec + 64

@@ -5,8 +5,9 @@ import (
 )
 
 const (
-	ln2   = 0.6931471805599453
-	sqrt2 = 1.4142135623730951
+	ln2HiF32 = float32(0.693145751953125) // 0x3f317200
+	ln2LoF32 = float32(1.428606765330187e-06)
+	sqrt2    = 1.4142135623730951
 )
 
 // FastLogMinimax computes ln(y) using IEEE 754 bit-cast exponent extraction and
@@ -54,8 +55,8 @@ func FastLogMinimax(y float64) float64 {
 		c4 = 2.0 / 7.0
 	)
 	poly := s * (c1 + s2*(c2+s2*(c3+s2*c4)))
-
-	return float64(exp)*ln2 + poly
+	fe := float64(exp)
+	return fe*ln2Hi + (poly + fe*ln2Lo)
 }
 
 // FastLogChebyshev computes ln(y) using bit-cast exponent extraction and an 8th-degree
@@ -101,8 +102,8 @@ func FastLogChebyshev(y float64) float64 {
 		a7 = 0.138
 	)
 	poly := z * (a1 + z*(a2+z*(a3+z*(a4+z*(a5+z*(a6+z*a7))))))
-
-	return float64(exp)*ln2 + poly
+	fe := float64(exp)
+	return fe*ln2Hi + (poly + fe*ln2Lo)
 }
 
 // FastLog computes the natural logarithm using the fast rational minimax approximation.
@@ -142,6 +143,6 @@ func FastLogF32(y float32) float32 {
 	s := (m - 1.0) / (m + 1.0)
 	s2 := s * s
 	poly := s * (2.0 + s2*(0.6666667+s2*0.4))
-
-	return float32(exp)*0.6931472 + poly
+	fe := float32(exp)
+	return fe*ln2HiF32 + (poly + fe*ln2LoF32)
 }

@@ -45,6 +45,18 @@ func tanAVX512(a, result []float64) { _, _ = a, result }
 func fmaAVX2(a, b, c, result []float64)   { _, _, _, _ = a, b, c, result }
 func fmaAVX512(a, b, c, result []float64) { _, _, _, _ = a, b, c, result }
 
+func addAVX2F32(a, b, result []float32)                         { _, _, _ = a, b, result }
+func subAVX2F32(a, b, result []float32)                         { _, _, _ = a, b, result }
+func mulAVX2F32(a, b, result []float32)                         { _, _, _ = a, b, result }
+func divAVX2F32(a, b, result []float32)                         { _, _, _ = a, b, result }
+func sqrtAVX2F32(a, result []float32)                           { _, _ = a, result }
+func addScalarAVX2F32(a []float32, b float32, result []float32) { _, _, _ = a, b, result }
+func mulScalarAVX2F32(a []float32, b float32, result []float32) { _, _, _ = a, b, result }
+func absAVX2F32(a, result []float32)                            { _, _ = a, result }
+func negAVX2F32(a, result []float32)                            { _, _ = a, result }
+func invAVX2F32(a, result []float32)                            { _, _ = a, result }
+func fmaAVX2F32(a, b, c, result []float32)                      { _, _, _, _ = a, b, c, result }
+
 func addAVX512F32(a, b, result []float32) { _, _, _ = a, b, result }
 func subAVX512F32(a, b, result []float32) { _, _, _ = a, b, result }
 func mulAVX512F32(a, b, result []float32) { _, _, _ = a, b, result }
@@ -58,6 +70,12 @@ func negAVX512F32(a, result []float32)                            { _, _ = a, re
 func invAVX512F32(a, result []float32)                            { _, _ = a, result }
 func fmaAVX512F32(a, b, c, result []float32)                      { _, _, _, _ = a, b, c, result }
 
+func floorAVX2(a, result []float64)    { _, _ = a, result }
+func ceilAVX2(a, result []float64)     { _, _ = a, result }
+func truncAVX2(a, result []float64)    { _, _ = a, result }
+func roundAVX2(a, result []float64)    { _, _ = a, result }
+func maxAVX2(a, b, result []float64)   { _, _, _ = a, b, result }
+func minAVX2(a, b, result []float64)   { _, _, _ = a, b, result }
 func floorAVX512(a, result []float64)  { _, _ = a, result }
 func ceilAVX512(a, result []float64)   { _, _ = a, result }
 func truncAVX512(a, result []float64)  { _, _ = a, result }

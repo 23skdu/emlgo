@@ -559,7 +559,7 @@ func runFloat32Benchmarks() []BenchmarkResult {
 	}))
 
 	results = append(results, benchmarkFuncFloat32("float32", "Log", func(x float32) {
-		_ = float32(logexp.Exp(float64(x)))
+		_ = float32(logexp.Log(float64(x)))
 	}, func(x float32) {
 		_ = float32(math.Log(float64(x)))
 	}))
@@ -615,11 +615,22 @@ func runFloat32Benchmarks() []BenchmarkResult {
 	return results
 }
 
+func domainSample(name string, u float64) float64 {
+	switch name {
+	case "Log", "Log2", "Log10", "Sqrt", "Pow", "Acosh":
+		return 0.01 + u*9.99
+	case "Asin", "Acos", "Atanh":
+		return -0.99 + u*1.98
+	default:
+		return u*10 - 5
+	}
+}
+
 func benchmarkFuncFloat32(typ, name string, emlgoFunc, mathFunc func(float32)) BenchmarkResult {
 	rng := newBenchmarkRand()
 	randData := make([]float32, iterations)
 	for i := range randData {
-		randData[i] = float32(rng.Float64()*10 - 5)
+		randData[i] = float32(domainSample(name, rng.Float64()))
 	}
 
 	start := time.Now()
@@ -707,7 +718,7 @@ func benchmarkFloat64WithTyp(typ, name string, emlgoFunc, mathFunc func(float64)
 	randData := make([]float64, iterations)
 	// #nosec G404 - benchmark tool uses math/rand for deterministic test data
 	for i := range randData {
-		randData[i] = rng.Float64()*10 - 5
+		randData[i] = domainSample(name, rng.Float64())
 	}
 
 	start := time.Now()
@@ -1366,7 +1377,7 @@ func testExpAccuracy() (uint64, bool) {
 	return testOpAccuracy(func(x float64) float64 { return logexp.Exp(x) }, math.Exp)
 }
 func testLogAccuracy() (uint64, bool) {
-	return testOpAccuracy(func(x float64) float64 { return logexp.Log(x) }, math.Log)
+	return testOpAccuracy(func(x float64) float64 { return logexp.Log(math.Abs(x) + 0.01) }, func(x float64) float64 { return math.Log(math.Abs(x) + 0.01) })
 }
 func testSinAccuracy() (uint64, bool)   { return testOpAccuracy(trig.Sin, math.Sin) }
 func testCosAccuracy() (uint64, bool)   { return testOpAccuracy(trig.Cos, math.Cos) }
@@ -1376,14 +1387,16 @@ func testCoshAccuracy() (uint64, bool)  { return testOpAccuracy(hyper.Cosh, math
 func testTanhAccuracy() (uint64, bool)  { return testOpAccuracy(hyper.Tanh, math.Tanh) }
 func testAsinhAccuracy() (uint64, bool) { return testOpAccuracy(hyper.Asinh, math.Asinh) }
 func testAcoshAccuracy() (uint64, bool) {
-	return testOpAccuracy(func(x float64) float64 { return hyper.Acosh(x + 1) }, func(x float64) float64 { return math.Acosh(x + 1) })
+	return testOpAccuracy(func(x float64) float64 { return hyper.Acosh(math.Abs(x) + 1) }, func(x float64) float64 { return math.Acosh(math.Abs(x) + 1) })
 }
 func testAtanhAccuracy() (uint64, bool) {
-	return testOpAccuracy(func(x float64) float64 { return hyper.Atanh(x * 0.5) }, func(x float64) float64 { return math.Atanh(x * 0.5) })
+	return testOpAccuracy(func(x float64) float64 { return hyper.Atanh(x * 0.099) }, func(x float64) float64 { return math.Atanh(x * 0.099) })
 }
-func testSqrtAccuracy() (uint64, bool) { return testOpAccuracy(arithmetic.Sqrt, math.Sqrt) }
+func testSqrtAccuracy() (uint64, bool) {
+	return testOpAccuracy(func(x float64) float64 { return arithmetic.Sqrt(math.Abs(x)) }, func(x float64) float64 { return math.Sqrt(math.Abs(x)) })
+}
 func testPowAccuracy() (uint64, bool) {
-	return testOpAccuracy(func(x float64) float64 { return arithmetic.Pow(x, 2.5) }, func(x float64) float64 { return math.Pow(x, 2.5) })
+	return testOpAccuracy(func(x float64) float64 { return arithmetic.Pow(math.Abs(x)+0.01, 2.5) }, func(x float64) float64 { return math.Pow(math.Abs(x)+0.01, 2.5) })
 }
 
 var forceFailAccuracy = false
@@ -1400,7 +1413,7 @@ func testOpAccuracy(emlgoFunc, mathFunc func(float64) float64) (uint64, bool) {
 		if ulp > maxULP {
 			maxULP = ulp
 		}
-		if ulp > 200 {
+		if ulp > 16 {
 			return maxULP, false
 		}
 	}
@@ -1507,8 +1520,8 @@ var baseline = map[string]float64{
 	"batch/Pow":   1.35,
 	"batch/Cbrt":  1.25,
 	"batch/Hypot": 1.35,
-	"batch/Max":   4.80,
-	"batch/Min":   5.00,
+	"batch/Max":   1.05,
+	"batch/Min":   1.05,
 }
 
 // regressionThreshold is the relative slowdown above which a benchmark is

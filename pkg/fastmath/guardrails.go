@@ -78,13 +78,17 @@ func LnClippedF32(y, eps float32) float32 {
 // 0.5 * ln(y^2 + eps^2) = ln(hypot(y, eps)).
 // This function is C-infinity everywhere on R, eliminates singularities at y=0,
 // and has continuous derivative: d/dy [0.5 * ln(y^2 + eps^2)] = y / (y^2 + eps^2).
-// Implemented via FastLog(math.Hypot(y, eps)) to avoid squaring overflow.
+// Uses max-magnitude factoring when y^2 + eps^2 would overflow or underflow.
 func LnRegularized(y, eps float64) float64 {
 	if eps <= 0 {
 		eps = DefaultEpsilon
 	}
-	if math.Abs(y) > 1e150 {
-		return FastLog(math.Abs(y))
+	ay := math.Abs(y)
+	if ay > 1e150 || (ay < 1e-150 && eps < 1e-150) {
+		m := math.Max(ay, eps)
+		ry := ay / m
+		re := eps / m
+		return FastLog(m) + 0.5*FastLog(ry*ry+re*re)
 	}
 	return 0.5 * FastLog(y*y+eps*eps)
 }
@@ -94,8 +98,12 @@ func LnRegularizedF32(y, eps float32) float32 {
 	if eps <= 0 {
 		eps = DefaultEpsilonF32
 	}
-	if math.Abs(float64(y)) > 1e18 {
-		return FastLogF32(float32(math.Abs(float64(y))))
+	ay := float32(math.Abs(float64(y)))
+	if ay > 1e18 || (ay < 1e-18 && eps < 1e-18) {
+		m := float32(math.Max(float64(ay), float64(eps)))
+		ry := ay / m
+		re := eps / m
+		return FastLogF32(m) + 0.5*FastLogF32(ry*ry+re*re)
 	}
 	return 0.5 * FastLogF32(y*y+eps*eps)
 }

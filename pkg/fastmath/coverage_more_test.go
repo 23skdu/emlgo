@@ -29,8 +29,16 @@ func TestFastmathComprehensive(t *testing.T) {
 	_ = LnClippedF32(0.1, 0.5)
 
 	_ = LnRegularized(2.0, -1.0) // eps <= 0
+	if got := LnRegularized(0.0, 1e-200); math.IsInf(got, 0) || math.IsNaN(got) {
+		t.Errorf("LnRegularized(0, 1e-200) underflowed: %v", got)
+	}
+	_ = LnRegularized(1e160, 1e-12)
 	_ = LnRegularizedF32(2.0, -1.0)
 	_ = LnRegularizedF32(2.0, 1e-4)
+	if got := LnRegularizedF32(0.0, 1e-30); math.IsInf(float64(got), 0) || math.IsNaN(float64(got)) {
+		t.Errorf("LnRegularizedF32(0, 1e-30) underflowed: %v", got)
+	}
+	_ = LnRegularizedF32(1e20, 1e-6)
 
 	// fast_eml.go
 	_ = FastEml(1.0, 2.0)

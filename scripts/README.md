@@ -56,3 +56,4 @@ Override the minimum statement coverage threshold if needed during local debuggi
 ```bash
 ./scripts/pre-commit.sh --min-coverage 99.0
 ```
+

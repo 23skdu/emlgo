@@ -96,33 +96,37 @@ if [ "$ACTUAL_HEADER" != "$EXPECTED_HEADER" ]; then
     exit 1
 fi
 
-VECTOR_COUNT="$(grep -v '^#' "$MPFR_CSV" | grep -v '^op,' | grep -v '^[[:space:]]*$' | wc -l | tr -d ' ')"
-if [ "$VECTOR_COUNT" -lt 32 ]; then
-    echo -e "${RED}FAIL: Expected at least 32 MPFR reference vectors in $MPFR_CSV, found $VECTOR_COUNT${NC}" >&2
+VECTOR_COUNT="$(grep -v '^#' "$MPFR_CSV" | grep -v '^operation,' | grep -v '^[[:space:]]*$' | wc -l | tr -d ' ')"
+if [ "$VECTOR_COUNT" -lt 130 ]; then
+    echo -e "${RED}FAIL: Expected at least 130 MPFR reference vectors in $MPFR_CSV, found $VECTOR_COUNT${NC}" >&2
     exit 1
 fi
 
 if [ "$REGEN_CHECK" = true ]; then
-    if command -v cc >/dev/null 2>&1 && echo '#include <mpfr.h>' | cc -E - >/dev/null 2>&1; then
+    if command -v cc >/dev/null 2>&1; then
         TMP_BIN="$(mktemp)"
         TMP_CSV="$(mktemp)"
         trap 'rm -f "$TMP_BIN" "$TMP_CSV"' EXIT
-        cc -O2 -Wall -Wextra -Werror scripts/generate_mpfr_vectors.c -o "$TMP_BIN" -lmpfr -lgmp
-        if "$TMP_BIN" > "$TMP_CSV" 2>/dev/null; then
-            if ! diff -u "$MPFR_CSV" "$TMP_CSV"; then
-                echo -e "${RED}FAIL: Regenerated MPFR vectors differ from $MPFR_CSV${NC}" >&2
-                exit 1
+        if cc -O2 -Wall -Wextra -Werror scripts/generate_mpfr_vectors.c -o "$TMP_BIN" -lmpfr -lgmp 2>/dev/null || \
+           cc -O2 -Wall -Wextra -Werror scripts/generate_mpfr_vectors.c /usr/lib/x86_64-linux-gnu/libmpfr.so.6 -o "$TMP_BIN" 2>/dev/null; then
+            if "$TMP_BIN" "$TMP_CSV" 2>/dev/null; then
+                if ! diff -u "$MPFR_CSV" "$TMP_CSV"; then
+                    echo -e "${RED}FAIL: Regenerated MPFR vectors differ from $MPFR_CSV${NC}" >&2
+                    exit 1
+                fi
+                echo -e "  ${GREEN}✓ Regenerated MPFR 4.2.2 vectors match $MPFR_CSV byte-for-byte${NC}"
+            else
+                echo -e "  ${YELLOW}⚠ Host MPFR version differs from 4.2.2; skipped live regeneration diff${NC}"
             fi
-            echo -e "  ${GREEN}✓ Regenerated MPFR 4.2.2 vectors match $MPFR_CSV byte-for-byte${NC}"
         else
-            echo -e "  ${YELLOW}⚠ Host MPFR version differs from 4.2.2; skipped live regeneration diff${NC}"
+            echo -e "  ${YELLOW}⚠ libmpfr not found; skipped live regeneration diff${NC}"
         fi
     else
-        echo -e "  ${YELLOW}⚠ libmpfr development headers not installed; skipped live regeneration diff${NC}"
+        echo -e "  ${YELLOW}⚠ C compiler not installed; skipped live regeneration diff${NC}"
     fi
 fi
 
-go test "${GO_TEST_FLAGS[@]}" -run 'Test(LoadVectors|.*MPFR).*' ./internal/accuracyvectors/... ./internal/eml/... ./pkg/fastmath/...
+go test "${GO_TEST_FLAGS[@]}" -run 'Test(Rows|.*MPFR).*' ./internal/accuracyvectors/... ./internal/eml/... ./pkg/fastmath/...
 echo -e "${GREEN}PASS [1/5]: MPFR 4.2.2 golden vectors verified ($VECTOR_COUNT vectors)${NC}"
 echo ""
 

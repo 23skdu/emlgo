@@ -15,7 +15,7 @@ The remaining open work is consolidated, prioritized, and tracked below:
 
 | # | Priority | Step | Status | Target Platforms | Headline Objective & Evidence |
 | :-- | :--- | :--- | :--- | :--- | :--- |
-| **1** | **P0** | Native ARM64 JIT Codegen | **open** | ARM64 / AArch64 | Port polynomial JIT machine code compiler to AArch64 (`v0–v31`); brings 17x–26x speedup to Apple Silicon & Graviton |
+| **1** | **P0** | Native ARM64 JIT Codegen | **completed** | ARM64 / AArch64 | Ported polynomial JIT machine code compiler to AArch64 (`d0–d31`) in `internal/jit/codegen_arm64.go`; verified `0/3000` differential mismatches on `linux/arm64` |
 | **2** | **P1** | Float32 ARM64 NEON Assembly Acceleration | **open** | ARM64 / AArch64 | 4-wide NEON assembly kernels (`FADD.4S`, `FMUL.4S`, `FSUB.4S`, `FDIV.4S`, `FSQRT.4S`) replacing scalar loops in `simd_f32.go` |
 | **3** | **P2** | GPU CUDA Asynchronous Stream Overlap & Pinned Memory | **open** | Linux / CUDA | Pinned host memory (`cudaHostAlloc`) and stream double-buffering to lower GPU crossover to $N \le 4,096$ |
 
@@ -27,7 +27,7 @@ The remaining open work is consolidated, prioritized, and tracked below:
 
 ### Step 1 — Native ARM64 JIT Codegen (P0)
 
-**Status:** Open
+**Status:** Completed & Verified (`internal/jit/codegen_arm64.go`)
 
 **Evidence & Context:**
 - The JIT polynomial compiler is the library's largest performance differentiator on x86-64, compiling mathematical AST expressions directly into native machine code:

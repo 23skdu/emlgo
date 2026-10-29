@@ -99,7 +99,8 @@ func TestCotComprehensive(t *testing.T) {
 	}{
 		{"pi/4", math.Pi / 4, 1},
 		{"pi/2", math.Pi / 2, 0},
-		{"zero", 0, math.NaN()},
+		{"zero", 0, math.Inf(1)},
+		{"neg_zero", math.Copysign(0, -1), math.Inf(-1)},
 	}
 
 	for _, tt := range tests {
@@ -522,7 +523,9 @@ func TestAtanhComprehensive(t *testing.T) {
 		{"zero", 0, 0},
 		{"half", 0.5, math.Atanh(0.5)},
 		{"neg_half", -0.5, math.Atanh(-0.5)},
-		{"one", 1, math.NaN()},
+		{"one", 1, math.Inf(1)},
+		{"neg_one", -1, math.Inf(-1)},
+		{"out_of_domain", 2, math.NaN()},
 		{"boundary", 0.999999, math.Atanh(0.999999)},
 	}
 
