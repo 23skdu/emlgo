@@ -86,7 +86,7 @@ func LnRegularized(y, eps float64) float64 {
 	if math.Abs(y) > 1e150 {
 		return FastLog(math.Abs(y))
 	}
-	return 0.5 * FastLog(y*y + eps*eps)
+	return 0.5 * FastLog(y*y+eps*eps)
 }
 
 // LnRegularizedF32 computes 0.5 * ln(y^2 + eps^2) for float32.
@@ -97,5 +97,5 @@ func LnRegularizedF32(y, eps float32) float32 {
 	if math.Abs(float64(y)) > 1e18 {
 		return FastLogF32(float32(math.Abs(float64(y))))
 	}
-	return 0.5 * FastLogF32(y*y + eps*eps)
+	return 0.5 * FastLogF32(y*y+eps*eps)
 }

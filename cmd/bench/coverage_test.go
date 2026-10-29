@@ -244,4 +244,3 @@ func TestBenchComprehensiveCoverage(t *testing.T) {
 	_ = benchmarkBatch("batch", "Test", 4096, func(a, b []float64) {}, func(a, b []float64) {})
 	iterations = 2
 }
-

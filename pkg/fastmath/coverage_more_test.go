@@ -194,4 +194,3 @@ func TestFastmathComprehensive(t *testing.T) {
 	_ = FastExpF32(95.0)
 	_ = FastExpF32(float32(math.NaN()))
 }
-

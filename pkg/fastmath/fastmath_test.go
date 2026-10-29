@@ -190,3 +190,29 @@ func close(a, b, tol float64) bool {
 	}
 	return math.Abs(a-b) <= tol
 }
+
+func FuzzFastMathDifferential(f *testing.F) {
+	f.Add(0.5)
+	f.Add(1.0)
+	f.Add(2.718281828459045)
+	f.Add(-3.141592653589793)
+	f.Fuzz(func(t *testing.T, x float64) {
+		if math.IsNaN(x) || math.IsInf(x, 0) {
+			return
+		}
+		if x >= -20 && x <= 20 {
+			gotExp := FastExp(x)
+			wantExp := math.Exp(x)
+			if math.Abs(gotExp-wantExp) > 1e-6*math.Max(1, math.Abs(wantExp)) {
+				t.Fatalf("FastExp(%g) = %g, want %g", x, gotExp, wantExp)
+			}
+		}
+		if x > 1e-6 && x < 1e6 {
+			gotLog := FastLog(x)
+			wantLog := math.Log(x)
+			if math.Abs(gotLog-wantLog) > 1e-5*math.Max(1, math.Abs(wantLog)) {
+				t.Fatalf("FastLog(%g) = %g, want %g", x, gotLog, wantLog)
+			}
+		}
+	})
+}

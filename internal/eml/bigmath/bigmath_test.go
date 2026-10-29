@@ -347,3 +347,41 @@ func TestAsinAcosComplement(t *testing.T) {
 		}
 	}
 }
+
+func TestVerifyIdentityEdgeCases(t *testing.T) {
+	vBadPrec := &IdentityVerifier{
+		Precision: uint(math.MaxInt) + 1,
+		Samples:   1,
+		Tolerance: 1.0,
+	}
+	if vBadPrec.VerifyIdentity(Exp, Exp) {
+		t.Error("expected VerifyIdentity to return false for precision > MaxInt")
+	}
+	if _, err := vBadPrec.VerifyIdentityAt(Exp, Exp, []*big.Float{NewFloat(1)}); err == nil {
+		t.Error("expected VerifyIdentityAt error for precision > MaxInt")
+	}
+
+	v := DefaultVerifier()
+	if _, err := v.VerifyIdentityAt(nil, Exp, []*big.Float{NewFloat(1)}); err == nil {
+		t.Error("expected VerifyIdentityAt error for nil expr1")
+	}
+	if _, err := v.VerifyIdentityAt(Exp, Exp, nil); err == nil {
+		t.Error("expected VerifyIdentityAt error for empty points")
+	}
+}
+
+func FuzzExpLnRoundtrip(f *testing.F) {
+	f.Add(0.5)
+	f.Add(1.0)
+	f.Add(2.5)
+	f.Fuzz(func(t *testing.T, x float64) {
+		if math.IsNaN(x) || math.IsInf(x, 0) || x <= 0.01 || x > 50 {
+			return
+		}
+		bx := NewFloat(x)
+		got := Float64(Exp(Log(bx)))
+		if math.Abs(got-x) > 1e-12*x {
+			t.Fatalf("Exp(Log(%g)) = %g, want %g", x, got, x)
+		}
+	})
+}

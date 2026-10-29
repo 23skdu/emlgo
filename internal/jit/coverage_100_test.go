@@ -350,11 +350,11 @@ func TestStep18CacheAndMemoryReclamation(t *testing.T) {
 	if handle.size <= 0 {
 		t.Fatalf("handle size = %d, want > 0", handle.size)
 	}
-	if err := handle.Free(); err != nil {
-		t.Fatalf("handle.Free() = %v", err)
+	if freeErr := handle.Free(); freeErr != nil {
+		t.Fatalf("handle.Free() = %v", freeErr)
 	}
-	if err := handle.Free(); err != nil {
-		t.Fatalf("second handle.Free() = %v, want nil", err)
+	if freeErr := handle.Free(); freeErr != nil {
+		t.Fatalf("second handle.Free() = %v, want nil", freeErr)
 	}
 
 	// 4. newCacheShard(0) and newJITCache(0)
@@ -374,7 +374,7 @@ func TestStep18CacheAndMemoryReclamation(t *testing.T) {
 	_, h3, _ := c.CompileWithHandle("x + 3")
 	smallCache.put("k1", func(x float64) float64 { return x + 1 }, h1)
 	smallCache.put("k2", func(x float64) float64 { return x + 2 }, h2)
-	smallCache.put("k1", func(x float64) float64 { return x + 1 }) // recency update
+	smallCache.put("k1", func(x float64) float64 { return x + 1 })     // recency update
 	smallCache.put("k3", func(x float64) float64 { return x + 3 }, h3) // evicts k2
 	if !h2.free {
 		t.Errorf("expected h2 to be freed on eviction")
@@ -403,9 +403,9 @@ func TestStep18CacheAndMemoryReclamation(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			f, err := CompileCached("x^2 + 5*x + 6")
-			if err != nil {
-				t.Errorf("concurrent CompileCached failed: %v", err)
+			f, cErr := CompileCached("x^2 + 5*x + 6")
+			if cErr != nil {
+				t.Errorf("concurrent CompileCached failed: %v", cErr)
 			}
 			if f(3) != 30 {
 				t.Errorf("concurrent f(3) = %v, want 30", f(3))
@@ -415,7 +415,7 @@ func TestStep18CacheAndMemoryReclamation(t *testing.T) {
 	wg.Wait()
 
 	// Parse error in CompileCached
-	if _, err := CompileCached("2 * +"); err == nil {
+	if _, cErr := CompileCached("2 * +"); cErr == nil {
 		t.Errorf("CompileCached(\"2 * +\") should fail")
 	}
 
@@ -481,7 +481,7 @@ func TestStep18CacheAndMemoryReclamation(t *testing.T) {
 	}
 
 	// CompileAST invalid node error
-	if _, _, err := c.CompileAST(Variable{Name: "y"}); err == nil {
+	if _, _, cErr := c.CompileAST(Variable{Name: "y"}); cErr == nil {
 		t.Errorf("CompileAST(Variable{Name: \"y\"}) should fail")
 	}
 
@@ -492,5 +492,59 @@ func TestStep18CacheAndMemoryReclamation(t *testing.T) {
 	mprotectFn = origMprotect
 	if errMprotect == nil {
 		t.Errorf("CompileCached with failing mprotect should error")
+	}
+}
+
+func TestJITRemainingCoverage100(t *testing.T) {
+	// 1. CodeHandle.Free error return path (unaligned pointer triggers EINVAL on munmap)
+	var unaligned [2]byte
+	badHandle := &CodeHandle{ptr: unsafe.Pointer(&unaligned[1]), size: 1}
+	if err := badHandle.Free(); err == nil {
+		t.Error("expected error from Free() with unaligned pointer")
+	}
+
+	// 2. validateASTLimits unsupported node type
+	if err := validateASTLimits(testCustomNode{}); err == nil {
+		t.Error("expected error from validateASTLimits for unsupported node type")
+	}
+
+	// 3. BinaryOp left & right error propagation in normal and spill paths
+	var g generator
+	if err := g.gen(BinaryOp{Left: Variable{Name: "y"}, Op: '+', Right: Number{Value: 1}}, 0); err == nil {
+		t.Error("expected error for invalid variable in BinaryOp.Left")
+	}
+	if err := g.gen(BinaryOp{Left: Number{Value: 1}, Op: '+', Right: Variable{Name: "y"}}, 0); err == nil {
+		t.Error("expected error for invalid variable in BinaryOp.Right")
+	}
+
+	gSpill := &generator{}
+	for i := 0; i < 14; i++ {
+		_, _ = gSpill.alloc()
+	}
+	if err := gSpill.gen(BinaryOp{Left: Number{Value: 1}, Op: '+', Right: Variable{Name: "y"}}, 0); err == nil {
+		t.Error("expected error for invalid variable in BinaryOp.Right under register spill")
+	}
+
+	// 4. compileToCode exceeding maxJITCodeSize
+	oldMaxCodeSize := maxJITCodeSize
+	maxJITCodeSize = 8
+	_, errCodeSize := compileToCode(BinaryOp{Left: Variable{Name: "x"}, Op: '+', Right: Number{Value: 1}})
+	maxJITCodeSize = oldMaxCodeSize
+	if errCodeSize == nil {
+		t.Error("expected compileToCode error when generated code exceeds maxJITCodeSize")
+	}
+
+	// 5. parseMulDiv addNode error when BinaryOp '*' hits MaxASTNodes + 1
+	pMul := newParser("1*1")
+	pMul.nodes = MaxASTNodes - 2
+	if _, err := pMul.parseExpr(); err == nil {
+		t.Error("expected parseExpr error when parseMulDiv BinaryOp exceeds MaxASTNodes")
+	}
+
+	// 6. parsePower addNode error when BinaryOp '^' hits MaxASTNodes + 1
+	pPow := newParser("1^1")
+	pPow.nodes = MaxASTNodes - 2
+	if _, err := pPow.parseExpr(); err == nil {
+		t.Error("expected parseExpr error when parsePower BinaryOp exceeds MaxASTNodes")
 	}
 }

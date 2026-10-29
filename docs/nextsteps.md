@@ -3,6 +3,8 @@
 An evidence-based plan for the remaining open engineering items in `emlgo`.
 Every step below cites measurements, architectural audits, and hardware evidence from this repository.
 
+> **Note:** See [`docs/roadmap.md`](./roadmap.md) for the complete **P0 Blocker Matrix** (P0-1 through P0-7) covering SIMD transcendental assembly accuracy, MPFR 4.2.2 oracle expansion, IEEE 754 domain/edge-case fixes, benchmark harness fixes, batch SIMD vectorization, and 100% statement coverage targets.
+
 ---
 
 ## Active Roadmap Overview

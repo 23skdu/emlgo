@@ -304,4 +304,3 @@ func TurboQuant4DistanceScratch(query []float32, tqData []byte, dim int, pow2 in
 func DotProductInt8(a []uint8, b []int8) int32 {
 	return eml.DotInt8SIMD(a, b)
 }
-

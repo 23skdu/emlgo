@@ -182,3 +182,26 @@ func TestDotProductInt8(t *testing.T) {
 		}
 	}
 }
+
+func FuzzPackUnpack4Bit(f *testing.F) {
+	f.Add([]byte{0, 1, 2, 3, 4, 5, 6, 7})
+	f.Add([]byte{15, 14, 13, 12, 11})
+	f.Fuzz(func(t *testing.T, raw []byte) {
+		if len(raw) == 0 || len(raw) > 1024 {
+			return
+		}
+		nibbles := make([]byte, len(raw))
+		for i, v := range raw {
+			nibbles[i] = v & 0x0F
+		}
+		packed := make([]byte, (len(nibbles)+1)/2)
+		Pack4Bit(nibbles, packed)
+		unpacked := make([]byte, len(nibbles))
+		Unpack4Bit(packed, unpacked, len(nibbles))
+		for i := range nibbles {
+			if unpacked[i] != nibbles[i] {
+				t.Fatalf("nibble[%d] = %d, want %d", i, unpacked[i], nibbles[i])
+			}
+		}
+	})
+}

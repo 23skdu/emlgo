@@ -7,14 +7,14 @@ import (
 )
 
 const (
-	One    float64 = 1.0
-	E      float64 = math.E
-	Pi     float64 = math.Pi
-	NegOne float64 = -1.0
-	Two    float64 = 2.0
-	Half   float64 = 0.5
-	Sqrt2  float64 = 1.4142135623730951
-	Sqrt3  float64 = 1.7320508075688772
+	One         float64 = 1.0
+	E           float64 = math.E
+	Pi          float64 = math.Pi
+	NegOne      float64 = -1.0
+	Two         float64 = 2.0
+	Half        float64 = 0.5
+	Sqrt2       float64 = 1.4142135623730951
+	Sqrt3       float64 = 1.7320508075688772
 	Ln2         float64 = 0.693147180559945309417232121458
 	Ln10        float64 = 2.302585092994046
 	SqrtPi      float64 = 1.7724538509055159

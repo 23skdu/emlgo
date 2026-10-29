@@ -19,8 +19,10 @@ components only; Go prevents downstream modules from importing those packages.
 | [performance.md](performance.md) | Reproducible benchmark methodology and regression gate |
 | [comparison.md](comparison.md) | Status of historical emlgo vs math performance claims |
 | [wasm.md](wasm.md) | WebAssembly targets, batch kernels, and test harness |
-| [accuracy.md](accuracy.md) | Numerical accuracy contracts and validation limits |
-| [nextsteps.md](nextsteps.md) | Roadmap and verification status |
+| [accuracy.md](accuracy.md) | Numerical accuracy contracts, oracle accuracy gate, and validation limits |
+| [roadmap.md](roadmap.md) | Engineering roadmap and P0 blocker matrix |
+| [nextsteps.md](nextsteps.md) | Prioritized open work log and historical milestone archive |
+| [../scripts/README.md](../scripts/README.md) | Reference for oracle gate, pre-commit hook, benchmark, and validation scripts |
 
 ## Quick Links
 
@@ -28,4 +30,5 @@ components only; Go prevents downstream modules from importing those packages.
 - **API Reference**: See [FUNCTIONS.md](FUNCTIONS.md)
 - **Architecture**: See [architecture.md](architecture.md)
 - **Benchmarks**: See [performance.md](performance.md)
-- **Roadmap / known bottlenecks**: See [nextsteps.md](nextsteps.md)
+- **Oracle Accuracy Gate**: See [accuracy.md](accuracy.md) and [../scripts/README.md](../scripts/README.md)
+- **Roadmap / P0 Blockers**: See [roadmap.md](roadmap.md) and [nextsteps.md](nextsteps.md)

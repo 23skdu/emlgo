@@ -5,8 +5,6 @@ import (
 	"testing"
 )
 
-
-
 func TestStep33_SubnormalLogOracle(t *testing.T) {
 	// 1. Verify powers of 2 in [2^-1074, 2^-1022] (all subnormal powers of 2)
 	// plus 2^-1022 (smallest normal).

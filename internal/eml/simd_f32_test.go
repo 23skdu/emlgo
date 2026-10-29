@@ -309,4 +309,3 @@ func TestAVX512F32Panics(t *testing.T) {
 	mustPanic("FmaSIMDF32To", func() { FmaSIMDF32To([]float32{1, 2}, []float32{1, 2}, []float32{1}, []float32{1, 2}) })
 	mustPanic("FmaSIMDF32", func() { FmaSIMDF32([]float32{1, 2}, []float32{1}, []float32{1, 2}) })
 }
-

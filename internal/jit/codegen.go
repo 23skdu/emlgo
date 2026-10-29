@@ -581,6 +581,8 @@ func (g *generator) genPowUint(base Node, n int, dst byte) error {
 	return nil
 }
 
+var maxJITCodeSize = MaxJITCodeSize
+
 func compileToCode(n Node) ([]byte, error) {
 	if err := validateASTLimits(n); err != nil {
 		return nil, err
@@ -594,8 +596,8 @@ func compileToCode(n Node) ([]byte, error) {
 	}
 	g.enc.emit(0xC3)
 	g.enc.fixupConstants()
-	if len(g.enc.code) > MaxJITCodeSize {
-		return nil, fmt.Errorf("generated code exceeds maximum size (%d bytes)", MaxJITCodeSize)
+	if len(g.enc.code) > maxJITCodeSize {
+		return nil, fmt.Errorf("generated code exceeds maximum size (%d bytes)", maxJITCodeSize)
 	}
 	return g.enc.code, nil
 }
