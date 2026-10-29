@@ -4,6 +4,7 @@ import (
 	"math"
 
 	"github.com/emlgo/eml/internal/eml"
+	"github.com/emlgo/eml/pkg/hyper"
 	"github.com/emlgo/eml/pkg/logexp"
 )
 
@@ -21,11 +22,6 @@ var (
 	nativeAcos  = eml.Acos
 	nativeAtan  = eml.Atan
 	nativeAtan2 = eml.Atan2
-	nativeSqrt  = eml.Sqrt
-
-	nativeSinh = eml.Sinh
-	nativeCosh = eml.Cosh
-	nativeTanh = eml.Tanh
 )
 
 func Sin(x float64) float64 {
@@ -53,26 +49,21 @@ func Cot(x float64) float64 {
 	if isNaN(x) || isInf(x, 0) {
 		return nan()
 	}
-	sinx := Sin(x)
-	cosx := Cos(x)
-	if sinx == 0 {
-		return nan()
-	}
-	return cosx / sinx
+	return Cos(x) / Sin(x)
 }
 
 func Sec(x float64) float64 {
 	if isNaN(x) || isInf(x, 0) {
 		return nan()
 	}
-	return 1 / math.Cos(x)
+	return 1 / nativeCos(x)
 }
 
 func Csc(x float64) float64 {
 	if isNaN(x) || isInf(x, 0) {
 		return nan()
 	}
-	return 1 / math.Sin(x)
+	return 1 / Sin(x)
 }
 
 func Asin(x float64) float64 {
@@ -119,15 +110,15 @@ func Acsc(x float64) float64 {
 }
 
 func Sinh(x float64) float64 {
-	return nativeSinh(x)
+	return hyper.Sinh(x)
 }
 
 func Cosh(x float64) float64 {
-	return nativeCosh(x)
+	return hyper.Cosh(x)
 }
 
 func Tanh(x float64) float64 {
-	return nativeTanh(x)
+	return hyper.Tanh(x)
 }
 
 func Coth(x float64) float64 {
@@ -170,45 +161,15 @@ func Csch(x float64) float64 {
 }
 
 func Asinh(x float64) float64 {
-	if isNaN(x) {
-		return nan()
-	}
-	if isInf(x, 0) {
-		return x
-	}
-	if x == 0 {
-		return 0
-	}
-	return logexp.Log(x + nativeSqrt(x*x+1))
+	return hyper.Asinh(x)
 }
 
 func Acosh(x float64) float64 {
-	if isNaN(x) {
-		return nan()
-	}
-	if x < 1 {
-		return nan()
-	}
-	if x == 1 {
-		return 0
-	}
-	if isInf(x, 0) {
-		return x
-	}
-	return logexp.Log(x + nativeSqrt(x-1)*nativeSqrt(x+1))
+	return hyper.Acosh(x)
 }
 
 func Atanh(x float64) float64 {
-	if isNaN(x) {
-		return nan()
-	}
-	if x <= -1 || x >= 1 {
-		return nan()
-	}
-	if x == 0 {
-		return 0
-	}
-	return logexp.Log((1+x)/(1-x)) / 2
+	return hyper.Atanh(x)
 }
 
 func Acoth(x float64) float64 {
@@ -240,7 +201,7 @@ func Acsch(x float64) float64 {
 	}
 	if x == 0 {
 		// acsch(x) → sign(x) * Inf as x → 0
-		return inf(1)
+		return math.Copysign(inf(1), x)
 	}
 	if isInf(x, 0) {
 		return 0

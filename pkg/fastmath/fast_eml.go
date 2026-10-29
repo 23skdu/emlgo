@@ -1,5 +1,7 @@
 package fastmath
 
+import "github.com/emlgo/eml/internal/eml"
+
 // FastEml computes the canonical EML operator: eml(x, y) = exp(x) - ln(y)
 // using high-speed minimax polynomial approximations for both exp and log.
 func FastEml(x, y float64) float64 {
@@ -55,9 +57,11 @@ func FastEmlBatchTo(x, y, dst []float64) {
 	if len(x) != len(y) || len(x) != len(dst) {
 		panic("slice length mismatch")
 	}
-	for i := range x {
-		dst[i] = FastEml(x[i], y[i])
-	}
+	eml.ForEachChunk(len(x), func(start, end int) {
+		for i := start; i < end; i++ {
+			dst[i] = FastEml(x[i], y[i])
+		}
+	})
 }
 
 // FastEmlBatchF32 computes element-wise FastEml for float32 slices.
@@ -75,7 +79,9 @@ func FastEmlBatchToF32(x, y, dst []float32) {
 	if len(x) != len(y) || len(x) != len(dst) {
 		panic("slice length mismatch")
 	}
-	for i := range x {
-		dst[i] = FastEmlF32(x[i], y[i])
-	}
+	eml.ForEachChunk(len(x), func(start, end int) {
+		for i := start; i < end; i++ {
+			dst[i] = FastEmlF32(x[i], y[i])
+		}
+	})
 }

@@ -41,7 +41,9 @@ func SqrtSIMDF32To(src, dst []float32) {
 	if len(src) != len(dst) {
 		panic("slice length mismatch")
 	}
-	dispatchSqrtSIMDF32To(src, dst)
+	ForEachChunk(len(src), func(start, end int) {
+		dispatchSqrtSIMDF32To(src[start:end], dst[start:end])
+	})
 }
 
 // SqrtSIMDF32 computes element-wise sqrt(x) for a float32 slice.
@@ -56,7 +58,9 @@ func AddSIMDF32To(a, b, dst []float32) {
 	if len(a) != len(b) || len(a) != len(dst) {
 		panic("slice length mismatch")
 	}
-	dispatchAddSIMDF32To(a, b, dst)
+	ForEachChunk(len(a), func(start, end int) {
+		dispatchAddSIMDF32To(a[start:end], b[start:end], dst[start:end])
+	})
 }
 
 // AddSIMDF32 computes element-wise a[i]+b[i] for float32 slices.
@@ -75,7 +79,9 @@ func MulSIMDF32To(a, b, dst []float32) {
 	if len(a) != len(b) || len(a) != len(dst) {
 		panic("slice length mismatch")
 	}
-	dispatchMulSIMDF32To(a, b, dst)
+	ForEachChunk(len(a), func(start, end int) {
+		dispatchMulSIMDF32To(a[start:end], b[start:end], dst[start:end])
+	})
 }
 
 // MulSIMDF32 computes element-wise a[i]*b[i] for float32 slices.
@@ -94,7 +100,9 @@ func AddScalarSIMDF32To(a []float32, b float32, dst []float32) {
 	if len(a) != len(dst) {
 		panic("slice length mismatch")
 	}
-	dispatchAddScalarSIMDF32To(a, b, dst)
+	ForEachChunk(len(a), func(start, end int) {
+		dispatchAddScalarSIMDF32To(a[start:end], b, dst[start:end])
+	})
 }
 
 // AddScalarSIMDF32 adds scalar b to each element of a.
@@ -109,7 +117,9 @@ func MulScalarSIMDF32To(a []float32, b float32, dst []float32) {
 	if len(a) != len(dst) {
 		panic("slice length mismatch")
 	}
-	dispatchMulScalarSIMDF32To(a, b, dst)
+	ForEachChunk(len(a), func(start, end int) {
+		dispatchMulScalarSIMDF32To(a[start:end], b, dst[start:end])
+	})
 }
 
 // MulScalarSIMDF32 multiplies each element of a by scalar b.
@@ -124,7 +134,9 @@ func SubSIMDF32To(a, b, dst []float32) {
 	if len(a) != len(b) || len(a) != len(dst) {
 		panic("slice length mismatch")
 	}
-	dispatchSubSIMDF32To(a, b, dst)
+	ForEachChunk(len(a), func(start, end int) {
+		dispatchSubSIMDF32To(a[start:end], b[start:end], dst[start:end])
+	})
 }
 
 // SubSIMDF32 computes element-wise a[i]-b[i] for float32 slices.
@@ -143,7 +155,9 @@ func DivSIMDF32To(a, b, dst []float32) {
 	if len(a) != len(b) || len(a) != len(dst) {
 		panic("slice length mismatch")
 	}
-	dispatchDivSIMDF32To(a, b, dst)
+	ForEachChunk(len(a), func(start, end int) {
+		dispatchDivSIMDF32To(a[start:end], b[start:end], dst[start:end])
+	})
 }
 
 // DivSIMDF32 computes element-wise a[i]/b[i] for float32 slices.
@@ -162,7 +176,9 @@ func AbsSIMDF32To(x, dst []float32) {
 	if len(x) != len(dst) {
 		panic("slice length mismatch")
 	}
-	dispatchAbsSIMDF32To(x, dst)
+	ForEachChunk(len(x), func(start, end int) {
+		dispatchAbsSIMDF32To(x[start:end], dst[start:end])
+	})
 }
 
 // AbsSIMDF32 computes element-wise abs(x) for float32 slices.
@@ -177,7 +193,9 @@ func NegSIMDF32To(x, dst []float32) {
 	if len(x) != len(dst) {
 		panic("slice length mismatch")
 	}
-	dispatchNegSIMDF32To(x, dst)
+	ForEachChunk(len(x), func(start, end int) {
+		dispatchNegSIMDF32To(x[start:end], dst[start:end])
+	})
 }
 
 // NegSIMDF32 computes element-wise -x for float32 slices.
@@ -192,7 +210,9 @@ func InvSIMDF32To(x, dst []float32) {
 	if len(x) != len(dst) {
 		panic("slice length mismatch")
 	}
-	dispatchInvSIMDF32To(x, dst)
+	ForEachChunk(len(x), func(start, end int) {
+		dispatchInvSIMDF32To(x[start:end], dst[start:end])
+	})
 }
 
 // InvSIMDF32 computes element-wise 1/x for float32 slices.
@@ -207,7 +227,9 @@ func FmaSIMDF32To(a, b, c, dst []float32) {
 	if len(a) != len(b) || len(a) != len(c) || len(a) != len(dst) {
 		panic("slice length mismatch")
 	}
-	dispatchFmaSIMDF32To(a, b, c, dst)
+	ForEachChunk(len(a), func(start, end int) {
+		dispatchFmaSIMDF32To(a[start:end], b[start:end], c[start:end], dst[start:end])
+	})
 }
 
 // FmaSIMDF32 returns a new slice containing a[i]*b[i] + c[i].

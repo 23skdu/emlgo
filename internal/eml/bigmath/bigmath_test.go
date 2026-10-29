@@ -368,6 +368,15 @@ func TestVerifyIdentityEdgeCases(t *testing.T) {
 	if _, err := v.VerifyIdentityAt(Exp, Exp, nil); err == nil {
 		t.Error("expected VerifyIdentityAt error for empty points")
 	}
+
+	infPos := new(big.Float).SetPrec(Prec).SetInf(false)
+	infNeg := new(big.Float).SetPrec(Prec).SetInf(true)
+	if Sin(infPos).Sign() != 0 || Sin(infNeg).Sign() != 0 {
+		t.Error("expected Sin(±Inf) to return 0 sentinel without panicking")
+	}
+	if Cos(infPos).Sign() != 0 || Cos(infNeg).Sign() != 0 {
+		t.Error("expected Cos(±Inf) to return 0 sentinel without panicking")
+	}
 }
 
 func FuzzExpLnRoundtrip(f *testing.F) {

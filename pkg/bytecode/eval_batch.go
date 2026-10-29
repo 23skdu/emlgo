@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/emlgo/eml/internal/eml"
 	"github.com/emlgo/eml/pkg/fastmath"
 )
 
@@ -170,9 +171,7 @@ func (p *Program) EvalBatchColumnarScratch(data [][]float64, dst []float64, scra
 				sp--
 				yCol := stackCols[sp][:currLen]
 				xCol := stackCols[sp-1][:currLen]
-				for i := range xCol {
-					xCol[i] += yCol[i]
-				}
+				eml.AddSIMDTo(xCol, yCol, xCol)
 
 			case OpSub:
 				if sp < 2 {
@@ -181,9 +180,7 @@ func (p *Program) EvalBatchColumnarScratch(data [][]float64, dst []float64, scra
 				sp--
 				yCol := stackCols[sp][:currLen]
 				xCol := stackCols[sp-1][:currLen]
-				for i := range xCol {
-					xCol[i] -= yCol[i]
-				}
+				eml.SubSIMDTo(xCol, yCol, xCol)
 
 			case OpMul:
 				if sp < 2 {
@@ -192,9 +189,7 @@ func (p *Program) EvalBatchColumnarScratch(data [][]float64, dst []float64, scra
 				sp--
 				yCol := stackCols[sp][:currLen]
 				xCol := stackCols[sp-1][:currLen]
-				for i := range xCol {
-					xCol[i] *= yCol[i]
-				}
+				eml.MulSIMDTo(xCol, yCol, xCol)
 
 			case OpDiv:
 				if sp < 2 {
@@ -203,9 +198,7 @@ func (p *Program) EvalBatchColumnarScratch(data [][]float64, dst []float64, scra
 				sp--
 				yCol := stackCols[sp][:currLen]
 				xCol := stackCols[sp-1][:currLen]
-				for i := range xCol {
-					xCol[i] /= yCol[i]
-				}
+				eml.DivSIMDTo(xCol, yCol, xCol)
 
 			case OpPow:
 				if sp < 2 {
@@ -223,27 +216,21 @@ func (p *Program) EvalBatchColumnarScratch(data [][]float64, dst []float64, scra
 					panic(fmt.Sprintf("bytecode: stack underflow on %s (sp=%d)", op.String(), sp))
 				}
 				xCol := stackCols[sp-1][:currLen]
-				for i := range xCol {
-					xCol[i] = -xCol[i]
-				}
+				eml.NegSIMDTo(xCol, xCol)
 
 			case OpInv:
 				if sp < 1 {
 					panic(fmt.Sprintf("bytecode: stack underflow on %s (sp=%d)", op.String(), sp))
 				}
 				xCol := stackCols[sp-1][:currLen]
-				for i := range xCol {
-					xCol[i] = 1.0 / xCol[i]
-				}
+				eml.InvSIMDTo(xCol, xCol)
 
 			case OpSqrt:
 				if sp < 1 {
 					panic(fmt.Sprintf("bytecode: stack underflow on %s (sp=%d)", op.String(), sp))
 				}
 				xCol := stackCols[sp-1][:currLen]
-				for i := range xCol {
-					xCol[i] = math.Sqrt(xCol[i])
-				}
+				eml.SqrtSIMDTo(xCol, xCol)
 
 			case OpExp:
 				if sp < 1 {

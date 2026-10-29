@@ -54,8 +54,24 @@ func TestArithCoverageRemaining(t *testing.T) {
 	_ = PowInt(2.0, math.MinInt)
 
 	// GCD and IntAbs MinInt cases
-	_ = GCD(math.MinInt64, 10)
-	_ = GCD(10, math.MinInt64)
+	if got := GCD(math.MinInt64, 2); got != 2 {
+		t.Errorf("GCD(MinInt64, 2) = %d, want 2", got)
+	}
+	if got := GCD(math.MinInt64, 10); got != 2 {
+		t.Errorf("GCD(MinInt64, 10) = %d, want 2", got)
+	}
+	if got := GCD(10, math.MinInt64); got != 2 {
+		t.Errorf("GCD(10, MinInt64) = %d, want 2", got)
+	}
+	if got := GCD(math.MinInt64, math.MinInt64); got != math.MaxInt64 {
+		t.Errorf("GCD(MinInt64, MinInt64) = %d, want MaxInt64", got)
+	}
+	if !math.IsInf(Log1p(-1.0), -1) {
+		t.Errorf("Log1p(-1.0) = %v, want -Inf", Log1p(-1.0))
+	}
+	if !math.IsNaN(Log1p(-2.0)) {
+		t.Errorf("Log1p(-2.0) = %v, want NaN", Log1p(-2.0))
+	}
 	_ = GCD(-10, -20)
 	if IntAbs(math.MinInt) != math.MaxInt {
 		t.Errorf("IntAbs(MinInt) should be MaxInt")

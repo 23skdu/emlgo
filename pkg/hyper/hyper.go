@@ -101,6 +101,8 @@ func Asinh(x float64) float64 {
 	var res float64
 	if x < 1e-8 {
 		res = x
+	} else if x < 1.0 {
+		res = eml.Log1p(x + x*x/(1.0+arithmetic.Sqrt(x*x+1.0)))
 	} else if x > 1e8 {
 		// ln(2x)
 		res = nativeLog(x) + constants.Ln2
@@ -125,6 +127,10 @@ func Acosh(x float64) float64 {
 	}
 	if x > 1e8 {
 		return nativeLog(x) + constants.Ln2
+	}
+	if x < 2.0 {
+		t := x - 1.0
+		return eml.Log1p(t + arithmetic.Sqrt(t*(t+2.0)))
 	}
 	return nativeLog(x + arithmetic.Sqrt(x-1)*arithmetic.Sqrt(x+1))
 }
@@ -153,7 +159,7 @@ func Atanh(x float64) float64 {
 	if x < 1e-8 {
 		return sign * x
 	}
-	return sign * nativeLog((1+x)/(1-x)) / 2
+	return sign * 0.5 * eml.Log1p(2.0*x/(1.0-x))
 }
 
 func SinhBatch(x []float64) []float64 {

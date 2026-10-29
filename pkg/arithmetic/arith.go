@@ -7,22 +7,19 @@ import (
 	"github.com/emlgo/eml/internal/eml"
 )
 
-var (
-	isNaN       = eml.IsNaN
-	isInf       = eml.IsInf
-	nan         = eml.NaN
-	inf         = eml.Inf
-	nativeLog   = eml.Log
-	nativeLog1p = eml.Log1p
-	nativeSqrt  = eml.Sqrt
-	nativeHypot = eml.Hypot
-
-	nativeFloor = eml.Floor
-	nativeCeil  = eml.Ceil
-	nativeTrunc = eml.Trunc
-	nativeRound = eml.Round
-	nativeExp   = eml.Exp
-)
+func isNaN(x float64) bool             { return eml.IsNaN(x) }
+func isInf(x float64, s int) bool      { return eml.IsInf(x, s) }
+func nan() float64                     { return eml.NaN() }
+func inf(s int) float64                { return eml.Inf(s) }
+func nativeLog(x float64) float64      { return eml.Log(x) }
+func nativeLog1p(x float64) float64    { return eml.Log1p(x) }
+func nativeSqrt(x float64) float64     { return eml.Sqrt(x) }
+func nativeHypot(x, y float64) float64 { return eml.Hypot(x, y) }
+func nativeFloor(x float64) float64    { return eml.Floor(x) }
+func nativeCeil(x float64) float64     { return eml.Ceil(x) }
+func nativeTrunc(x float64) float64    { return eml.Trunc(x) }
+func nativeRound(x float64) float64    { return eml.Round(x) }
+func nativeExp(x float64) float64      { return eml.Exp(x) }
 
 // parallelMap applies fn to each element of x, storing results in result.
 // For large slices, work is distributed across the shared worker pool.
@@ -274,30 +271,23 @@ func Exp(x float64) float64 {
 }
 
 func Log(x float64) float64 {
-	if isNaN(x) {
+	if isNaN(x) || x < 0 {
 		return nan()
-	}
-	if x > 0 {
-		// For x near 1, use Log1p for better accuracy
-		if x > 0.5 && x < 1.5 {
-			return nativeLog1p(x - 1)
-		}
-		return nativeLog(x)
 	}
 	if x == 0 {
 		return inf(-1)
 	}
-	return nan()
+	return nativeLog(x)
 }
 
 func Log1p(x float64) float64 {
-	if isNaN(x) {
+	if isNaN(x) || x < -1 {
 		return nan()
 	}
-	if x > -1 {
-		return eml.Log1p(x)
+	if x == -1 {
+		return inf(-1)
 	}
-	return nan()
+	return eml.Log1p(x)
 }
 
 func Expm1(x float64) float64 {
@@ -311,29 +301,24 @@ func FMA(x, y, z float64) float64 {
 	return eml.FmaScalar(x, y, z)
 }
 
-func GCD(a, b int64) int64 {
-	if a < 0 {
-		if a == math.MinInt64 {
-			a = math.MaxInt64
-		} else {
-			a = -a
-		}
+func absUint64(x int64) uint64 {
+	if x < 0 {
+		return -uint64(x) // #nosec G115 -- intentional two's complement magnitude for MinInt64
 	}
-	if b < 0 {
-		if b == math.MinInt64 {
-			b = math.MaxInt64
-		} else {
-			b = -b
-		}
-	}
-	for b != 0 {
-		a, b = b, a%b
-	}
-	return a
+	return uint64(x) // #nosec G115 -- x >= 0
 }
 
-// Note: GCD(MinInt64, x) uses MaxInt64 as the absolute value approximation.
-// This is a known limitation documented in docs/nextsteps.md.
+func GCD(a, b int64) int64 {
+	ua := absUint64(a)
+	ub := absUint64(b)
+	for ub != 0 {
+		ua, ub = ub, ua%ub
+	}
+	if ua > uint64(math.MaxInt64) {
+		return math.MaxInt64
+	}
+	return int64(ua) // #nosec G115 -- ua <= math.MaxInt64
+}
 
 func LCM(a, b int64) int64 {
 	if a == 0 || b == 0 {
@@ -550,7 +535,11 @@ func MaxBatch(x []float64, y float64) []float64 {
 		return x
 	}
 	result := make([]float64, n)
-	parallelMap(x, result, func(v float64) float64 { return Max(v, y) })
+	eml.ForEachChunk(n, func(start, end int) {
+		for i := start; i < end; i++ {
+			result[i] = Max(x[i], y)
+		}
+	})
 	return result
 }
 
@@ -560,7 +549,11 @@ func MinBatch(x []float64, y float64) []float64 {
 		return x
 	}
 	result := make([]float64, n)
-	parallelMap(x, result, func(v float64) float64 { return Min(v, y) })
+	eml.ForEachChunk(n, func(start, end int) {
+		for i := start; i < end; i++ {
+			result[i] = Min(x[i], y)
+		}
+	})
 	return result
 }
 

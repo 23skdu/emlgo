@@ -23,20 +23,21 @@ func TestAMD64DispatchBranches(t *testing.T) {
 	_ = HasAVX512VNNI()
 
 	const n = 7
-	a := []float64{1, 2, 3, 4, 5, 6, math.NaN()}
+	a := []float64{1, math.NaN(), 3, 4, 5, 6, math.NaN()}
 	b := []float64{2, 1, 4, 3, 6, 5, 8}
 	c := []float64{1, 1, 1, 1, 1, 1, 1}
 	res := make([]float64, n)
 
-	af32 := []float32{1, 2, 3, 4, 5, 6, 7}
-	bf32 := []float32{2, 3, 4, 5, 6, 7, 8}
-	cf32 := []float32{1, 1, 1, 1, 1, 1, 1}
-	resf32 := make([]float32, n)
+	const nf32 = 9
+	af32 := []float32{1, 2, 3, 4, 5, 6, 7, 8, 9}
+	bf32 := []float32{2, 3, 4, 5, 6, 7, 8, 9, 10}
+	cf32 := []float32{1, 1, 1, 1, 1, 1, 1, 1, 1}
+	resf32 := make([]float32, nf32)
 
 	u8 := []uint8{1, 2, 3, 4, 5, 6, 7}
 	i8 := []int8{1, -2, 3, -4, 5, -6, 7}
 
-	// Mode 1: AVX-512 enabled (simdLen=0 for n=7, tests AVX-512 branch and tail scalar loop)
+	// Mode 1: AVX-512 enabled (simdLen=0 for n=7 / nf32=9, tests AVX-512 branch and tail scalar loop)
 	hasAVX512 = true
 	hasAVX512VNNI = true
 	hasAVX2 = true
@@ -52,6 +53,11 @@ func TestAMD64DispatchBranches(t *testing.T) {
 	amd64AbsSIMD(a, res)
 	amd64NegSIMD(a, res)
 	amd64InvSIMD(a, res)
+	amd64ExpSIMD(a, res)
+	amd64LogSIMD(a, res)
+	amd64SinSIMD(a, res)
+	amd64CosSIMD(a, res)
+	amd64TanSIMD(a, res)
 	fmaSIMD(a, b, c, res)
 	dispatchFloorSIMDTo(a, res)
 	dispatchCeilSIMDTo(a, res)
@@ -73,7 +79,7 @@ func TestAMD64DispatchBranches(t *testing.T) {
 	dispatchFmaSIMDF32To(af32, bf32, cf32, resf32)
 	_ = dispatchDotInt8SIMD(u8, i8)
 
-	// Mode 2: AVX-512 disabled, AVX2 enabled (simdLen=4 for n=7, tests AVX2 branch and tail scalar loop)
+	// Mode 2: AVX-512 disabled, AVX2 enabled (simdLen=4 for n=7, simdLen=8 for nf32=9)
 	hasAVX512 = false
 	hasAVX512VNNI = false
 	hasAVX2 = true
@@ -89,7 +95,30 @@ func TestAMD64DispatchBranches(t *testing.T) {
 	amd64AbsSIMD(a, res)
 	amd64NegSIMD(a, res)
 	amd64InvSIMD(a, res)
+	amd64ExpSIMD(a, res)
+	amd64LogSIMD(a, res)
+	amd64SinSIMD(a, res)
+	amd64CosSIMD(a, res)
+	amd64TanSIMD(a, res)
 	fmaSIMD(a, b, c, res)
+	dispatchFloorSIMDTo(a, res)
+	dispatchCeilSIMDTo(a, res)
+	dispatchTruncSIMDTo(a, res)
+	dispatchRoundSIMDTo(a, res)
+	dispatchMaxSIMDTo(a, b, res)
+	dispatchMinSIMDTo(a, b, res)
+
+	dispatchAddSIMDF32To(af32, bf32, resf32)
+	dispatchSubSIMDF32To(af32, bf32, resf32)
+	dispatchMulSIMDF32To(af32, bf32, resf32)
+	dispatchDivSIMDF32To(af32, bf32, resf32)
+	dispatchSqrtSIMDF32To(af32, resf32)
+	dispatchAddScalarSIMDF32To(af32, 2.0, resf32)
+	dispatchMulScalarSIMDF32To(af32, 2.0, resf32)
+	dispatchAbsSIMDF32To(af32, resf32)
+	dispatchNegSIMDF32To(af32, resf32)
+	dispatchInvSIMDF32To(af32, resf32)
+	dispatchFmaSIMDF32To(af32, bf32, cf32, resf32)
 
 	// Mode 3: AVX-512 disabled, AVX2 disabled (tests fallback scalar loop)
 	hasAVX512 = false
@@ -106,7 +135,30 @@ func TestAMD64DispatchBranches(t *testing.T) {
 	amd64AbsSIMD(a, res)
 	amd64NegSIMD(a, res)
 	amd64InvSIMD(a, res)
+	amd64ExpSIMD(a, res)
+	amd64LogSIMD(a, res)
+	amd64SinSIMD(a, res)
+	amd64CosSIMD(a, res)
+	amd64TanSIMD(a, res)
 	fmaSIMD(a, b, c, res)
+	dispatchFloorSIMDTo(a, res)
+	dispatchCeilSIMDTo(a, res)
+	dispatchTruncSIMDTo(a, res)
+	dispatchRoundSIMDTo(a, res)
+	dispatchMaxSIMDTo(a, b, res)
+	dispatchMinSIMDTo(a, b, res)
+
+	dispatchAddSIMDF32To(af32, bf32, resf32)
+	dispatchSubSIMDF32To(af32, bf32, resf32)
+	dispatchMulSIMDF32To(af32, bf32, resf32)
+	dispatchDivSIMDF32To(af32, bf32, resf32)
+	dispatchSqrtSIMDF32To(af32, resf32)
+	dispatchAddScalarSIMDF32To(af32, 2.0, resf32)
+	dispatchMulScalarSIMDF32To(af32, 2.0, resf32)
+	dispatchAbsSIMDF32To(af32, resf32)
+	dispatchNegSIMDF32To(af32, resf32)
+	dispatchInvSIMDF32To(af32, resf32)
+	dispatchFmaSIMDF32To(af32, bf32, cf32, resf32)
 }
 
 func TestInt8SatSIMD(t *testing.T) {

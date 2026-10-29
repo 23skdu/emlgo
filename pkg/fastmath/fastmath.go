@@ -72,12 +72,7 @@ func SqrtBatchF32(x []float32) []float32 {
 
 // SqrtBatchToF32 computes element-wise square root for float32 slices storing in dst.
 func SqrtBatchToF32(x, dst []float32) {
-	if len(x) != len(dst) {
-		panic("slice length mismatch")
-	}
-	for i, v := range x {
-		dst[i] = float32(math.Sqrt(float64(v)))
-	}
+	eml.SqrtSIMDF32To(x, dst)
 }
 
 // ExpF32 returns e^x for float32 using fast polynomial approximation.
