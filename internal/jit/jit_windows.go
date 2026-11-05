@@ -22,7 +22,8 @@ func AllocateExecutableMemory(code []byte) (unsafe.Pointer, error) {
 	}
 
 	// Copy code into allocated memory
-	dst := unsafe.Slice((*byte)(unsafe.Pointer(addr)), len(code)) // #nosec G103
+	ptr := *(*unsafe.Pointer)(unsafe.Pointer(&addr)) // #nosec G103
+	dst := unsafe.Slice((*byte)(ptr), len(code))     // #nosec G103
 	copy(dst, code)
 
 	// Change protection to executable
@@ -33,7 +34,7 @@ func AllocateExecutableMemory(code []byte) (unsafe.Pointer, error) {
 		return nil, fmt.Errorf("VirtualProtect failed: %v", err)
 	}
 
-	return unsafe.Pointer(addr), nil // #nosec G103
+	return ptr, nil
 }
 
 // FreeExecutableMemory frees memory allocated by AllocateExecutableMemory on Windows.

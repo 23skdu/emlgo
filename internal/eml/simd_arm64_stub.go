@@ -1,5 +1,5 @@
-//go:build (!arm64 && !wasm) || purego
-// +build !arm64,!wasm purego
+//go:build !arm64 || purego
+// +build !arm64 purego
 
 package eml
 
