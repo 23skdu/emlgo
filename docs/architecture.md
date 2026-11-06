@@ -2,6 +2,23 @@
 
 `emlgo` is built on the principle that all elementary functions can be derived from a single operator, the **EML Operator**, combined with mathematical constants.
 
+## Architecture Overview
+
+```mermaid
+flowchart TD
+    A[Public APIs\npkg/*] --> B[Dispatch Layer\ninternal/eml]
+    B --> C{Target Architecture}
+    C -->|amd64| D[AVX2 / AVX-512 Kernels]
+    C -->|arm64| E[NEON Kernels]
+    C -->|wasm/js| F[Unrolled Go Loops]
+    C -->|other| G[Scalar Go Fallback]
+    B --> H[Composable Pipeline\nDouble-Buffered]
+    B --> I[Complex Batch\nDe-interleaved SIMD]
+    B --> J[BigMath\nArbitrary Precision]
+    B --> K[JIT Compiler\nNative Codegen]
+    L[GPU Backend\ninternal/gpu + CUDA] --> B
+```
+
 ## 1. Core Operator: EML
 
 The core of the library is the `eml(x, y)` function, defined as:

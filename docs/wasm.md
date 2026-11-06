@@ -2,6 +2,16 @@
 
 This document describes emlgo's WebAssembly targets, loop-unrolled batch kernels, build instructions, and test infrastructure.
 
+## Target Pipeline
+
+```mermaid
+flowchart TD
+    A[Go Source] --> B[GOOS=js/wasip1\nGOARCH=wasm]
+    B --> C[Unrolled Go Kernels]
+    C --> D[Browser / Node / WASI Runtime]
+    D --> E[Optional Engine SIMD Lowering]
+```
+
 ## Overview
 
 emlgo compiles to WebAssembly via `GOOS=js GOARCH=wasm` (browser/Node.js) or `GOOS=wasip1 GOARCH=wasm` (WASI). Core math APIs and batch operations are available; batch kernels use loop-unrolled Go code. The Go toolchain and runtime determine whether any operations are lowered to SIMD instructions.

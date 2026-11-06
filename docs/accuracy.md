@@ -6,6 +6,18 @@ rounded or certified. Numerical results can differ across Go versions,
 architectures, and execution backends; correctness budgets apply only where a
 specific test or API contract says they do.
 
+## Verification Flow
+
+```mermaid
+flowchart LR
+    A[MPFR Golden Vectors] --> B[Oracle Accuracy Gate]
+    B --> C[Implementation Under Test]
+    C --> D[ULP / Abs / Rel Budgets]
+    D --> E[Pass / Fail]
+    F[Fuzz Suites] --> C
+    G[Coverage Gate 100%] --> E
+```
+
 ## Backend contract
 
 | API family | Implementation/reference | Accuracy expectation | Domain and special values |

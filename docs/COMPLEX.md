@@ -14,6 +14,15 @@ When `y = 1`, this simplifies to `cmplx.Exp(x)`.
 
 ## Architecture
 
+```mermaid
+flowchart LR
+    A[complex128 Slice] --> B[De-interleave\nReal / Imag]
+    B --> C[Real SIMD Kernels\nExp / Sin / Cos]
+    B --> D[Hyperbolic via Exp\nCosh / Sinh]
+    C --> E[Recombine\ncomplex128 result]
+    D --> E
+```
+
 The library uses a dual-path design:
 
 - **float64 fast path**: All scalar `float64` operations use native EML + SIMD paths (AVX2/AVX512/NEON/WASM).

@@ -81,6 +81,14 @@ int eml_copy_to_host(void* dst, const void* src, long long size) {
     return (int)cudaMemcpy(dst, src, (size_t)size, cudaMemcpyDeviceToHost);
 }
 
+int eml_copy_to_device_async(void* dst, const void* src, long long size, long long stream) {
+    return (int)cudaMemcpyAsync(dst, src, (size_t)size, cudaMemcpyHostToDevice, (cudaStream_t)stream);
+}
+
+int eml_copy_to_host_async(void* dst, const void* src, long long size, long long stream) {
+    return (int)cudaMemcpyAsync(dst, src, (size_t)size, cudaMemcpyDeviceToHost, (cudaStream_t)stream);
+}
+
 int eml_sync_device(void) {
     return (int)cudaDeviceSynchronize();
 }

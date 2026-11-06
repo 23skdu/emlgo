@@ -1099,3 +1099,33 @@ func (d *Device) FmaBatch(a, b, c []float64) ([]float64, error) {
 	_ = c
 	return nil, fmt.Errorf("GPU execution not implemented for FmaBatch")
 }
+
+// ============================================================================
+// Asynchronous (non-blocking) host<->device copies for stream overlap
+// ============================================================================
+
+// CopyToDeviceAsync copies size bytes from host memory src to device memory dst
+// on the given stream without blocking the host.
+func CopyToDeviceAsync(dst, src unsafe.Pointer, size int, stream *Stream) error {
+	var sh C.longlong
+	if stream != nil {
+		sh = C.longlong(stream.handle)
+	}
+	if err := C.eml_copy_to_device_async(dst, src, C.longlong(size), sh); err != 0 {
+		return fmt.Errorf("async copy to device failed: error %d", int(err))
+	}
+	return nil
+}
+
+// CopyToHostAsync copies size bytes from device memory src to host memory dst
+// on the given stream without blocking the host.
+func CopyToHostAsync(dst, src unsafe.Pointer, size int, stream *Stream) error {
+	var sh C.longlong
+	if stream != nil {
+		sh = C.longlong(stream.handle)
+	}
+	if err := C.eml_copy_to_host_async(dst, src, C.longlong(size), sh); err != 0 {
+		return fmt.Errorf("async copy to host failed: error %d", int(err))
+	}
+	return nil
+}

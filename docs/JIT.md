@@ -2,6 +2,19 @@
 
 emlgo includes a JIT (Just-In-Time) compiler that generates AMD64 machine code from mathematical expression strings, plus symbolic differentiation, expression simplification, and an EML decompiler.
 
+## Pipeline Overview
+
+```mermaid
+flowchart LR
+    A[Expression String] --> B[Lexer / Parser]
+    B --> C[AST]
+    C --> D[Canonicalizer]
+    D --> E[Code Generator\namd64 / arm64]
+    E --> F[Executable Memory]
+    F --> G[Native Function Call]
+    C --> H[AST Interpreter\nfallback]
+```
+
 ## Overview
 
 The JIT compiler (`internal/jit`) parses a mathematical expression string, builds an AST, and emits native AMD64 SSE2 machine code that can be called as a regular Go function. Performance depends on the expression and target; this project makes no portable JIT speedup claim.

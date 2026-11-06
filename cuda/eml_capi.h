@@ -31,6 +31,8 @@ int eml_allocate(void** ptr, long long size);
 int eml_free(void* ptr);
 int eml_copy_to_device(void* dst, const void* src, long long size);
 int eml_copy_to_host(void* dst, const void* src, long long size);
+int eml_copy_to_device_async(void* dst, const void* src, long long size, long long stream);
+int eml_copy_to_host_async(void* dst, const void* src, long long size, long long stream);
 int eml_sync_device(void);
 int eml_memset(void* ptr, int value, long long size);
 int eml_memset_stream(void* ptr, int value, long long size, long long stream);

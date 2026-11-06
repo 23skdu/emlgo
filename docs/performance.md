@@ -1,5 +1,18 @@
 # Performance Measurement
 
+## Benchmark Flow
+
+```mermaid
+flowchart TD
+    A[Input Slices] --> B[ForEachChunk]
+    B --> C[Worker Pool]
+    C --> D[Architecture Dispatch]
+    D --> E[SIMD Kernels]
+    D --> F[Scalar Fallback]
+    E --> G[Result Slice]
+    F --> G
+```
+
 ## Status of published results
 
 This repository does not currently publish portable performance results or

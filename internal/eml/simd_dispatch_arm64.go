@@ -269,67 +269,122 @@ func dispatchDotInt8SIMD(a []uint8, b []int8) int32 {
 }
 
 func dispatchAddSIMDF32To(a, b, dst []float32) {
-	for i := range a {
+	n := len(a)
+	simdLen := (n / 4) * 4
+	if simdLen > 0 {
+		addNEONF32(a[:simdLen], b[:simdLen], dst[:simdLen])
+	}
+	for i := simdLen; i < n; i++ {
 		dst[i] = a[i] + b[i]
 	}
 }
 
 func dispatchSubSIMDF32To(a, b, dst []float32) {
-	for i := range a {
+	n := len(a)
+	simdLen := (n / 4) * 4
+	if simdLen > 0 {
+		subNEONF32(a[:simdLen], b[:simdLen], dst[:simdLen])
+	}
+	for i := simdLen; i < n; i++ {
 		dst[i] = a[i] - b[i]
 	}
 }
 
 func dispatchMulSIMDF32To(a, b, dst []float32) {
-	for i := range a {
+	n := len(a)
+	simdLen := (n / 4) * 4
+	if simdLen > 0 {
+		mulNEONF32(a[:simdLen], b[:simdLen], dst[:simdLen])
+	}
+	for i := simdLen; i < n; i++ {
 		dst[i] = a[i] * b[i]
 	}
 }
 
 func dispatchDivSIMDF32To(a, b, dst []float32) {
-	for i := range a {
+	n := len(a)
+	simdLen := (n / 4) * 4
+	if simdLen > 0 {
+		divNEONF32(a[:simdLen], b[:simdLen], dst[:simdLen])
+	}
+	for i := simdLen; i < n; i++ {
 		dst[i] = a[i] / b[i]
 	}
 }
 
 func dispatchSqrtSIMDF32To(src, dst []float32) {
-	for i := range src {
+	n := len(src)
+	simdLen := (n / 4) * 4
+	if simdLen > 0 {
+		sqrtNEONF32(src[:simdLen], dst[:simdLen])
+	}
+	for i := simdLen; i < n; i++ {
 		dst[i] = float32(nativeSqrt(float64(src[i])))
 	}
 }
 
 func dispatchAddScalarSIMDF32To(a []float32, b float32, dst []float32) {
-	for i := range a {
+	n := len(a)
+	simdLen := (n / 4) * 4
+	if simdLen > 0 {
+		addScalarNEONF32(a[:simdLen], b, dst[:simdLen])
+	}
+	for i := simdLen; i < n; i++ {
 		dst[i] = a[i] + b
 	}
 }
 
 func dispatchMulScalarSIMDF32To(a []float32, b float32, dst []float32) {
-	for i := range a {
+	n := len(a)
+	simdLen := (n / 4) * 4
+	if simdLen > 0 {
+		mulScalarNEONF32(a[:simdLen], b, dst[:simdLen])
+	}
+	for i := simdLen; i < n; i++ {
 		dst[i] = a[i] * b
 	}
 }
 
 func dispatchAbsSIMDF32To(src, dst []float32) {
-	for i := range src {
+	n := len(src)
+	simdLen := (n / 4) * 4
+	if simdLen > 0 {
+		absNEONF32(src[:simdLen], dst[:simdLen])
+	}
+	for i := simdLen; i < n; i++ {
 		dst[i] = math.Float32frombits(math.Float32bits(src[i]) & 0x7fffffff)
 	}
 }
 
 func dispatchNegSIMDF32To(src, dst []float32) {
-	for i := range src {
+	n := len(src)
+	simdLen := (n / 4) * 4
+	if simdLen > 0 {
+		negNEONF32(src[:simdLen], dst[:simdLen])
+	}
+	for i := simdLen; i < n; i++ {
 		dst[i] = -src[i]
 	}
 }
 
 func dispatchInvSIMDF32To(src, dst []float32) {
-	for i := range src {
+	n := len(src)
+	simdLen := (n / 4) * 4
+	if simdLen > 0 {
+		invNEONF32(src[:simdLen], dst[:simdLen])
+	}
+	for i := simdLen; i < n; i++ {
 		dst[i] = 1.0 / src[i]
 	}
 }
 
 func dispatchFmaSIMDF32To(a, b, c, dst []float32) {
-	for i := range a {
+	n := len(a)
+	simdLen := (n / 4) * 4
+	if simdLen > 0 {
+		fmaNEONF32(a[:simdLen], b[:simdLen], c[:simdLen], dst[:simdLen])
+	}
+	for i := simdLen; i < n; i++ {
 		dst[i] = float32(math.FMA(float64(a[i]), float64(b[i]), float64(c[i])))
 	}
 }
