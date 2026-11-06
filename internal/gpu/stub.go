@@ -6,6 +6,7 @@ package gpu
 import (
 	"fmt"
 	"runtime"
+	"unsafe"
 )
 
 // Override in tests to exercise specific paths.
@@ -634,4 +635,22 @@ func (s *Stream) Sync() error {
 func (s *Stream) Destroy() error {
 	_ = s
 	return nil
+}
+
+// CopyToDeviceAsync is a no-op stub in non-CUDA builds.
+func CopyToDeviceAsync(dst, src unsafe.Pointer, size int, stream *Stream) error {
+	_ = dst
+	_ = src
+	_ = size
+	_ = stream
+	return fmt.Errorf("CUDA not available (build with -tags cuda)")
+}
+
+// CopyToHostAsync is a no-op stub in non-CUDA builds.
+func CopyToHostAsync(dst, src unsafe.Pointer, size int, stream *Stream) error {
+	_ = dst
+	_ = src
+	_ = size
+	_ = stream
+	return fmt.Errorf("CUDA not available (build with -tags cuda)")
 }

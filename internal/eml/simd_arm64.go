@@ -22,6 +22,19 @@ func negNEON(a, result []float64)
 func invNEON(a, result []float64)
 func fmaNEON(a, b, c, result []float64)
 
+// Float32 NEON vector kernels
+func addNEONF32(a, b, result []float32)
+func subNEONF32(a, b, result []float32)
+func mulNEONF32(a, b, result []float32)
+func divNEONF32(a, b, result []float32)
+func sqrtNEONF32(a, result []float32)
+func addScalarNEONF32(a []float32, b float32, result []float32)
+func mulScalarNEONF32(a []float32, b float32, result []float32)
+func absNEONF32(a, result []float32)
+func negNEONF32(a, result []float32)
+func invNEONF32(a, result []float32)
+func fmaNEONF32(a, b, c, result []float32)
+
 // Signed 8-bit saturating vector kernels
 func addSatInt8NEON(a, b, result []int8)
 func subSatInt8NEON(a, b, result []int8)
