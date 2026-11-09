@@ -536,6 +536,7 @@ The repository enforces a 5-stage automated numerical oracle gate via `./scripts
 
 | Category | Makefile Target | Command / Action Performed |
 | :--- | :--- | :--- |
+| **Target Discovery** | `make help` | Prints every Makefile target with a one-line description, followed by the overridable variables (`FUZZTIME`, `IMAGE_REPO`, `TAG`, `CUDA_ARCH`) and their defaults. |
 | **Git Hooks** | `make makehooks` (alias: `make install-hooks`) | Marks `scripts/verify.sh` executable and installs it into `.git/hooks/pre-commit` (and syncs `scripts/pre-commit.sh`). |
 | **Verification Gate** | `make verify` | Runs `./scripts/verify.sh` (staged artifact hygiene, `go vet`, `golangci-lint`, `gosec`, fast oracle accuracy gate, and 100.0% statement coverage gate). |
 | **Full CI Quality Gate** | `make check` | Runs `vet`, `fmt-check`, `lint`, `security` (`gosec` + `govulncheck`), `oracle-gate`, and `test-cover`. |
@@ -549,6 +550,13 @@ The repository enforces a 5-stage automated numerical oracle gate via `./scripts
 | **Allocation Benchmark** | `make bench-mem` | Runs `go test -bench=. -benchmem` across `./internal/eml/...` and `./pkg/...`. |
 | **Oracle Accuracy Gate** | `make oracle-gate` (alias: `make accuracy-gate`) | Executes the 5-stage numerical accuracy gate `./scripts/oracle_accuracy_gate.sh`. |
 | **Fuzz Testing** | `make fuzz` | Runs all 30 anchored fuzz targets across `internal/jit`, `internal/eml`, `internal/eml/bigmath`, `internal/gpu`, and `pkg/*` (`FUZZTIME ?= 30s`). |
+
+The `help` target is self-maintaining: it greps the trailing `## <description>`
+annotation on each target line of the Makefile and prints the results in file
+order, so targets stay grouped under the same section banners used in the
+Makefile. Add the same annotation when introducing a new target so it shows up
+in `make help`; the presence of the `help:` target itself is asserted by
+`TestMakefileTargets` in `test/scripts_test.go`.
 
 ### 5.2 Installing and Running `scripts/verify.sh`
 

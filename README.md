@@ -317,6 +317,7 @@ make bench                                  # Run benchmarks
 make lint                                   # golangci-lint
 make fuzz                                   # Fuzz testing (30s per target)
 make gosec                                  # Security scan
+make help                                   # List all targets and variables
 ./scripts/bench-compare.sh                  # Benchmark regression
 ```
 

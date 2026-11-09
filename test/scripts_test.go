@@ -568,7 +568,7 @@ func TestVerifyHookScript(t *testing.T) {
 	})
 }
 
-// TestMakefileTargets validates that Makefile defines security, profiling, linting, oracle-gate, and makehooks targets.
+// TestMakefileTargets validates that Makefile defines security, profiling, linting, oracle-gate, makehooks, and help targets.
 func TestMakefileTargets(t *testing.T) {
 	root := getRepoRoot(t)
 	makefilePath := filepath.Join(root, "Makefile")
@@ -594,6 +594,7 @@ func TestMakefileTargets(t *testing.T) {
 		"verify:",
 		"makehooks:",
 		"scripts/verify.sh .git/hooks/pre-commit",
+		"help:",
 	}
 	for _, target := range requiredTargets {
 		if !strings.Contains(s, target) {

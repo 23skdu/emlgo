@@ -1,30 +1,30 @@
-.PHONY: build test test-short test-race test-docker test-scripts test-cover bench bench-mem bench-stat profile profile-cpu profile-mem lint vet fmt-check fuzz clean wasm security gosec govulncheck oracle-gate accuracy-gate verify check makehooks install-hooks docker docker-build docker-build-cpu docker-build-cuda docker-push docker-push-cpu docker-push-cuda
+.PHONY: build test test-short test-race test-docker test-scripts test-cover bench bench-mem bench-stat profile profile-cpu profile-mem lint vet fmt-check fuzz clean wasm security gosec govulncheck oracle-gate accuracy-gate verify check makehooks install-hooks docker docker-build docker-build-cpu docker-build-cuda docker-push docker-push-cpu docker-push-cuda help
 
-build:
+build: ## Compile all packages
 	go build ./...
 
-wasm:
+wasm: ## Build the WebAssembly binary (wasm/emlgo.wasm)
 	@mkdir -p wasm
 	cp "$$(go env GOROOT)/lib/wasm/wasm_exec.js" wasm/wasm_exec.js 2>/dev/null || cp "$$(go env GOROOT)/misc/wasm/wasm_exec.js" wasm/wasm_exec.js
 	GOOS=js GOARCH=wasm go build -o wasm/emlgo.wasm ./cmd/wasmbench
 
-test:
+test: ## Run the full test suite
 	go test -count=1 ./...
 
 # Fast subset: skips the long genetic-search convergence runs.
-test-short:
+test-short: ## Run fast tests only (skips long convergence runs)
 	go test -count=1 -short ./...
 
-test-race:
+test-race: ## Run tests with the race detector
 	go test -race -count=1 ./...
 
-test-docker:
+test-docker: ## Run the Docker integration tests
 	go test -v -run 'TestDocker.*' ./test/...
 
-test-scripts:
+test-scripts: ## Run script/hook/gate tests
 	go test -v -run 'Test(CheckBenchRegression|RunBenchmark|RunValidation|BenchCompare|WasmTest|GenerateMPFR|OracleAccuracyGate|PreCommit|VerifyHook|MakefileTargets).*' ./test/...
 
-test-cover:
+test-cover: ## Run tests with a coverage report
 	go test -coverprofile=coverage.out -covermode=atomic ./...
 	go tool cover -func=coverage.out
 
@@ -32,31 +32,31 @@ test-cover:
 # Performance & Memory Profiling Targets
 # ==============================================================================
 
-bench:
+bench: ## Run all benchmarks (3 runs each)
 	go test -bench=. -benchmem -count=3 ./...
 
-bench-mem:
+bench-mem: ## Run memory benchmarks for ./internal/eml and ./pkg
 	go test -run='^$$' -bench=. -benchmem -count=1 ./internal/eml/... ./pkg/...
 
-bench-stat:
+bench-stat: ## Run benchmarks and compare them with benchstat
 	@command -v benchstat >/dev/null 2>&1 || go install golang.org/x/perf/cmd/benchstat@latest
 	go test -bench=. -benchmem -count=6 ./... | benchstat
 
-profile-cpu:
+profile-cpu: ## CPU profile of the SIMD benchmarks
 	go test -run='^$$' -bench='^Benchmark(ExpSIMD|LogSIMD|SinSIMD|CosSIMD|AddSIMD|FmaSIMD)' -benchtime=200ms -benchmem -cpuprofile=cpu.prof ./internal/eml
 	go tool pprof -top -nodecount=20 cpu.prof
 
-profile-mem:
+profile-mem: ## Memory profile of the SIMD benchmarks
 	go test -run='^$$' -bench='^Benchmark(ExpSIMD|LogSIMD|Pipeline|Complex)' -benchtime=200ms -benchmem -memprofile=mem.prof ./internal/eml
 	go tool pprof -top -alloc_space -nodecount=20 mem.prof
 
-profile: profile-cpu profile-mem
+profile: profile-cpu profile-mem ## Run both the CPU and memory profiles
 
 # ==============================================================================
 # Linting & Static Analysis Targets
 # ==============================================================================
 
-fmt-check:
+fmt-check: ## Fail if any Go file is not gofmt'd
 	@unformatted="$$(gofmt -s -l .)"; \
 	if [ -n "$$unformatted" ]; then \
 		echo "ERROR: Unformatted Go files detected (run 'gofmt -s -w .'):"; \
@@ -64,10 +64,10 @@ fmt-check:
 		exit 1; \
 	fi
 
-vet:
+vet: ## Run go vet
 	go vet ./...
 
-lint: fmt-check vet
+lint: fmt-check vet ## fmt-check + vet + golangci-lint
 	@command -v golangci-lint >/dev/null 2>&1 || go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 	golangci-lint run ./...
 
@@ -78,7 +78,7 @@ lint: fmt-check vet
 FUZZTIME ?= 30s
 
 # Targets are anchored so they cannot match more than one fuzz test.
-fuzz:
+fuzz: ## Run all fuzz tests (override duration with FUZZTIME=60s)
 	go test -run='^$$' -fuzz='^FuzzParseNoPanic$$' -fuzztime=$(FUZZTIME) ./internal/jit/...
 	go test -run='^$$' -fuzz='^FuzzEval$$' -fuzztime=$(FUZZTIME) ./internal/jit/...
 	go test -run='^$$' -fuzz='^FuzzCompileMatchesEval$$' -fuzztime=$(FUZZTIME) ./internal/jit/...
@@ -115,42 +115,42 @@ fuzz:
 # Go Security & Vulnerability Targets
 # ==============================================================================
 
-gosec:
+gosec: ## Run gosec static analysis
 	@command -v golangci-lint >/dev/null 2>&1 || go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 	golangci-lint run --enable-only=gosec ./...
 
-govulncheck:
+govulncheck: ## Check dependencies for known vulnerabilities
 	govulncheck ./... || go run golang.org/x/vuln/cmd/govulncheck@latest ./...
 
-security: gosec govulncheck
+security: gosec govulncheck ## gosec + govulncheck
 
 # ==============================================================================
 # Accuracy, Oracle & Pre-Commit Quality Gates
 # ==============================================================================
 
-oracle-gate:
+oracle-gate: ## Run the oracle accuracy gate script
 	./scripts/oracle_accuracy_gate.sh
 
-accuracy-gate: oracle-gate
+accuracy-gate: oracle-gate ## Alias for oracle-gate
 
-verify:
+verify: ## Run scripts/verify.sh (full verification)
 	./scripts/verify.sh
 
-check: vet fmt-check lint security oracle-gate test-cover
+check: vet fmt-check lint security oracle-gate test-cover ## Full quality gate: vet, fmt-check, lint, security, oracle-gate, test-cover
 
-makehooks:
+makehooks: ## Install the git pre-commit hook
 	chmod +x scripts/verify.sh scripts/pre-commit.sh
 	cp scripts/verify.sh scripts/pre-commit.sh
 	cp scripts/verify.sh .git/hooks/pre-commit
 	chmod +x .git/hooks/pre-commit
 
-install-hooks: makehooks
+install-hooks: makehooks ## Alias for makehooks
 
 IMAGE_REPO ?= ghcr.io/23skdu/emlgo
 TAG ?= 0.6
 CUDA_ARCH ?= sm_89
 
-docker-build-cpu:
+docker-build-cpu: ## Build the CPU Docker image
 	docker build -f Dockerfile.cpu \
 		-t $(IMAGE_REPO):$(TAG) \
 		-t $(IMAGE_REPO):latest \
@@ -158,30 +158,46 @@ docker-build-cpu:
 		-t $(IMAGE_REPO):latest-cpu \
 		-t $(IMAGE_REPO):cpu .
 
-docker-build-cuda:
+docker-build-cuda: ## Build the CUDA Docker image (override with CUDA_ARCH=sm_XX)
 	docker build -f Dockerfile.cuda --build-arg CUDA_ARCH=$(CUDA_ARCH) \
 		-t $(IMAGE_REPO):$(TAG)-cuda \
 		-t $(IMAGE_REPO):latest-cuda \
 		-t $(IMAGE_REPO):cuda .
 
-docker-build: docker-build-cpu docker-build-cuda
+docker-build: docker-build-cpu docker-build-cuda ## Build the CPU and CUDA Docker images
 
-docker: docker-build
+docker: docker-build ## Alias for docker-build
 
-docker-push-cpu:
+docker-push-cpu: ## Push the CPU Docker image tags
 	docker push $(IMAGE_REPO):$(TAG)
 	docker push $(IMAGE_REPO):latest
 	docker push $(IMAGE_REPO):$(TAG)-cpu
 	docker push $(IMAGE_REPO):latest-cpu
 	docker push $(IMAGE_REPO):cpu
 
-docker-push-cuda:
+docker-push-cuda: ## Push the CUDA Docker image tags
 	docker push $(IMAGE_REPO):$(TAG)-cuda
 	docker push $(IMAGE_REPO):latest-cuda
 	docker push $(IMAGE_REPO):cuda
 
-docker-push: docker-push-cpu docker-push-cuda
+docker-push: docker-push-cpu docker-push-cuda ## Push all Docker image tags
 
-clean:
+clean: ## Remove build artifacts and generated files
 	rm -f bench validate emlcli wasmbench coverage.out *.out *.test *.prof *.cov
 	rm -rf dist/ wasm/emlgo.wasm wasm/wasm_exec.js wasm/run.js node_modules/ .playwright/ playwright-report/ test-results/
+
+# ==============================================================================
+# Help
+# ==============================================================================
+
+help: ## List all available targets and variables
+	@echo "Usage: make <target> [VARIABLE=value ...]"
+	@echo ""
+	@echo "Targets:"
+	@grep -hE '^[A-Za-z0-9_-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = "## "} {t = $$1; sub(/:.*/, "", t); printf "  %-18s %s\n", t, $$2}'
+	@echo ""
+	@echo "Variables (override on the command line):"
+	@echo "  FUZZTIME=$(FUZZTIME)          Duration per fuzz test (default 30s)"
+	@echo "  IMAGE_REPO=$(IMAGE_REPO)      Docker image repository (default ghcr.io/23skdu/emlgo)"
+	@echo "  TAG=$(TAG)                    Docker image tag (default 0.6)"
+	@echo "  CUDA_ARCH=$(CUDA_ARCH)        CUDA arch for cuda images (default sm_89)"
