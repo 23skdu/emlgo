@@ -186,6 +186,12 @@ func dispatchSinCosSIMDTo(x, sin, cos []float64) {
 	parallelizeSinCos(x, sin, cos)
 }
 
+func sinCosChunk(x, sin, cos []float64) {
+	for i := range x {
+		sin[i], cos[i] = Sincos(x[i])
+	}
+}
+
 func dispatchSqrtSIMDTo(x, result []float64) {
 	arm64SqrtSIMD(x, result)
 }

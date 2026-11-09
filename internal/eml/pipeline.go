@@ -54,18 +54,8 @@ func executeAffine(src []float64, scale, bias float64, dst []float64) {
 		MulScalarSIMDTo(src, scale, dst)
 		return
 	}
-	// Fused affine pass: dst[i] = src[i] * scale + bias
-	n := len(src)
-	i := 0
-	for ; i+3 < n; i += 4 {
-		dst[i] = src[i]*scale + bias
-		dst[i+1] = src[i+1]*scale + bias
-		dst[i+2] = src[i+2]*scale + bias
-		dst[i+3] = src[i+3]*scale + bias
-	}
-	for ; i < n; i++ {
-		dst[i] = src[i]*scale + bias
-	}
+	MulScalarSIMDTo(src, scale, dst)
+	AddScalarSIMDTo(dst, bias, dst)
 }
 
 // Pipeline is a composable, zero-allocation chain of batch operations.

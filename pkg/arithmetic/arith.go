@@ -104,7 +104,7 @@ func Pow(x, y float64) float64 {
 	if x == 0 && y == 0 {
 		return 1
 	}
-	if y == 0 {
+	if y == 0 || x == 1 || (x == -1 && isInf(y, 0)) {
 		return 1
 	}
 	if x < 0 && !isInteger(y) {
@@ -133,10 +133,10 @@ func Pow(x, y float64) float64 {
 // For x near 1: x^y = exp(y * log(x)) ≈ exp(y * log1p(x-1))
 func powStable(x, y float64) float64 {
 	absX1 := x - 1
-	if absX1 > -0.5 && absX1 < 0.5 {
+	if absX1 > -0.125 && absX1 < 0.125 && math.Abs(y) <= 64 {
 		return nativeExp(y * nativeLog1p(absX1))
 	}
-	return nativeExp(y * nativeLog(x))
+	return eml.Pow(x, y)
 }
 
 func PowInt(x float64, n int) float64 {

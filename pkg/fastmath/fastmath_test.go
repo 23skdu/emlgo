@@ -216,3 +216,40 @@ func FuzzFastMathDifferential(f *testing.F) {
 		}
 	})
 }
+
+func FuzzGuardrailsAndRegularizedEml(f *testing.F) {
+	f.Add(0.5, 2.0, 1e-6)
+	f.Add(-1000.0, 0.0, 1e-12)
+	f.Add(1000.0, -5.0, 1e-8)
+	f.Fuzz(func(t *testing.T, x, y, eps float64) {
+		if math.IsNaN(x) || math.IsNaN(y) || math.IsNaN(eps) || math.IsInf(x, 0) || math.IsInf(y, 0) || math.IsInf(eps, 0) {
+			return
+		}
+		if math.Abs(y) > 1e140 || math.Abs(eps) > 1e140 {
+			return
+		}
+		c := FastEmlClipped(x, y, eps)
+		if math.IsNaN(c) || math.IsInf(c, 0) {
+			t.Fatalf("FastEmlClipped(%g, %g, %g) = %v, want finite", x, y, eps, c)
+		}
+		r := FastEmlRegularized(x, y, eps)
+		if math.IsNaN(r) || math.IsInf(r, 0) {
+			t.Fatalf("FastEmlRegularized(%g, %g, %g) = %v, want finite", x, y, eps, r)
+		}
+	})
+}
+
+func TestOracleFastMathAccuracyBounds(t *testing.T) {
+	for i := 1; i <= 100; i++ {
+		x := -10.0 + float64(i)*0.2
+		y := float64(i) * 0.1
+		got := FastEml(x, y)
+		want := math.Exp(x) - math.Log(y)
+		if math.Abs(got-want) > 2e-5*math.Max(1.0, math.Abs(want)) {
+			t.Fatalf("FastEml(%g, %g) = %v, want %v", x, y, got, want)
+		}
+	}
+	if got := LnRegularized(0, 1e-200); math.IsInf(got, 0) || math.IsNaN(got) {
+		t.Fatalf("LnRegularized(0, 1e-200) = %v, want finite", got)
+	}
+}

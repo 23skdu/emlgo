@@ -588,19 +588,16 @@ func AtanhBatch(x []float64) []float64 {
 }
 
 type parallelJob struct {
-	x        []float64
-	a        []float64
-	b        []float64
-	result   []float64
-	sinOut   []float64
-	cosOut   []float64
-	start    int
-	end      int
-	fn       func(float64) float64
-	chunkFn  func(start, end int)
-	fusedOp  int
-	isSinCos bool
-	wg       *sync.WaitGroup
+	x       []float64
+	a       []float64
+	b       []float64
+	result  []float64
+	start   int
+	end     int
+	fn      func(float64) float64
+	chunkFn func(start, end int)
+	fusedOp int
+	wg      *sync.WaitGroup
 }
 
 const (
@@ -654,10 +651,6 @@ func workerPoolWorker(q <-chan parallelJob) {
 		switch {
 		case job.chunkFn != nil:
 			job.chunkFn(job.start, job.end)
-		case job.isSinCos:
-			for j := job.start; j < job.end; j++ {
-				job.sinOut[j], job.cosOut[j] = Sincos(job.x[j])
-			}
 		case job.fusedOp != fusedNone:
 			applyFusedOp(job)
 		default:
@@ -670,23 +663,34 @@ func workerPoolWorker(q <-chan parallelJob) {
 }
 
 func applyFusedOp(job parallelJob) {
-	a, b, result := job.a, job.b, job.result
+	a, b, result := job.a[job.start:job.end], job.b[job.start:job.end], job.result[job.start:job.end]
+	const chunk = 128
+	var tmp [chunk]float64
+	n := len(a)
 	switch job.fusedOp {
 	case fusedExpMul:
-		for j := job.start; j < job.end; j++ {
-			result[j] = nativeExp(a[j]) * b[j]
+		for i := 0; i < n; i += chunk {
+			m := min(chunk, n-i)
+			dispatchExpSIMDTo(a[i:i+m], tmp[:m])
+			dispatchMulSIMD(tmp[:m], b[i:i+m], result[i:i+m])
 		}
 	case fusedExpAdd:
-		for j := job.start; j < job.end; j++ {
-			result[j] = nativeExp(a[j]) + b[j]
+		for i := 0; i < n; i += chunk {
+			m := min(chunk, n-i)
+			dispatchExpSIMDTo(a[i:i+m], tmp[:m])
+			dispatchAddSIMD(tmp[:m], b[i:i+m], result[i:i+m])
 		}
 	case fusedLogDiv:
-		for j := job.start; j < job.end; j++ {
-			result[j] = nativeLog(a[j]) / b[j]
+		for i := 0; i < n; i += chunk {
+			m := min(chunk, n-i)
+			dispatchLogSIMDTo(a[i:i+m], tmp[:m])
+			dispatchDivSIMD(tmp[:m], b[i:i+m], result[i:i+m])
 		}
 	case fusedLogSub:
-		for j := job.start; j < job.end; j++ {
-			result[j] = nativeLog(a[j]) - b[j]
+		for i := 0; i < n; i += chunk {
+			m := min(chunk, n-i)
+			dispatchLogSIMDTo(a[i:i+m], tmp[:m])
+			dispatchSubSIMD(tmp[:m], b[i:i+m], result[i:i+m])
 		}
 	}
 }
@@ -725,37 +729,9 @@ func parallelizeGeneric(x, result []float64, fn func(float64) float64) {
 }
 
 func parallelizeSinCos(x, sin, cos []float64) {
-	n := len(x)
-	if n == 0 {
-		return
-	}
-
-	if n < SmallCutoff() || poolClosed.Load() {
-		for j := 0; j < n; j++ {
-			sin[j], cos[j] = Sincos(x[j])
-		}
-		return
-	}
-
-	chunkSize := GetParallelChunkSize(n)
-	var wg sync.WaitGroup
-	for i := 0; i < n; i += chunkSize {
-		end := i + chunkSize
-		if end > n {
-			end = n
-		}
-		wg.Add(1)
-		jobQueue <- parallelJob{
-			x:        x,
-			sinOut:   sin,
-			cosOut:   cos,
-			start:    i,
-			end:      end,
-			isSinCos: true,
-			wg:       &wg,
-		}
-	}
-	wg.Wait()
+	ForEachChunk(len(x), func(start, end int) {
+		sinCosChunk(x[start:end], sin[start:end], cos[start:end])
+	})
 }
 
 func parallelizeFused(a, b, result []float64, fusedOp int) {

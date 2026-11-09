@@ -504,7 +504,100 @@ func TestPreCommitHookScript(t *testing.T) {
 			t.Fatalf("Failed to read %s: %v", hookPath, err)
 		}
 		if string(scriptBytes) != string(hookBytes) {
-			t.Errorf(".git/hooks/pre-commit differs from scripts/pre-commit.sh; run 'make install-hooks'")
+			t.Errorf(".git/hooks/pre-commit differs from scripts/pre-commit.sh; run 'make makehooks'")
 		}
 	})
+}
+
+// TestVerifyHookScript tests scripts/verify.sh and .git/hooks/pre-commit synchronization.
+func TestVerifyHookScript(t *testing.T) {
+	root := getRepoRoot(t)
+	scriptPath := filepath.Join(root, "scripts", "verify.sh")
+	hookPath := filepath.Join(root, ".git", "hooks", "pre-commit")
+
+	bashPath, err := exec.LookPath("bash")
+	if err != nil {
+		t.Skip("bash not found; skipping bash script tests")
+	}
+
+	t.Run("BashSyntaxCheck", func(t *testing.T) {
+		cmd := exec.Command(bashPath, "-n", scriptPath)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("Syntax check for verify.sh failed: %v\nOutput: %s", err, string(out))
+		}
+	})
+
+	t.Run("HelpOption", func(t *testing.T) {
+		cmd := exec.Command(bashPath, scriptPath, "-h")
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("verify.sh -h failed: %v\nOutput: %s", err, string(out))
+		}
+		if !strings.Contains(string(out), "--min-coverage") || !strings.Contains(string(out), "--with-profile") {
+			t.Errorf("Expected usage instructions in output, got:\n%s", string(out))
+		}
+	})
+
+	t.Run("InvalidOption", func(t *testing.T) {
+		cmd := exec.Command(bashPath, scriptPath, "--unknown-flag")
+		out, err := cmd.CombinedOutput()
+		if err == nil {
+			t.Fatalf("Expected non-zero exit for invalid option, got success:\n%s", string(out))
+		}
+		if !strings.Contains(string(out), "Invalid option") {
+			t.Errorf("Expected Invalid option error in output, got:\n%s", string(out))
+		}
+	})
+
+	t.Run("GitHookInstalledAndSyncedWithVerify", func(t *testing.T) {
+		if _, err := os.Stat(filepath.Join(root, ".git")); os.IsNotExist(err) {
+			t.Skip(".git directory not present")
+		}
+		scriptBytes, err := os.ReadFile(scriptPath)
+		if err != nil {
+			t.Fatalf("Failed to read %s: %v", scriptPath, err)
+		}
+		hookBytes, err := os.ReadFile(hookPath)
+		if err != nil {
+			t.Fatalf("Failed to read %s: %v", hookPath, err)
+		}
+		if string(scriptBytes) != string(hookBytes) {
+			t.Errorf(".git/hooks/pre-commit differs from scripts/verify.sh; run 'make makehooks'")
+		}
+	})
+}
+
+// TestMakefileTargets validates that Makefile defines security, profiling, linting, oracle-gate, and makehooks targets.
+func TestMakefileTargets(t *testing.T) {
+	root := getRepoRoot(t)
+	makefilePath := filepath.Join(root, "Makefile")
+	content, err := os.ReadFile(makefilePath)
+	if err != nil {
+		t.Fatalf("Failed to read Makefile: %v", err)
+	}
+	s := string(content)
+
+	requiredTargets := []string{
+		"security:",
+		"gosec:",
+		"govulncheck:",
+		"profile:",
+		"profile-cpu:",
+		"profile-mem:",
+		"bench-mem:",
+		"lint:",
+		"fmt-check:",
+		"vet:",
+		"oracle-gate:",
+		"accuracy-gate:",
+		"verify:",
+		"makehooks:",
+		"scripts/verify.sh .git/hooks/pre-commit",
+	}
+	for _, target := range requiredTargets {
+		if !strings.Contains(s, target) {
+			t.Errorf("Makefile missing required target or directive: %q", target)
+		}
+	}
 }

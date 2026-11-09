@@ -262,8 +262,19 @@ func (p *Program) EvalBatchColumnarScratch(data [][]float64, dst []float64, scra
 					panic(fmt.Sprintf("bytecode: stack underflow on %s (sp=%d)", op.String(), sp))
 				}
 				xCol := stackCols[sp-1][:currLen]
-				for i := range xCol {
-					xCol[i] = fn(xCol[i])
+				switch op {
+				case OpAbs:
+					eml.AbsSIMDTo(xCol, xCol)
+				case OpFloor:
+					eml.FloorSIMDTo(xCol, xCol)
+				case OpCeil:
+					eml.CeilSIMDTo(xCol, xCol)
+				case OpTrunc:
+					eml.TruncSIMDTo(xCol, xCol)
+				default:
+					for i := range xCol {
+						xCol[i] = fn(xCol[i])
+					}
 				}
 			}
 		}

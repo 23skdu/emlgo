@@ -246,6 +246,14 @@ func (e *encoder) callFunc2(fn jitFunc2, arg0, arg1 byte) {
 	// Zero xmm15 (Go ABI register invariant)
 	e.xorpd(15, 15)
 
+	// Temporarily set g.stackguard0 (16(R14)) = g.stack.lo (0(R14)) across CALL R8
+	// so leaf math.* functions never enter runtime.morestack while the mmap
+	// return PC is on the stack, then atomically restore g.stackguard0 if unchanged.
+	e.emit(0x49, 0x8B, 0x46, 0x10)                         // MOVQ 16(R14), RAX
+	e.emit(0x48, 0x89, 0x84, 0x24, 0x00, 0x01, 0x00, 0x00) // MOVQ RAX, 256(RSP)
+	e.emit(0x49, 0x8B, 0x06)                               // MOVQ 0(R14), RAX
+	e.emit(0x49, 0x89, 0x46, 0x10)                         // MOVQ RAX, 16(R14)
+
 	// Load function pointer into R8
 	off := len(e.code)
 	e.emit(0x4C, 0x8B, 0x05)
@@ -254,6 +262,11 @@ func (e *encoder) callFunc2(fn jitFunc2, arg0, arg1 byte) {
 
 	// CALL R8 — result in xmm0
 	e.emit(0x41, 0xFF, 0xD0)
+
+	// Atomically restore 16(R14) if still equal to 0(R14)
+	e.emit(0x49, 0x8B, 0x06)                               // MOVQ 0(R14), RAX
+	e.emit(0x48, 0x8B, 0x8C, 0x24, 0x00, 0x01, 0x00, 0x00) // MOVQ 256(RSP), RCX
+	e.emit(0xF0, 0x49, 0x0F, 0xB1, 0x4E, 0x10)             // LOCK CMPXCHGQ RCX, 16(R14)
 
 	// Restore xmm1-xmm15 (skip xmm0 which holds the return value)
 	for i := byte(1); i < 16; i++ {
@@ -291,6 +304,14 @@ func (e *encoder) callFunc(fn jitFunc, argReg byte) {
 	// Zero xmm15 (Go ABI register invariant)
 	e.xorpd(15, 15)
 
+	// Temporarily set g.stackguard0 (16(R14)) = g.stack.lo (0(R14)) across CALL R8
+	// so leaf math.* functions never enter runtime.morestack while the mmap
+	// return PC is on the stack, then atomically restore g.stackguard0 if unchanged.
+	e.emit(0x49, 0x8B, 0x46, 0x10)                         // MOVQ 16(R14), RAX
+	e.emit(0x48, 0x89, 0x84, 0x24, 0x00, 0x01, 0x00, 0x00) // MOVQ RAX, 256(RSP)
+	e.emit(0x49, 0x8B, 0x06)                               // MOVQ 0(R14), RAX
+	e.emit(0x49, 0x89, 0x46, 0x10)                         // MOVQ RAX, 16(R14)
+
 	// Load function pointer into R8
 	off := len(e.code)
 	e.emit(0x4C, 0x8B, 0x05)
@@ -299,6 +320,11 @@ func (e *encoder) callFunc(fn jitFunc, argReg byte) {
 
 	// CALL R8 — result in xmm0
 	e.emit(0x41, 0xFF, 0xD0)
+
+	// Atomically restore 16(R14) if still equal to 0(R14)
+	e.emit(0x49, 0x8B, 0x06)                               // MOVQ 0(R14), RAX
+	e.emit(0x48, 0x8B, 0x8C, 0x24, 0x00, 0x01, 0x00, 0x00) // MOVQ 256(RSP), RCX
+	e.emit(0xF0, 0x49, 0x0F, 0xB1, 0x4E, 0x10)             // LOCK CMPXCHGQ RCX, 16(R14)
 
 	// Restore xmm1-xmm15 only (xmm0 holds the return value, skip it)
 	for i := byte(1); i < 16; i++ {
@@ -442,6 +468,10 @@ func (g *generator) genFuncCall(name string, arg Node, dst byte) error {
 	// Evaluate the argument into dst.
 	if err := g.gen(arg, dst); err != nil {
 		return err
+	}
+	if name == "sqrt" {
+		g.enc.sqrtsd(dst, dst)
+		return nil
 	}
 	// Call the function. dst holds the argument; result goes to xmm0.
 	// callFunc saves/restores xmm1-xmm7 but xmm0 gets the return value.

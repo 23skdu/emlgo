@@ -5,7 +5,6 @@ import (
 
 	"github.com/23skdu/emlgo/internal/eml"
 	"github.com/23skdu/emlgo/pkg/hyper"
-	"github.com/23skdu/emlgo/pkg/logexp"
 )
 
 var (
@@ -93,7 +92,7 @@ func Asec(x float64) float64 {
 	if isNaN(x) {
 		return nan()
 	}
-	if x >= -1 && x <= 1 {
+	if x > -1 && x < 1 {
 		return nan()
 	}
 	return Acos(1 / x)
@@ -103,7 +102,7 @@ func Acsc(x float64) float64 {
 	if isNaN(x) {
 		return nan()
 	}
-	if x >= -1 && x <= 1 {
+	if x > -1 && x < 1 {
 		return nan()
 	}
 	return Asin(1 / x)
@@ -125,39 +124,21 @@ func Coth(x float64) float64 {
 	if isNaN(x) || x == 0 {
 		return nan()
 	}
-	if isInf(x, 1) {
-		return 1
-	}
-	if isInf(x, -1) {
-		return -1
-	}
-	ex := logexp.Exp(x)
-	emx := logexp.Exp(-x)
-	return (ex + emx) / (ex - emx)
+	return 1 / hyper.Tanh(x)
 }
 
 func Sech(x float64) float64 {
 	if isNaN(x) {
 		return nan()
 	}
-	if isInf(x, 0) {
-		return 0
-	}
-	ex := logexp.Exp(x)
-	emx := logexp.Exp(-x)
-	return 2 / (ex + emx)
+	return 1 / hyper.Cosh(x)
 }
 
 func Csch(x float64) float64 {
 	if isNaN(x) || x == 0 {
 		return nan()
 	}
-	if isInf(x, 0) {
-		return 0
-	}
-	ex := logexp.Exp(x)
-	emx := logexp.Exp(-x)
-	return 2 / (ex - emx)
+	return 1 / hyper.Sinh(x)
 }
 
 func Asinh(x float64) float64 {
@@ -238,8 +219,7 @@ func SinCosBatch(x []float64) (sin, cos []float64) {
 }
 
 func TanBatch(x []float64) []float64 {
-	sin, cos := SinCosBatch(x)
-	return eml.DivSIMD(sin, cos)
+	return eml.TanSIMD(x)
 }
 
 func SinFast(x float64) float64 {

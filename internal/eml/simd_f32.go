@@ -14,25 +14,35 @@ func parallelizeGenericF32(src, dst []float32, fn func(src, dst []float32)) {
 	})
 }
 
-// ExpSIMDF32 computes element-wise exp(x) for a float32 slice.
-func ExpSIMDF32(x []float32) []float32 {
-	dst := make([]float32, len(x))
+// ExpSIMDF32To computes element-wise exp(x) for a float32 slice into dst.
+func ExpSIMDF32To(x, dst []float32) {
 	parallelizeGenericF32(x, dst, func(src, d []float32) {
 		for i, v := range src {
 			d[i] = float32(math.Exp(float64(v)))
 		}
 	})
+}
+
+// ExpSIMDF32 computes element-wise exp(x) for a float32 slice.
+func ExpSIMDF32(x []float32) []float32 {
+	dst := make([]float32, len(x))
+	ExpSIMDF32To(x, dst)
 	return dst
 }
 
-// LogSIMDF32 computes element-wise log(x) for a float32 slice.
-func LogSIMDF32(x []float32) []float32 {
-	dst := make([]float32, len(x))
+// LogSIMDF32To computes element-wise log(x) for a float32 slice into dst.
+func LogSIMDF32To(x, dst []float32) {
 	parallelizeGenericF32(x, dst, func(src, d []float32) {
 		for i, v := range src {
 			d[i] = float32(math.Log(float64(v)))
 		}
 	})
+}
+
+// LogSIMDF32 computes element-wise log(x) for a float32 slice.
+func LogSIMDF32(x []float32) []float32 {
+	dst := make([]float32, len(x))
+	LogSIMDF32To(x, dst)
 	return dst
 }
 
@@ -242,35 +252,50 @@ func FmaSIMDF32(a, b, c []float32) []float32 {
 	return dst
 }
 
-// SinSIMDF32 computes element-wise sin(x) for float32 slices.
-func SinSIMDF32(x []float32) []float32 {
-	dst := make([]float32, len(x))
+// SinSIMDF32To computes element-wise sin(x) for float32 slices into dst.
+func SinSIMDF32To(x, dst []float32) {
 	parallelizeGenericF32(x, dst, func(src, d []float32) {
 		for i, v := range src {
 			d[i] = float32(math.Sin(float64(v)))
 		}
 	})
+}
+
+// SinSIMDF32 computes element-wise sin(x) for float32 slices.
+func SinSIMDF32(x []float32) []float32 {
+	dst := make([]float32, len(x))
+	SinSIMDF32To(x, dst)
 	return dst
 }
 
-// CosSIMDF32 computes element-wise cos(x) for float32 slices.
-func CosSIMDF32(x []float32) []float32 {
-	dst := make([]float32, len(x))
+// CosSIMDF32To computes element-wise cos(x) for float32 slices into dst.
+func CosSIMDF32To(x, dst []float32) {
 	parallelizeGenericF32(x, dst, func(src, d []float32) {
 		for i, v := range src {
 			d[i] = float32(math.Cos(float64(v)))
 		}
 	})
+}
+
+// CosSIMDF32 computes element-wise cos(x) for float32 slices.
+func CosSIMDF32(x []float32) []float32 {
+	dst := make([]float32, len(x))
+	CosSIMDF32To(x, dst)
 	return dst
 }
 
-// TanSIMDF32 computes element-wise tan(x) for float32 slices.
-func TanSIMDF32(x []float32) []float32 {
-	dst := make([]float32, len(x))
+// TanSIMDF32To computes element-wise tan(x) for float32 slices into dst.
+func TanSIMDF32To(x, dst []float32) {
 	parallelizeGenericF32(x, dst, func(src, d []float32) {
 		for i, v := range src {
 			d[i] = float32(math.Tan(float64(v)))
 		}
 	})
+}
+
+// TanSIMDF32 computes element-wise tan(x) for float32 slices.
+func TanSIMDF32(x []float32) []float32 {
+	dst := make([]float32, len(x))
+	TanSIMDF32To(x, dst)
 	return dst
 }

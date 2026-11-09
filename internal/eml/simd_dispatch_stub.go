@@ -75,14 +75,20 @@ func dispatchSinSIMDTo(x, result []float64)      { parallelizeGeneric(x, result,
 func dispatchCosSIMDTo(x, result []float64)      { parallelizeGeneric(x, result, nativeCos) }
 func dispatchTanSIMDTo(x, result []float64)      { parallelizeGeneric(x, result, nativeTan) }
 func dispatchSinCosSIMDTo(x, sin, cos []float64) { parallelizeSinCos(x, sin, cos) }
-func dispatchSqrtSIMDTo(x, result []float64)     { parallelizeGeneric(x, result, nativeSqrt) }
-func dispatchAddSIMD(a, b, result []float64)     { stubAddSIMD(a, b, result) }
-func dispatchSubSIMD(a, b, result []float64)     { stubSubSIMD(a, b, result) }
-func dispatchMulSIMD(a, b, result []float64)     { stubMulSIMD(a, b, result) }
-func dispatchDivSIMD(a, b, result []float64)     { stubDivSIMD(a, b, result) }
-func dispatchAbsSIMD(x, result []float64)        { stubAbsSIMD(x, result) }
-func dispatchNegSIMD(x, result []float64)        { stubNegSIMD(x, result) }
-func dispatchInvSIMD(x, result []float64)        { stubInvSIMD(x, result) }
+
+func sinCosChunk(x, sin, cos []float64) {
+	for i := range x {
+		sin[i], cos[i] = Sincos(x[i])
+	}
+}
+func dispatchSqrtSIMDTo(x, result []float64) { parallelizeGeneric(x, result, nativeSqrt) }
+func dispatchAddSIMD(a, b, result []float64) { stubAddSIMD(a, b, result) }
+func dispatchSubSIMD(a, b, result []float64) { stubSubSIMD(a, b, result) }
+func dispatchMulSIMD(a, b, result []float64) { stubMulSIMD(a, b, result) }
+func dispatchDivSIMD(a, b, result []float64) { stubDivSIMD(a, b, result) }
+func dispatchAbsSIMD(x, result []float64)    { stubAbsSIMD(x, result) }
+func dispatchNegSIMD(x, result []float64)    { stubNegSIMD(x, result) }
+func dispatchInvSIMD(x, result []float64)    { stubInvSIMD(x, result) }
 
 func dispatchAddScalarSIMD(a []float64, b float64, result []float64) {
 	for i := range a {

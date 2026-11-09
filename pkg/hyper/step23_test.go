@@ -101,3 +101,42 @@ func FuzzHyperbolicAccuracy(f *testing.F) {
 		}
 	})
 }
+
+func FuzzHyperbolicInverseRoundtrip(f *testing.F) {
+	f.Add(0.0)
+	f.Add(0.5)
+	f.Add(-1.25)
+	f.Add(5.0)
+	f.Fuzz(func(t *testing.T, x float64) {
+		if math.IsNaN(x) || math.IsInf(x, 0) || math.Abs(x) > 15.0 {
+			return
+		}
+		rt := Asinh(Sinh(x))
+		if math.Abs(rt-x) > 1e-9*math.Max(1.0, math.Abs(x)) {
+			t.Fatalf("Asinh(Sinh(%g)) = %g, want %g", x, rt, x)
+		}
+		sh, ch := Sinh(x), Cosh(x)
+		ident := ch*ch - sh*sh
+		if math.Abs(ident-1.0) > 1e-7*math.Max(1.0, ch*ch) {
+			t.Fatalf("Cosh(%g)^2 - Sinh(%g)^2 = %g, want 1", x, x, ident)
+		}
+	})
+}
+
+func TestOracleHyperbolicIdentitiesAndULP(t *testing.T) {
+	xs := []float64{-5.0, -1.0, -1e-12, 0.0, 1e-12, 0.25, 1.0, 5.0}
+	sb := SinhBatch(xs)
+	cb := CoshBatch(xs)
+	tb := TanhBatch(xs)
+	for i, x := range xs {
+		if math.Abs(sb[i]-math.Sinh(x)) > 1e-12*math.Max(1.0, math.Abs(math.Sinh(x))) {
+			t.Fatalf("SinhBatch[%d](%g) = %v, want %v", i, x, sb[i], math.Sinh(x))
+		}
+		if math.Abs(cb[i]-math.Cosh(x)) > 1e-12*math.Cosh(x) {
+			t.Fatalf("CoshBatch[%d](%g) = %v, want %v", i, x, cb[i], math.Cosh(x))
+		}
+		if math.Abs(tb[i]-math.Tanh(x)) > 1e-12 {
+			t.Fatalf("TanhBatch[%d](%g) = %v, want %v", i, x, tb[i], math.Tanh(x))
+		}
+	}
+}

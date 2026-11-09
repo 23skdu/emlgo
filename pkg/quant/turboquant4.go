@@ -120,53 +120,43 @@ func EncodeTurboQuant4(vec []float32, pow2 int) ([]byte, error) {
 	angleCount := pow2 - 1
 	qIndices := make([]byte, angleCount)
 
-	// Recursive tree polar decomposition
-	currentRadii := padded
+	// Recursive tree polar decomposition (in-place inside padded)
 	angleOffset := 0
 
 	for currentLen := pow2; currentLen > 1; currentLen /= 2 {
 		halfLen := currentLen / 2
-		nextRadii := make([]float32, halfLen)
 		for i := 0; i < halfLen; i++ {
-			x := currentRadii[2*i]
-			y := currentRadii[2*i+1]
+			x := padded[2*i]
+			y := padded[2*i+1]
 			r := float32(math.Sqrt(float64(x*x + y*y)))
 			theta := math.Atan2(float64(y), float64(x))
 
 			bin := clampAngleBin(int(math.Round(((theta + math.Pi) / (2 * math.Pi)) * 15.0)))
 			qIndices[angleOffset+i] = byte(bin) // #nosec G115 -- clampAngleBin guarantees 0 <= bin <= 15
-			nextRadii[i] = r
+			padded[i] = r
 		}
 		angleOffset += halfLen
-		currentRadii = nextRadii
 	}
 
-	radius := currentRadii[0]
+	radius := padded[0]
 
-	// Reconstruct to compute QJL residuals
-	recon := make([]float32, pow2)
+	// Reconstruct into padded to compute QJL residuals without allocating a second float32 slice
+	recon := padded
 	ReconstructTQ4(radius, qIndices, TQ4Lookup, pow2, recon)
 
-	// Compute QJL 1-bit residual mask
+	// Assemble final buffer directly: 4 bytes radius + packedAngles + qjlBits
+	angleBytes := (angleCount*4 + 7) / 8
 	qjlBytesCount := (pow2 + 7) / 8
-	qjlBits := make([]byte, qjlBytesCount)
+	totalSize := 4 + angleBytes + qjlBytesCount
+	out := make([]byte, totalSize)
+	binary.LittleEndian.PutUint32(out[0:4], math.Float32bits(radius))
+	Pack4Bit(qIndices, out[4:4+angleBytes])
+	qjlBits := out[4+angleBytes:]
 	for i := 0; i < len(vec); i++ {
 		if vec[i] >= recon[i] {
 			qjlBits[i/8] |= byte(1 << uint(i%8))
 		}
 	}
-
-	// Pack 4-bit angles
-	angleBytes := (angleCount*4 + 7) / 8
-	packedAngles := make([]byte, angleBytes)
-	Pack4Bit(qIndices, packedAngles)
-
-	// Assemble final buffer: 4 bytes radius + packedAngles + qjlBits
-	totalSize := 4 + angleBytes + qjlBytesCount
-	out := make([]byte, totalSize)
-	binary.LittleEndian.PutUint32(out[0:4], math.Float32bits(radius))
-	copy(out[4:4+angleBytes], packedAngles)
-	copy(out[4+angleBytes:], qjlBits)
 
 	return out, nil
 }
@@ -221,6 +211,9 @@ func TurboQuant4Distance(query []float32, tqData []byte, dim int, pow2 int) (flo
 // TurboQuant4DistanceScratch computes TurboQuant4 distance using caller-provided scratch buffers.
 // Zero heap allocations.
 func TurboQuant4DistanceScratch(query []float32, tqData []byte, dim int, pow2 int, recon []float32, qIndices []byte) (float32, error) {
+	if pow2 <= 1 || (pow2&(pow2-1)) != 0 || dim < 0 {
+		return 0, fmt.Errorf("quant: invalid pow2 %d or dim %d", pow2, dim)
+	}
 	radius := math.Float32frombits(binary.LittleEndian.Uint32(tqData[0:4]))
 
 	angleCount := pow2 - 1

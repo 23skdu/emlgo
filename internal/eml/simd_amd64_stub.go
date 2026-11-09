@@ -30,11 +30,12 @@ func absAVX512(a, result []float64) { _, _ = a, result }
 func negAVX512(a, result []float64) { _, _ = a, result }
 func invAVX512(a, result []float64) { _, _ = a, result }
 
-func expAVX2(a, result []float64) { _, _ = a, result }
-func logAVX2(a, result []float64) { _, _ = a, result }
-func sinAVX2(a, result []float64) { _, _ = a, result }
-func cosAVX2(a, result []float64) { _, _ = a, result }
-func tanAVX2(a, result []float64) { _, _ = a, result }
+func expAVX2(a, result []float64)            { _, _ = a, result }
+func logAVX2(a, result []float64)            { _, _ = a, result }
+func sinAVX2(a, result []float64)            { _, _ = a, result }
+func cosAVX2(a, result []float64)            { _, _ = a, result }
+func tanAVX2(a, result []float64)            { _, _ = a, result }
+func sincosAVX2(a, sinOut, cosOut []float64) { _, _, _ = a, sinOut, cosOut }
 
 func expAVX512(a, result []float64) { _, _ = a, result }
 func logAVX512(a, result []float64) { _, _ = a, result }
@@ -83,8 +84,9 @@ func roundAVX512(a, result []float64)  { _, _ = a, result }
 func maxAVX512(a, b, result []float64) { _, _, _ = a, b, result }
 func minAVX512(a, b, result []float64) { _, _, _ = a, b, result }
 
-func addSatInt8AVX2(a, b, result []int8) { _, _, _ = a, b, result }
-func subSatInt8AVX2(a, b, result []int8) { _, _, _ = a, b, result }
+func addSatInt8AVX2(a, b, result []int8)    { _, _, _ = a, b, result }
+func subSatInt8AVX2(a, b, result []int8)    { _, _, _ = a, b, result }
+func dotInt8AVX2(a []uint8, b []int8) int32 { _, _ = a, b; return 0 }
 
 func addSatInt8AVX512(a, b, result []int8)        { _, _, _ = a, b, result }
 func subSatInt8AVX512(a, b, result []int8)        { _, _, _ = a, b, result }

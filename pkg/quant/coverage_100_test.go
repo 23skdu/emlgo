@@ -51,4 +51,8 @@ func TestTurboQuant4EdgeCases(t *testing.T) {
 		truncatedTQData := enc[:6]
 		_, _ = TurboQuant4DistanceScratch(shortQuery, truncatedTQData, 4, 4, nil, nil)
 	}
+
+	if _, err := TurboQuant4DistanceScratch(vec, enc, 4, 3, nil, nil); err == nil {
+		t.Errorf("expected error for non-power-of-two pow2 in TurboQuant4DistanceScratch")
+	}
 }

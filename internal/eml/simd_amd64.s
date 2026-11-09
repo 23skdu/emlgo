@@ -2163,8 +2163,12 @@ loop_max512_16:
 	VMOVUPD 64(SI), Z1
 	VMOVUPD (DI), Z2
 	VMOVUPD 64(DI), Z3
+	VMAXPD Z0, Z2, Z4
 	VMAXPD Z2, Z0, Z0
+	VPORQ Z4, Z0, Z0
+	VMAXPD Z1, Z3, Z5
 	VMAXPD Z3, Z1, Z1
+	VPORQ Z5, Z1, Z1
 	VMOVUPD Z0, (DX)
 	VMOVUPD Z1, 64(DX)
 	ADDQ $128, SI
@@ -2178,7 +2182,9 @@ tail_max512:
 	JZ done_max512
 	VMOVUPD (SI), Z0
 	VMOVUPD (DI), Z1
+	VMAXPD Z0, Z1, Z3
 	VMAXPD Z1, Z0, Z2
+	VPORQ Z3, Z2, Z2
 	VMOVUPD Z2, (DX)
 
 done_max512:
@@ -2201,8 +2207,12 @@ loop_min512_16:
 	VMOVUPD 64(SI), Z1
 	VMOVUPD (DI), Z2
 	VMOVUPD 64(DI), Z3
+	VMINPD Z0, Z2, Z4
 	VMINPD Z2, Z0, Z0
+	VPORQ Z4, Z0, Z0
+	VMINPD Z1, Z3, Z5
 	VMINPD Z3, Z1, Z1
+	VPORQ Z5, Z1, Z1
 	VMOVUPD Z0, (DX)
 	VMOVUPD Z1, 64(DX)
 	ADDQ $128, SI
@@ -2216,7 +2226,9 @@ tail_min512:
 	JZ done_min512
 	VMOVUPD (SI), Z0
 	VMOVUPD (DI), Z1
+	VMINPD Z0, Z1, Z3
 	VMINPD Z1, Z0, Z2
+	VPORQ Z3, Z2, Z2
 	VMOVUPD Z2, (DX)
 
 done_min512:
@@ -2633,6 +2645,156 @@ loop_fma_avx2_f32:
 	JNZ loop_fma_avx2_f32
 
 done_fma_avx2_f32:
+	VZEROUPPER
+	RET
+
+// func dotInt8AVX2(a []uint8, b []int8) int32
+TEXT ·dotInt8AVX2(SB), NOSPLIT, $0-52
+	MOVQ a_len+8(FP), CX
+	SHRQ $4, CX // n / 16
+	JZ zero_dot_avx2
+
+	MOVQ a_base+0(FP), SI
+	MOVQ b_base+24(FP), DI
+	VPXOR Y0, Y0, Y0
+
+loop_dot_avx2:
+	VMOVDQU (SI), X1
+	VMOVDQU (DI), X2
+	VPMOVZXBW X1, Y1
+	VPMOVSXBW X2, Y2
+	VPMADDWD Y2, Y1, Y1
+	VPADDD Y1, Y0, Y0
+	ADDQ $16, SI
+	ADDQ $16, DI
+	DECQ CX
+	JNZ loop_dot_avx2
+
+	VEXTRACTI128 $1, Y0, X1
+	VPADDD X1, X0, X0
+	VPSHUFD $0x4E, X0, X1
+	VPADDD X1, X0, X0
+	VPSHUFD $0xB1, X0, X1
+	VPADDD X1, X0, X0
+	MOVL X0, ret+48(FP)
+	VZEROUPPER
+	RET
+
+zero_dot_avx2:
+	MOVL $0, ret+48(FP)
+	VZEROUPPER
+	RET
+
+// func sincosAVX2(a, sinOut, cosOut []float64)
+TEXT ·sincosAVX2(SB), NOSPLIT, $0-72
+	MOVQ a_base+0(FP), SI
+	MOVQ sinOut_base+24(FP), DI
+	MOVQ cosOut_base+48(FP), DX
+	MOVQ a_len+8(FP), CX
+
+	SHRQ $2, CX // n / 4
+	JZ done_sincos_avx2
+
+	VBROADCASTSD trig_consts<>+0(SB), Y8   // 2/pi
+	VBROADCASTSD trig_consts<>+8(SB), Y9   // PI2A
+	VBROADCASTSD trig_consts<>+16(SB), Y10 // PI2B
+	VBROADCASTSD trig_consts<>+24(SB), Y11 // PI2C
+	VBROADCASTSD trig_consts<>+136(SB), Y12 // abs mask
+
+loop_sincos_avx2:
+	VMOVUPD (SI), Y0
+	VBROADCASTSD trig_consts<>+144(SB), Y14
+	VANDPD Y0, Y14, Y14                     // Y14 = sign bit of x
+	VANDPD Y12, Y0, Y0                      // Y0 = |x|
+
+	// Check |x| < 2^30
+	VBROADCASTSD trig_consts<>+128(SB), Y13
+	VCMPPD $1, Y13, Y0, Y13                 // Y13 = (|x| < 2^30)
+
+	// k = roundToEven(|x| * (2/pi))
+	VMULPD Y8, Y0, Y1
+	VROUNDPD $0, Y1, Y1
+
+	// Extended precision modular reduction: z = ((|x| - k*PI2A) - k*PI2B) - k*PI2C
+	VMULPD Y9, Y1, Y2
+	VSUBPD Y2, Y0, Y2
+	VMULPD Y10, Y1, Y3
+	VSUBPD Y3, Y2, Y2
+	VMULPD Y11, Y1, Y3
+	VSUBPD Y3, Y2, Y2                       // Y2 = z
+
+	VMULPD Y2, Y2, Y3                       // Y3 = zz = z*z
+
+	// S(z) = z + z * zz * P_sin(zz) in Y4
+	VBROADCASTSD trig_consts<>+32(SB), Y4   // s0
+	VBROADCASTSD trig_consts<>+40(SB), Y6   // s1
+	VFMADD213PD Y6, Y3, Y4
+	VBROADCASTSD trig_consts<>+48(SB), Y6   // s2
+	VFMADD213PD Y6, Y3, Y4
+	VBROADCASTSD trig_consts<>+56(SB), Y6   // s3
+	VFMADD213PD Y6, Y3, Y4
+	VBROADCASTSD trig_consts<>+64(SB), Y6   // s4
+	VFMADD213PD Y6, Y3, Y4
+	VBROADCASTSD trig_consts<>+72(SB), Y6   // s5
+	VFMADD213PD Y6, Y3, Y4
+	VMULPD Y3, Y4, Y4
+	VFMADD213PD Y2, Y2, Y4                  // Y4 = S(z)
+
+	// C(z) = (1.0 - 0.5*zz) + zz*zz*P_cos(zz) in Y5
+	VBROADCASTSD trig_consts<>+80(SB), Y5   // c0
+	VBROADCASTSD trig_consts<>+88(SB), Y6   // c1
+	VFMADD213PD Y6, Y3, Y5
+	VBROADCASTSD trig_consts<>+96(SB), Y6   // c2
+	VFMADD213PD Y6, Y3, Y5
+	VBROADCASTSD trig_consts<>+104(SB), Y6  // c3
+	VFMADD213PD Y6, Y3, Y5
+	VBROADCASTSD trig_consts<>+112(SB), Y6  // c4
+	VFMADD213PD Y6, Y3, Y5
+	VBROADCASTSD trig_consts<>+120(SB), Y6  // c5
+	VFMADD213PD Y6, Y3, Y5
+	VMULPD Y3, Y5, Y5
+	VMULPD Y3, Y5, Y5
+	VBROADCASTSD exp_consts<>+80(SB), Y6    // 0.5
+	VMULPD Y6, Y3, Y6
+	VBROADCASTSD exp_consts<>+88(SB), Y7    // 1.0
+	VSUBPD Y6, Y7, Y7
+	VADDPD Y7, Y5, Y5                       // Y5 = C(z)
+
+	// Quadrant selection from k for both sin and cos
+	VCVTPD2DQY Y1, X15
+	VPMOVZXDQ X15, Y15
+	VPSLLQ $63, Y15, Y6                     // bit 63 = k & 1
+	VBLENDVPD Y6, Y5, Y4, Y2                // sin mag: (k & 1) ? C(z) : S(z)
+	VBLENDVPD Y6, Y4, Y5, Y3                // cos mag: (k & 1) ? S(z) : C(z)
+
+	// Sin sign: ((k >> 1) & 1) ^ sign(x)
+	VPSLLQ $62, Y15, Y6
+	VBROADCASTSD trig_consts<>+144(SB), Y7
+	VANDPD Y7, Y6, Y6
+	VXORPD Y14, Y6, Y6
+	VXORPD Y6, Y2, Y2
+
+	// Cos sign: (k ^ (k >> 1)) & 1
+	VPSRLQ $1, Y15, Y6
+	VPXOR Y15, Y6, Y6
+	VPSLLQ $63, Y6, Y6
+	VXORPD Y6, Y3, Y3
+
+	// Mark lanes with !( |x| < 2^30 ) as NaN for scalar Payne-Hanek fallback
+	VBROADCASTSD log_consts<>+168(SB), Y6
+	VBLENDVPD Y13, Y2, Y6, Y2
+	VBLENDVPD Y13, Y3, Y6, Y3
+
+	VMOVUPD Y2, (DI)
+	VMOVUPD Y3, (DX)
+
+	ADDQ $32, SI
+	ADDQ $32, DI
+	ADDQ $32, DX
+	DECQ CX
+	JNZ loop_sincos_avx2
+
+done_sincos_avx2:
 	VZEROUPPER
 	RET
 

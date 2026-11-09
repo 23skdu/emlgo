@@ -215,7 +215,7 @@ func Optimize(p *Program) *Program {
 				stack = append(stack, newConstNode(left.val/right.val))
 			} else if right.isConst && right.val == 1.0 {
 				stack = append(stack, left)
-			} else if left.isConst && left.val == 0.0 {
+			} else if left.isConst && left.val == 0.0 && (!right.isConst || right.val != 0.0) {
 				stack = append(stack, newConstNode(0.0))
 			} else {
 				stack = append(stack, newBinaryNode(OpDiv, left, right))

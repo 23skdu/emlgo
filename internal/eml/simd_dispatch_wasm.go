@@ -171,3 +171,9 @@ func dispatchMinSIMDTo(a, b, dst []float64) {
 }
 
 var _ = parallelizeSinCos
+
+func sinCosChunk(x, sin, cos []float64) {
+	for i := range x {
+		sin[i], cos[i] = Sincos(x[i])
+	}
+}

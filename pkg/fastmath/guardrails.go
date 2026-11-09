@@ -57,7 +57,7 @@ func LnClipped(y, eps float64) float64 {
 	if eps <= 0 {
 		eps = DefaultEpsilon
 	}
-	if y < eps {
+	if y < eps || math.IsNaN(y) {
 		y = eps
 	}
 	return FastLog(y)
@@ -68,7 +68,7 @@ func LnClippedF32(y, eps float32) float32 {
 	if eps <= 0 {
 		eps = DefaultEpsilonF32
 	}
-	if y < eps {
+	if y < eps || math.IsNaN(float64(y)) {
 		y = eps
 	}
 	return FastLogF32(y)

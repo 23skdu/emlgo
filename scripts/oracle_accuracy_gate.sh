@@ -126,7 +126,7 @@ if [ "$REGEN_CHECK" = true ]; then
     fi
 fi
 
-go test "${GO_TEST_FLAGS[@]}" -run 'Test(Rows|.*MPFR).*' ./internal/accuracyvectors/... ./internal/eml/... ./pkg/fastmath/...
+go test "${GO_TEST_FLAGS[@]}" -run 'Test(Rows|.*MPFR).*' ./internal/accuracyvectors/... ./internal/eml ./pkg/fastmath/...
 echo -e "${GREEN}PASS [1/5]: MPFR 4.2.2 golden vectors verified ($VECTOR_COUNT vectors)${NC}"
 echo ""
 

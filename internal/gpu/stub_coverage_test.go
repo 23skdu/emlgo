@@ -115,4 +115,12 @@ func TestStubRemainingOpsCoverage(t *testing.T) {
 	}
 	FreePinnedC128(pc128)
 	FreePinnedC128(nil)
+
+	// Async host<->device copy stubs
+	if err := CopyToDeviceAsync(nil, nil, 64, nil); err == nil {
+		t.Error("expected CopyToDeviceAsync stub to return error")
+	}
+	if err := CopyToHostAsync(nil, nil, 64, nil); err == nil {
+		t.Error("expected CopyToHostAsync stub to return error")
+	}
 }

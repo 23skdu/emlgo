@@ -1,4 +1,4 @@
-.PHONY: build test test-short test-race test-docker test-scripts test-cover bench lint vet fuzz clean wasm gosec govulncheck oracle-gate accuracy-gate check install-hooks docker docker-build docker-build-cpu docker-build-cuda docker-push docker-push-cpu docker-push-cuda
+.PHONY: build test test-short test-race test-docker test-scripts test-cover bench bench-mem bench-stat profile profile-cpu profile-mem lint vet fmt-check fuzz clean wasm security gosec govulncheck oracle-gate accuracy-gate verify check makehooks install-hooks docker docker-build docker-build-cpu docker-build-cuda docker-push docker-push-cpu docker-push-cuda
 
 build:
 	go build ./...
@@ -22,25 +22,58 @@ test-docker:
 	go test -v -run 'TestDocker.*' ./test/...
 
 test-scripts:
-	go test -v -run 'Test(CheckBenchRegression|RunBenchmark|RunValidation|BenchCompare|WasmTest|GenerateMPFR|OracleAccuracyGate|PreCommit).*' ./test/...
+	go test -v -run 'Test(CheckBenchRegression|RunBenchmark|RunValidation|BenchCompare|WasmTest|GenerateMPFR|OracleAccuracyGate|PreCommit|VerifyHook|MakefileTargets).*' ./test/...
 
 test-cover:
 	go test -coverprofile=coverage.out -covermode=atomic ./...
 	go tool cover -func=coverage.out
 
+# ==============================================================================
+# Performance & Memory Profiling Targets
+# ==============================================================================
+
 bench:
 	go test -bench=. -benchmem -count=3 ./...
+
+bench-mem:
+	go test -run='^$$' -bench=. -benchmem -count=1 ./internal/eml/... ./pkg/...
 
 bench-stat:
 	@command -v benchstat >/dev/null 2>&1 || go install golang.org/x/perf/cmd/benchstat@latest
 	go test -bench=. -benchmem -count=6 ./... | benchstat
 
-lint:
-	@command -v golangci-lint >/dev/null 2>&1 || go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-	golangci-lint run ./...
+profile-cpu:
+	go test -run='^$$' -bench='^Benchmark(ExpSIMD|LogSIMD|SinSIMD|CosSIMD|AddSIMD|FmaSIMD)' -benchtime=200ms -benchmem -cpuprofile=cpu.prof ./internal/eml
+	go tool pprof -top -nodecount=20 cpu.prof
+
+profile-mem:
+	go test -run='^$$' -bench='^Benchmark(ExpSIMD|LogSIMD|Pipeline|Complex)' -benchtime=200ms -benchmem -memprofile=mem.prof ./internal/eml
+	go tool pprof -top -alloc_space -nodecount=20 mem.prof
+
+profile: profile-cpu profile-mem
+
+# ==============================================================================
+# Linting & Static Analysis Targets
+# ==============================================================================
+
+fmt-check:
+	@unformatted="$$(gofmt -s -l .)"; \
+	if [ -n "$$unformatted" ]; then \
+		echo "ERROR: Unformatted Go files detected (run 'gofmt -s -w .'):"; \
+		echo "$$unformatted"; \
+		exit 1; \
+	fi
 
 vet:
 	go vet ./...
+
+lint: fmt-check vet
+	@command -v golangci-lint >/dev/null 2>&1 || go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+	golangci-lint run ./...
+
+# ==============================================================================
+# Fuzz Testing Targets
+# ==============================================================================
 
 FUZZTIME ?= 30s
 
@@ -48,36 +81,70 @@ FUZZTIME ?= 30s
 fuzz:
 	go test -run='^$$' -fuzz='^FuzzParseNoPanic$$' -fuzztime=$(FUZZTIME) ./internal/jit/...
 	go test -run='^$$' -fuzz='^FuzzEval$$' -fuzztime=$(FUZZTIME) ./internal/jit/...
+	go test -run='^$$' -fuzz='^FuzzCompileMatchesEval$$' -fuzztime=$(FUZZTIME) ./internal/jit/...
+	go test -run='^$$' -fuzz='^FuzzCanonicalSimplifyAndDiff$$' -fuzztime=$(FUZZTIME) ./internal/jit/...
 	go test -run='^$$' -fuzz='^FuzzExpSIMD$$' -fuzztime=$(FUZZTIME) ./internal/eml
 	go test -run='^$$' -fuzz='^FuzzLogSIMD$$' -fuzztime=$(FUZZTIME) ./internal/eml
 	go test -run='^$$' -fuzz='^FuzzSinSIMD$$' -fuzztime=$(FUZZTIME) ./internal/eml
+	go test -run='^$$' -fuzz='^FuzzEmlSIMD$$' -fuzztime=$(FUZZTIME) ./internal/eml
+	go test -run='^$$' -fuzz='^FuzzSinCosSIMD$$' -fuzztime=$(FUZZTIME) ./internal/eml
+	go test -run='^$$' -fuzz='^FuzzComplexBatchDifferential$$' -fuzztime=$(FUZZTIME) ./internal/eml
+	go test -run='^$$' -fuzz='^FuzzDotInt8AndSatInt8$$' -fuzztime=$(FUZZTIME) ./internal/eml
 	go test -run='^$$' -fuzz='^FuzzExpLnRoundtrip$$' -fuzztime=$(FUZZTIME) ./internal/eml/bigmath
+	go test -run='^$$' -fuzz='^FuzzBigMathTrigAndInverseIdentities$$' -fuzztime=$(FUZZTIME) ./internal/eml/bigmath
 	go test -run='^$$' -fuzz='^FuzzLaunchConfig$$' -fuzztime=$(FUZZTIME) ./internal/gpu
+	go test -run='^$$' -fuzz='^FuzzBatchVerifierVerifyOp$$' -fuzztime=$(FUZZTIME) ./internal/gpu
 	go test -run='^$$' -fuzz='^FuzzPow$$' -fuzztime=$(FUZZTIME) ./pkg/arithmetic
 	go test -run='^$$' -fuzz='^FuzzAdd$$' -fuzztime=$(FUZZTIME) ./pkg/arithmetic
+	go test -run='^$$' -fuzz='^FuzzGCDAndLCM$$' -fuzztime=$(FUZZTIME) ./pkg/arithmetic
+	go test -run='^$$' -fuzz='^FuzzInt8DistanceAndDot$$' -fuzztime=$(FUZZTIME) ./pkg/arithmetic
 	go test -run='^$$' -fuzz='^FuzzOptimizerDifferential$$' -fuzztime=$(FUZZTIME) ./pkg/bytecode
+	go test -run='^$$' -fuzz='^FuzzEvalBatchColumnarDifferential$$' -fuzztime=$(FUZZTIME) ./pkg/bytecode
 	go test -run='^$$' -fuzz='^FuzzFastMathDifferential$$' -fuzztime=$(FUZZTIME) ./pkg/fastmath
+	go test -run='^$$' -fuzz='^FuzzGuardrailsAndRegularizedEml$$' -fuzztime=$(FUZZTIME) ./pkg/fastmath
 	go test -run='^$$' -fuzz='^FuzzHyperbolicAccuracy$$' -fuzztime=$(FUZZTIME) ./pkg/hyper
+	go test -run='^$$' -fuzz='^FuzzHyperbolicInverseRoundtrip$$' -fuzztime=$(FUZZTIME) ./pkg/hyper
 	go test -run='^$$' -fuzz='^FuzzLogExpDifferential$$' -fuzztime=$(FUZZTIME) ./pkg/logexp
+	go test -run='^$$' -fuzz='^FuzzLogExpBatchAndSubnormalOracle$$' -fuzztime=$(FUZZTIME) ./pkg/logexp
 	go test -run='^$$' -fuzz='^FuzzPackUnpack4Bit$$' -fuzztime=$(FUZZTIME) ./pkg/quant
+	go test -run='^$$' -fuzz='^FuzzTurboQuant4EncodeDistance$$' -fuzztime=$(FUZZTIME) ./pkg/quant
 	go test -run='^$$' -fuzz='^FuzzTrigPythagoreanIdentity$$' -fuzztime=$(FUZZTIME) ./pkg/trig
+	go test -run='^$$' -fuzz='^FuzzTrigReciprocalAndInverse$$' -fuzztime=$(FUZZTIME) ./pkg/trig
+
+# ==============================================================================
+# Go Security & Vulnerability Targets
+# ==============================================================================
 
 gosec:
+	@command -v golangci-lint >/dev/null 2>&1 || go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 	golangci-lint run --enable-only=gosec ./...
 
 govulncheck:
 	govulncheck ./... || go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
+security: gosec govulncheck
+
+# ==============================================================================
+# Accuracy, Oracle & Pre-Commit Quality Gates
+# ==============================================================================
 
 oracle-gate:
 	./scripts/oracle_accuracy_gate.sh
 
 accuracy-gate: oracle-gate
 
-check: vet lint gosec govulncheck oracle-gate test-cover
+verify:
+	./scripts/verify.sh
 
-install-hooks:
-	cp scripts/pre-commit.sh .git/hooks/pre-commit
+check: vet fmt-check lint security oracle-gate test-cover
+
+makehooks:
+	chmod +x scripts/verify.sh scripts/pre-commit.sh
+	cp scripts/verify.sh scripts/pre-commit.sh
+	cp scripts/verify.sh .git/hooks/pre-commit
 	chmod +x .git/hooks/pre-commit
+
+install-hooks: makehooks
 
 IMAGE_REPO ?= ghcr.io/23skdu/emlgo
 TAG ?= 0.6

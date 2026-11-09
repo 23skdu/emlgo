@@ -236,13 +236,14 @@ func amd64InvSIMD(a, result []float64) {
 }
 
 func emlSIMD(x, y, result []float64) {
-	scalarEml(x, y, result)
-}
-
-func scalarEml(x, y, result []float64) {
+	const chunk = 128
+	var expBuf, logBuf [chunk]float64
 	n := len(x)
-	for i := 0; i < n; i++ {
-		result[i] = nativeExp(x[i]) - nativeLog(y[i])
+	for i := 0; i < n; i += chunk {
+		m := min(chunk, n-i)
+		amd64ExpSIMD(x[i:i+m], expBuf[:m])
+		amd64LogSIMD(y[i:i+m], logBuf[:m])
+		amd64SubSIMD(expBuf[:m], logBuf[:m], result[i:i+m])
 	}
 }
 
@@ -382,6 +383,10 @@ func dispatchDotInt8SIMD(a []uint8, b []int8) int32 {
 	if hasAVX512 && hasAVX512VNNI {
 		simdLen := (n / 64) * 64
 		sum = dotInt8AVX512VNNI(a[:simdLen], b[:simdLen])
+		i = simdLen
+	} else if hasAVX2 {
+		simdLen := (n / 16) * 16
+		sum = dotInt8AVX2(a[:simdLen], b[:simdLen])
 		i = simdLen
 	}
 	for ; i < n; i++ {

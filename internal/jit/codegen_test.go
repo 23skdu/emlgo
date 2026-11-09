@@ -390,7 +390,7 @@ func TestJITDifferentialStep11(t *testing.T) {
 		if err != nil {
 			continue
 		}
-		fn, err := compiler.Compile(expr)
+		fn, handle, err := compiler.CompileAST(ast)
 		if err != nil {
 			// Some deep expressions may exceed register limits or be invalid
 			continue
@@ -407,6 +407,7 @@ func TestJITDifferentialStep11(t *testing.T) {
 				break
 			}
 		}
+		_ = handle.Free()
 	}
 
 	if mismatches > 0 {

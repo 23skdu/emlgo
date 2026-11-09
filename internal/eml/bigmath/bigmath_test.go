@@ -377,6 +377,18 @@ func TestVerifyIdentityEdgeCases(t *testing.T) {
 	if Cos(infPos).Sign() != 0 || Cos(infNeg).Sign() != 0 {
 		t.Error("expected Cos(±Inf) to return 0 sentinel without panicking")
 	}
+	if !Exp(infPos).IsInf() || Exp(infPos).Sign() <= 0 {
+		t.Error("expected Exp(+Inf) to return +Inf")
+	}
+	if Exp(infNeg).Sign() != 0 || Exp(infNeg).IsInf() {
+		t.Error("expected Exp(-Inf) to return 0")
+	}
+	if !Log(infPos).IsInf() || Log(infPos).Sign() <= 0 {
+		t.Error("expected Log(+Inf) to return +Inf without panicking")
+	}
+	if Tan(infPos).Sign() != 0 || Tan(infNeg).Sign() != 0 {
+		t.Error("expected Tan(±Inf) to return 0 sentinel")
+	}
 }
 
 func FuzzExpLnRoundtrip(f *testing.F) {
@@ -393,4 +405,55 @@ func FuzzExpLnRoundtrip(f *testing.F) {
 			t.Fatalf("Exp(Log(%g)) = %g, want %g", x, got, x)
 		}
 	})
+}
+
+func FuzzBigMathTrigAndInverseIdentities(f *testing.F) {
+	f.Add(0.25)
+	f.Add(-0.6)
+	f.Add(0.85)
+	f.Fuzz(func(t *testing.T, x float64) {
+		if math.IsNaN(x) || math.IsInf(x, 0) || math.Abs(x) > 0.95 {
+			return
+		}
+		bx := NewFloat(x)
+		s := Sin(new(big.Float).SetPrec(Prec).Copy(bx))
+		c := Cos(new(big.Float).SetPrec(Prec).Copy(bx))
+		sum := new(big.Float).SetPrec(Prec).Add(
+			new(big.Float).SetPrec(Prec).Mul(s, s),
+			new(big.Float).SetPrec(Prec).Mul(c, c),
+		)
+		if math.Abs(Float64(sum)-1.0) > 1e-14 {
+			t.Fatalf("Sin(%g)^2 + Cos(%g)^2 = %.17g, want 1", x, x, Float64(sum))
+		}
+		atanTan := Float64(Atan(Tan(new(big.Float).SetPrec(Prec).Copy(bx))))
+		if math.Abs(atanTan-x) > 1e-13 {
+			t.Fatalf("Atan(Tan(%g)) = %.17g, want %g", x, atanTan, x)
+		}
+	})
+}
+
+func TestOracleBigMathIdentities(t *testing.T) {
+	v := DefaultVerifier()
+	points := []*big.Float{
+		NewFloat(0.2),
+		NewFloat(0.5),
+		NewFloat(0.8),
+	}
+	res, err := v.VerifyIdentityAt(
+		func(x *big.Float) *big.Float {
+			s := Sin(new(big.Float).SetPrec(Prec).Copy(x))
+			c := Cos(new(big.Float).SetPrec(Prec).Copy(x))
+			return new(big.Float).SetPrec(Prec).Add(
+				new(big.Float).SetPrec(Prec).Mul(s, s),
+				new(big.Float).SetPrec(Prec).Mul(c, c),
+			)
+		},
+		func(_ *big.Float) *big.Float {
+			return NewFloat(1.0)
+		},
+		points,
+	)
+	if err != nil || !res.Passed {
+		t.Fatalf("Pythagorean identity failed in bigmath oracle: err=%v, res=%+v", err, res)
+	}
 }

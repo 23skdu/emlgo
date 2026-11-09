@@ -41,27 +41,23 @@ func ComplexExpBatchTo(x, result []complex128) {
 	if len(x) != len(result) {
 		panic("slice length mismatch")
 	}
-	n := len(x)
-	if n == 0 {
-		return
-	}
-	// De-interleave into real/imaginary float64 arrays and use SIMD
-	// transcendental kernels for the heavy lifting.
-	reParts := make([]float64, n)
-	imParts := make([]float64, n)
-	for i := range x {
-		reParts[i] = real(x[i])
-		imParts[i] = imag(x[i])
-	}
-	expRe := make([]float64, n)
-	sinIm := make([]float64, n)
-	cosIm := make([]float64, n)
-	ExpSIMDTo(reParts, expRe)
-	SinSIMDTo(imParts, sinIm)
-	CosSIMDTo(imParts, cosIm)
-	for i := 0; i < n; i++ {
-		result[i] = complex(expRe[i]*cosIm[i], expRe[i]*sinIm[i]) // #nosec G602
-	}
+	ForEachChunk(len(x), func(start, end int) {
+		const chunk = 128
+		var reParts, imParts, expRe, sinIm, cosIm [chunk]float64
+		for base := start; base < end; base += chunk {
+			m := min(chunk, end-base)
+			for i := 0; i < m; i++ {
+				z := x[base+i]
+				reParts[i] = real(z)
+				imParts[i] = imag(z)
+			}
+			dispatchExpSIMDTo(reParts[:m], expRe[:m])
+			dispatchSinCosSIMDTo(imParts[:m], sinIm[:m], cosIm[:m])
+			for i := 0; i < m; i++ {
+				result[base+i] = complex(expRe[i]*cosIm[i], expRe[i]*sinIm[i]) // #nosec G602
+			}
+		}
+	})
 }
 
 func ComplexExpBatchC64(x []complex64) []complex64 {
@@ -74,22 +70,23 @@ func ComplexExpBatchToC64(x, result []complex64) {
 	if len(x) != len(result) {
 		panic("slice length mismatch")
 	}
-	n := len(x)
-	if n == 0 {
-		return
-	}
-	reParts := make([]float32, n)
-	imParts := make([]float32, n)
-	for i := range x {
-		reParts[i] = real(x[i])
-		imParts[i] = imag(x[i])
-	}
-	expRe := ExpSIMDF32(reParts)
-	sinIm := SinSIMDF32(imParts)
-	cosIm := CosSIMDF32(imParts)
-	for i := 0; i < n; i++ {
-		result[i] = complex(expRe[i]*cosIm[i], expRe[i]*sinIm[i]) // #nosec G602
-	}
+	ForEachChunk(len(x), func(start, end int) {
+		const chunk = 128
+		var reParts, imParts, expRe, sinIm, cosIm [chunk]float64
+		for base := start; base < end; base += chunk {
+			m := min(chunk, end-base)
+			for i := 0; i < m; i++ {
+				z := x[base+i]
+				reParts[i] = float64(real(z))
+				imParts[i] = float64(imag(z))
+			}
+			dispatchExpSIMDTo(reParts[:m], expRe[:m])
+			dispatchSinCosSIMDTo(imParts[:m], sinIm[:m], cosIm[:m])
+			for i := 0; i < m; i++ {
+				result[base+i] = complex(float32(expRe[i]*cosIm[i]), float32(expRe[i]*sinIm[i])) // #nosec G602
+			}
+		}
+	})
 }
 
 // ComplexLogBatch returns a new slice containing the complex logarithm of each element.
@@ -138,37 +135,21 @@ func ComplexSinBatchTo(x, result []complex128) {
 	if len(x) != len(result) {
 		panic("slice length mismatch")
 	}
-	n := len(x)
-	if n == 0 {
-		return
-	}
-	reParts := make([]float64, n)
-	imParts := make([]float64, n)
-	for i := range x {
-		reParts[i] = real(x[i])
-		imParts[i] = imag(x[i])
-	}
-	sinRe := make([]float64, n)
-	cosRe := make([]float64, n)
-	SinSIMDTo(reParts, sinRe)
-	CosSIMDTo(reParts, cosRe)
-	// cosh(y) = (exp(y)+exp(-y))/2 ; sinh(y) = (exp(y)-exp(-y))/2
-	expY := make([]float64, n)
-	expNegY := make([]float64, n)
-	for i := range imParts {
-		expNegY[i] = -imParts[i]
-	}
-	ExpSIMDTo(imParts, expY)
-	ExpSIMDTo(expNegY, expNegY)
-	coshY := make([]float64, n)
-	sinhY := make([]float64, n)
-	for i := 0; i < n; i++ {
-		coshY[i] = (expY[i] + expNegY[i]) * 0.5
-		sinhY[i] = (expY[i] - expNegY[i]) * 0.5
-	}
-	for i := 0; i < n; i++ {
-		result[i] = complex(sinRe[i]*coshY[i], cosRe[i]*sinhY[i]) // #nosec G602
-	}
+	ForEachChunk(len(x), func(start, end int) {
+		const chunk = 128
+		var reParts, sinRe, cosRe [chunk]float64
+		for base := start; base < end; base += chunk {
+			m := min(chunk, end-base)
+			for i := 0; i < m; i++ {
+				reParts[i] = real(x[base+i])
+			}
+			dispatchSinCosSIMDTo(reParts[:m], sinRe[:m], cosRe[:m])
+			for i := 0; i < m; i++ {
+				im := imag(x[base+i])
+				result[base+i] = complex(sinRe[i]*math.Cosh(im), cosRe[i]*math.Sinh(im)) // #nosec G602
+			}
+		}
+	})
 }
 
 func ComplexSinBatchC64(x []complex64) []complex64 {
@@ -181,33 +162,21 @@ func ComplexSinBatchToC64(x, result []complex64) {
 	if len(x) != len(result) {
 		panic("slice length mismatch")
 	}
-	n := len(x)
-	if n == 0 {
-		return
-	}
-	reParts := make([]float32, n)
-	imParts := make([]float32, n)
-	for i := range x {
-		reParts[i] = real(x[i])
-		imParts[i] = imag(x[i])
-	}
-	sinRe := SinSIMDF32(reParts)
-	cosRe := CosSIMDF32(reParts)
-	negIm := make([]float32, n)
-	for i := range imParts {
-		negIm[i] = -imParts[i]
-	}
-	expY := ExpSIMDF32(imParts)
-	expNegY := ExpSIMDF32(negIm)
-	coshY := make([]float32, n)
-	sinhY := make([]float32, n)
-	for i := 0; i < n; i++ {
-		coshY[i] = (expY[i] + expNegY[i]) * 0.5
-		sinhY[i] = (expY[i] - expNegY[i]) * 0.5
-	}
-	for i := 0; i < n; i++ {
-		result[i] = complex(sinRe[i]*coshY[i], cosRe[i]*sinhY[i]) // #nosec G602
-	}
+	ForEachChunk(len(x), func(start, end int) {
+		const chunk = 128
+		var reParts, sinRe, cosRe [chunk]float64
+		for base := start; base < end; base += chunk {
+			m := min(chunk, end-base)
+			for i := 0; i < m; i++ {
+				reParts[i] = float64(real(x[base+i]))
+			}
+			dispatchSinCosSIMDTo(reParts[:m], sinRe[:m], cosRe[:m])
+			for i := 0; i < m; i++ {
+				im := float64(imag(x[base+i]))
+				result[base+i] = complex(float32(sinRe[i]*math.Cosh(im)), float32(cosRe[i]*math.Sinh(im))) // #nosec G602
+			}
+		}
+	})
 }
 
 // ComplexCosBatch returns a new slice containing the complex cosine of each element.
@@ -221,36 +190,21 @@ func ComplexCosBatchTo(x, result []complex128) {
 	if len(x) != len(result) {
 		panic("slice length mismatch")
 	}
-	n := len(x)
-	if n == 0 {
-		return
-	}
-	reParts := make([]float64, n)
-	imParts := make([]float64, n)
-	for i := range x {
-		reParts[i] = real(x[i])
-		imParts[i] = imag(x[i])
-	}
-	sinRe := make([]float64, n)
-	cosRe := make([]float64, n)
-	SinSIMDTo(reParts, sinRe)
-	CosSIMDTo(reParts, cosRe)
-	expY := make([]float64, n)
-	expNegY := make([]float64, n)
-	for i := range imParts {
-		expNegY[i] = -imParts[i]
-	}
-	ExpSIMDTo(imParts, expY)
-	ExpSIMDTo(expNegY, expNegY)
-	coshY := make([]float64, n)
-	sinhY := make([]float64, n)
-	for i := 0; i < n; i++ {
-		coshY[i] = (expY[i] + expNegY[i]) * 0.5
-		sinhY[i] = (expY[i] - expNegY[i]) * 0.5
-	}
-	for i := 0; i < n; i++ {
-		result[i] = complex(cosRe[i]*coshY[i], -sinRe[i]*sinhY[i]) // #nosec G602
-	}
+	ForEachChunk(len(x), func(start, end int) {
+		const chunk = 128
+		var reParts, sinRe, cosRe [chunk]float64
+		for base := start; base < end; base += chunk {
+			m := min(chunk, end-base)
+			for i := 0; i < m; i++ {
+				reParts[i] = real(x[base+i])
+			}
+			dispatchSinCosSIMDTo(reParts[:m], sinRe[:m], cosRe[:m])
+			for i := 0; i < m; i++ {
+				im := imag(x[base+i])
+				result[base+i] = complex(cosRe[i]*math.Cosh(im), -sinRe[i]*math.Sinh(im)) // #nosec G602
+			}
+		}
+	})
 }
 
 func ComplexCosBatchC64(x []complex64) []complex64 {
@@ -263,33 +217,21 @@ func ComplexCosBatchToC64(x, result []complex64) {
 	if len(x) != len(result) {
 		panic("slice length mismatch")
 	}
-	n := len(x)
-	if n == 0 {
-		return
-	}
-	reParts := make([]float32, n)
-	imParts := make([]float32, n)
-	for i := range x {
-		reParts[i] = real(x[i])
-		imParts[i] = imag(x[i])
-	}
-	sinRe := SinSIMDF32(reParts)
-	cosRe := CosSIMDF32(reParts)
-	negIm := make([]float32, n)
-	for i := range imParts {
-		negIm[i] = -imParts[i]
-	}
-	expY := ExpSIMDF32(imParts)
-	expNegY := ExpSIMDF32(negIm)
-	coshY := make([]float32, n)
-	sinhY := make([]float32, n)
-	for i := 0; i < n; i++ {
-		coshY[i] = (expY[i] + expNegY[i]) * 0.5
-		sinhY[i] = (expY[i] - expNegY[i]) * 0.5
-	}
-	for i := 0; i < n; i++ {
-		result[i] = complex(cosRe[i]*coshY[i], -sinRe[i]*sinhY[i]) // #nosec G602
-	}
+	ForEachChunk(len(x), func(start, end int) {
+		const chunk = 128
+		var reParts, sinRe, cosRe [chunk]float64
+		for base := start; base < end; base += chunk {
+			m := min(chunk, end-base)
+			for i := 0; i < m; i++ {
+				reParts[i] = float64(real(x[base+i]))
+			}
+			dispatchSinCosSIMDTo(reParts[:m], sinRe[:m], cosRe[:m])
+			for i := 0; i < m; i++ {
+				im := float64(imag(x[base+i]))
+				result[base+i] = complex(float32(cosRe[i]*math.Cosh(im)), float32(-sinRe[i]*math.Sinh(im))) // #nosec G602
+			}
+		}
+	})
 }
 
 // ComplexTanBatch returns a new slice containing the complex tangent of each element.

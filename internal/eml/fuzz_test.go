@@ -2,6 +2,7 @@ package eml
 
 import (
 	"math"
+	"math/cmplx"
 	"testing"
 )
 
@@ -536,6 +537,110 @@ func FuzzFmaSIMDF32(f *testing.F) {
 			}
 			if !f32Close(got[i], want, 1e-4) {
 				t.Fatalf("fma32 i=%d got %v want %v", i, got[i], want)
+			}
+		}
+	})
+}
+
+func FuzzEmlSIMD(f *testing.F) {
+	f.Add(
+		[]byte{0, 0, 0, 0, 0, 0, 0xf0, 0x3f},
+		[]byte{0, 0, 0, 0, 0, 0, 0x00, 0x40},
+	)
+	f.Fuzz(func(t *testing.T, a, b []byte) {
+		fa, fb := bytesToFloat64(a), bytesToFloat64(b)
+		if len(fa) == 0 || len(fa) != len(fb) {
+			return
+		}
+		got := make([]float64, len(fa))
+		SIMD(fa, fb, got)
+		for i := range got {
+			if fa[i] < -700 || fa[i] > 700 || fb[i] <= 0 || math.IsNaN(fa[i]) || math.IsNaN(fb[i]) || math.IsInf(fa[i], 0) || math.IsInf(fb[i], 0) {
+				continue
+			}
+			want := nativeExp(fa[i]) - nativeLog(fb[i])
+			assertFuzzClose(t, "emlSIMD", got[i], want)
+		}
+	})
+}
+
+func FuzzSinCosSIMD(f *testing.F) {
+	f.Add([]byte{0, 0, 0, 0, 0, 0, 0xf0, 0x3f})
+	f.Fuzz(func(t *testing.T, a []byte) {
+		fa := bytesToFloat64(a)
+		if len(fa) == 0 {
+			return
+		}
+		gotSin, gotCos := SinCosSIMD(fa)
+		for i, x := range fa {
+			if math.IsNaN(x) || math.IsInf(x, 0) || math.Abs(x) > 1e6 {
+				continue
+			}
+			ws, wc := math.Sincos(x)
+			assertFuzzClose(t, "sincos.sin", gotSin[i], ws)
+			assertFuzzClose(t, "sincos.cos", gotCos[i], wc)
+		}
+	})
+}
+
+func FuzzComplexBatchDifferential(f *testing.F) {
+	f.Add(0.5, -0.75)
+	f.Add(-1.2, 0.3)
+	f.Fuzz(func(t *testing.T, re, im float64) {
+		if math.IsNaN(re) || math.IsNaN(im) || math.IsInf(re, 0) || math.IsInf(im, 0) {
+			return
+		}
+		if math.Abs(re) > 20 || math.Abs(im) > 20 || (math.Abs(re) < 1e-4 && math.Abs(im) < 1e-4) {
+			return
+		}
+		z := []complex128{complex(re, im)}
+		gotExp := ComplexExpBatch(z)[0]
+		wantExp := cmplx.Exp(z[0])
+		if cmplx.Abs(gotExp-wantExp) > 1e-9*(1+cmplx.Abs(wantExp)) {
+			t.Fatalf("ComplexExpBatch(%v) = %v, want %v", z[0], gotExp, wantExp)
+		}
+		gotLog := ComplexLogBatch(z)[0]
+		wantLog := cmplx.Log(z[0])
+		if cmplx.Abs(gotLog-wantLog) > 1e-9*(1+cmplx.Abs(wantLog)) {
+			t.Fatalf("ComplexLogBatch(%v) = %v, want %v", z[0], gotLog, wantLog)
+		}
+		gotSqrt := ComplexSqrtBatch(z)[0]
+		wantSqrt := cmplx.Sqrt(z[0])
+		if cmplx.Abs(gotSqrt-wantSqrt) > 1e-9*(1+cmplx.Abs(wantSqrt)) {
+			t.Fatalf("ComplexSqrtBatch(%v) = %v, want %v", z[0], gotSqrt, wantSqrt)
+		}
+	})
+}
+
+func FuzzDotInt8AndSatInt8(f *testing.F) {
+	f.Add([]byte{1, 2, 255, 128, 64}, []byte{1, 127, 128, 200, 5})
+	f.Fuzz(func(t *testing.T, a, b []byte) {
+		if len(a) == 0 || len(a) != len(b) || len(a) > 2048 {
+			return
+		}
+		sbA := make([]int8, len(a))
+		sbB := make([]int8, len(b))
+		var wantDot int32
+		for i := range a {
+			sbA[i] = int8(a[i])
+			sbB[i] = int8(b[i])
+			wantDot += int32(a[i]) * int32(sbB[i])
+		}
+		if gotDot := DotInt8SIMD(a, sbB); gotDot != wantDot {
+			t.Fatalf("DotInt8SIMD = %d, want %d", gotDot, wantDot)
+		}
+		gotAdd := make([]int8, len(a))
+		gotSub := make([]int8, len(a))
+		AddSatInt8SIMDTo(sbA, sbB, gotAdd)
+		SubSatInt8SIMDTo(sbA, sbB, gotSub)
+		for i := range a {
+			sum := max(-128, min(127, int(sbA[i])+int(sbB[i])))
+			diff := max(-128, min(127, int(sbA[i])-int(sbB[i])))
+			if int(gotAdd[i]) != sum {
+				t.Fatalf("AddSatInt8SIMDTo[%d] = %d, want %d", i, gotAdd[i], sum)
+			}
+			if int(gotSub[i]) != diff {
+				t.Fatalf("SubSatInt8SIMDTo[%d] = %d, want %d", i, gotSub[i], diff)
 			}
 		}
 	})

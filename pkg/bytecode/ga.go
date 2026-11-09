@@ -84,8 +84,10 @@ func LeastSquares(eps float64) Fitness {
 		if n == 0 {
 			return math.Inf(-1)
 		}
-		scratch := make([]float64, p.MaxStackDepth)
-		vars := make([]float64, len(d.X))
+		var localScratch [32]float64
+		var localVars [32]float64
+		scratch := localScratch[:]
+		vars := localVars[:len(d.X)]
 		var sum float64
 		for i := 0; i < n; i++ {
 			for v := range d.X {

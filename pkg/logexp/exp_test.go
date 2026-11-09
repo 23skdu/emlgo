@@ -227,3 +227,38 @@ func FuzzLogExpDifferential(f *testing.F) {
 		}
 	})
 }
+
+func FuzzLogExpBatchAndSubnormalOracle(f *testing.F) {
+	f.Add(math.SmallestNonzeroFloat64)
+	f.Add(1e-310)
+	f.Add(0.5)
+	f.Add(2.5)
+	f.Fuzz(func(t *testing.T, x float64) {
+		if math.IsNaN(x) || math.IsInf(x, 0) || x <= 0 || x > 50 {
+			return
+		}
+		gotBatch := LogBatch([]float64{x})[0]
+		gotScalar := Log(x)
+		if math.Abs(gotBatch-gotScalar) > 1e-12*math.Max(1.0, math.Abs(gotScalar)) {
+			t.Fatalf("LogBatch(%g)=%v != Log(%g)=%v", x, gotBatch, x, gotScalar)
+		}
+	})
+}
+
+func TestOracleLogExpSubnormalAndBatch(t *testing.T) {
+	subnormals := []float64{
+		math.SmallestNonzeroFloat64,
+		math.Float64frombits(0x0000000000000010),
+		math.Float64frombits(0x000fffffffffffff),
+		0.5,
+		1.0,
+		math.E,
+	}
+	gotBatch := LogBatch(subnormals)
+	for i, x := range subnormals {
+		want := Log(x)
+		if math.Abs(gotBatch[i]-want) > 1e-14*math.Max(1.0, math.Abs(want)) {
+			t.Fatalf("LogBatch[%d](%g) = %.17g, want %.17g", i, x, gotBatch[i], want)
+		}
+	}
+}

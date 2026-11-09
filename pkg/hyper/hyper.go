@@ -21,6 +21,7 @@ var (
 // Overflow threshold for exp-based hyperbolic functions:
 // ln(MaxFloat64) ≈ 709.782712893384 — exp(x) overflows to +Inf beyond this.
 const expOverflow = constants.ExpOverflow
+const sinhOverflow = 710.4758600739439
 
 func Sinh(x float64) float64 {
 	if isNaN(x) || isInf(x, 0) || x == 0 {
@@ -31,19 +32,21 @@ func Sinh(x float64) float64 {
 		x = -x
 		sign = -1.0
 	}
-	if x > expOverflow {
+	if x > sinhOverflow {
 		return sign * inf(1)
 	}
 	var res float64
-	if x < 1e-8 {
+	if x < 0x1p-28 {
 		res = x
 	} else if x < 0.5 {
 		// Avoid catastrophic cancellation: (expm1(x) - expm1(-x)) / 2
 		res = (math.Expm1(x) - math.Expm1(-x)) / 2
 	} else if x > 22.0 {
-		res = nativeExp(x) / 2
+		eh := nativeExp(x * 0.5)
+		res = (0.5 * eh) * eh
 	} else {
-		res = (nativeExp(x) - nativeExp(-x)) / 2
+		ex := nativeExp(x)
+		res = 0.5 * (ex - 1.0/ex)
 	}
 	return sign * res
 }
@@ -56,11 +59,12 @@ func Cosh(x float64) float64 {
 		return inf(1)
 	}
 	absX := nativeAbs(x)
-	if absX > expOverflow {
+	if absX > sinhOverflow {
 		return inf(1)
 	}
 	if absX > 22.0 {
-		return nativeExp(absX) / 2
+		eh := nativeExp(absX * 0.5)
+		return (0.5 * eh) * eh
 	}
 	ex := nativeExp(absX)
 	return 0.5 * (ex + 1.0/ex)
@@ -76,17 +80,11 @@ func Tanh(x float64) float64 {
 	if isInf(x, -1) || x <= -expOverflow || x < -20.0 {
 		return -1.0
 	}
-	if nativeAbs(x) < 1e-8 {
+	if nativeAbs(x) < 0x1p-28 {
 		return x
 	}
-	// For small to medium x, use expm1(2x)/(expm1(2x)+2) to preserve accuracy
-	if nativeAbs(x) < 0.5 {
-		e2x := math.Expm1(2 * x)
-		return e2x / (e2x + 2)
-	}
-	ex := nativeExp(x)
-	emx := nativeExp(-x)
-	return (ex - emx) / (ex + emx)
+	e2x := math.Expm1(2 * x)
+	return e2x / (e2x + 2)
 }
 
 func Asinh(x float64) float64 {

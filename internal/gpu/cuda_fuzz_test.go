@@ -1,5 +1,3 @@
-//go:build cuda && cgo
-
 package gpu
 
 import (
@@ -95,5 +93,22 @@ func FuzzULPDiff(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, a, b float64) {
 		_ = ulpDiff(a, b)
+	})
+}
+
+func FuzzBatchVerifierVerifyOp(f *testing.F) {
+	f.Add(0.5, 1.5, uint64(2))
+	f.Add(-2.0, 3.0, uint64(4))
+	f.Fuzz(func(t *testing.T, x0, x1 float64, maxULP uint64) {
+		if math.IsNaN(x0) || math.IsNaN(x1) || math.IsInf(x0, 0) || math.IsInf(x1, 0) {
+			return
+		}
+		v := &BatchVerifier{MaxULP: maxULP}
+		in := []float64{x0, x1}
+		out := []float64{math.Sin(x0), math.Sin(x1)}
+		ulp, failed, err := v.VerifyOp("Sin", in, out, math.Sin)
+		if err != nil || ulp != 0 || failed != 0 {
+			t.Fatalf("VerifyOp exact match failed: ulp=%d failed=%d err=%v", ulp, failed, err)
+		}
 	})
 }

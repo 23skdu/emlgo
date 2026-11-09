@@ -37,6 +37,8 @@ func TestAmd64DispatchStubs(t *testing.T) {
 	sinAVX2(nil, nil)
 	cosAVX2(nil, nil)
 	tanAVX2(nil, nil)
+	sincosAVX2(nil, nil, nil)
+	_ = dotInt8AVX2(nil, nil)
 	expAVX512(nil, nil)
 	logAVX512(nil, nil)
 	sinAVX512(nil, nil)

@@ -205,3 +205,35 @@ func FuzzPackUnpack4Bit(f *testing.F) {
 		}
 	})
 }
+
+func FuzzTurboQuant4EncodeDistance(f *testing.F) {
+	f.Add(float32(0.5), float32(-0.25), float32(1.0), float32(-0.75))
+	f.Fuzz(func(t *testing.T, v0, v1, v2, v3 float32) {
+		for _, v := range []float32{v0, v1, v2, v3} {
+			if math.IsNaN(float64(v)) || math.IsInf(float64(v), 0) || math.Abs(float64(v)) > 1e6 {
+				return
+			}
+		}
+		vec := []float32{v0, v1, v2, v3}
+		enc, err := EncodeTurboQuant4(vec, 4)
+		if err != nil {
+			t.Fatalf("EncodeTurboQuant4 failed: %v", err)
+		}
+		dist, err := TurboQuant4Distance(vec, enc, 4, 4)
+		if err != nil || math.IsNaN(float64(dist)) || dist < 0 {
+			t.Fatalf("TurboQuant4Distance = %v, err = %v", dist, err)
+		}
+	})
+}
+
+func TestOracleTurboQuant4FidelityAndInt8Dot(t *testing.T) {
+	vec := []float32{0.6, -0.8, 0.4, 0.2, -0.5, 0.7, 0.1, -0.3}
+	enc, err := EncodeTurboQuant4(vec, 8)
+	if err != nil {
+		t.Fatalf("EncodeTurboQuant4 failed: %v", err)
+	}
+	dist, err := TurboQuant4Distance(vec, enc, 8, 8)
+	if err != nil || dist > 0.6 {
+		t.Fatalf("TurboQuant4Distance self-distance = %v (err=%v), want <= 0.6", dist, err)
+	}
+}

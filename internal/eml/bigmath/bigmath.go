@@ -41,6 +41,12 @@ func Exp(x *big.Float) *big.Float {
 	if x.Sign() == 0 {
 		return new(big.Float).SetPrec(prec).SetInt64(1)
 	}
+	if x.IsInf() {
+		if x.Sign() < 0 {
+			return new(big.Float).SetPrec(prec)
+		}
+		return new(big.Float).SetPrec(prec).SetInf(false)
+	}
 
 	neg := x.Sign() < 0
 	absX := new(big.Float).Abs(x)
@@ -115,6 +121,9 @@ func Log(x *big.Float) *big.Float {
 	}
 	if x.Sign() < 0 {
 		return new(big.Float).SetPrec(prec)
+	}
+	if x.IsInf() {
+		return new(big.Float).SetPrec(prec).SetInf(false)
 	}
 
 	if x.Cmp(one) == 0 {
@@ -472,6 +481,9 @@ func Tan(x *big.Float) *big.Float {
 	prec := x.Prec()
 	if prec == 0 {
 		prec = Prec
+	}
+	if x.IsInf() {
+		return new(big.Float).SetPrec(prec)
 	}
 	s := Sin(new(big.Float).SetPrec(prec).Copy(x))
 	c := cosFn(new(big.Float).SetPrec(prec).Copy(x))

@@ -121,3 +121,20 @@ func dispatchTanSIMDTo(x, result []float64) {
 		amd64TanSIMD(x[start:end], result[start:end])
 	})
 }
+
+func sinCosChunk(x, sin, cos []float64) {
+	n := len(x)
+	simdLen := 0
+	if hasAVX2 {
+		simdLen = (n / 4) * 4
+		sincosAVX2(x[:simdLen], sin[:simdLen], cos[:simdLen])
+	}
+	for i := 0; i < simdLen; i++ {
+		if sin[i] != sin[i] || cos[i] != cos[i] {
+			sin[i], cos[i] = Sincos(x[i])
+		}
+	}
+	for i := simdLen; i < n; i++ {
+		sin[i], cos[i] = Sincos(x[i])
+	}
+}

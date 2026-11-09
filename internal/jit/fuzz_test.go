@@ -161,3 +161,35 @@ func FuzzCompileMatchesEval(f *testing.F) {
 		}
 	})
 }
+
+func FuzzCanonicalSimplifyAndDiff(f *testing.F) {
+	for _, expr := range []string{
+		"x + 0", "1 * x", "x^2 + 2*x + 1", "sin(x) + cos(x)", "exp(x) - log(x + 2)",
+	} {
+		f.Add(expr, 0.75)
+	}
+	f.Fuzz(func(t *testing.T, expr string, x float64) {
+		if len(expr) > 1024 || strings.ContainsAny(expr, "\x00\n\r\t") || math.IsNaN(x) || math.IsInf(x, 0) {
+			return
+		}
+		if math.Abs(x) > 10 {
+			return
+		}
+		ast, err := Parse(expr)
+		if err != nil {
+			return
+		}
+		canon := Canonicalize(ast)
+		if canon == nil {
+			return
+		}
+		simp := Simplify(canon)
+		_ = Decompile(simp)
+		_ = DecompileLaTeX(simp)
+		_ = DiffEval(simp, x)
+		regVal := EMLEvalRegularized(simp, x, 1e-6)
+		if math.IsNaN(regVal) {
+			t.Fatalf("EMLEvalRegularized(%q, %g) returned NaN", expr, x)
+		}
+	})
+}

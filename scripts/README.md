@@ -9,7 +9,8 @@ This directory contains validation, oracle accuracy gate, benchmarking, WebAssem
 | Script | Makefile Target | Purpose |
 | :--- | :--- | :--- |
 | [`oracle_accuracy_gate.sh`](oracle_accuracy_gate.sh) | `make oracle-gate` / `make accuracy-gate` | 5-stage numerical accuracy gate (MPFR 4.2.2 golden vectors, `bigmath` & `ExactLogOracle` differential suites, JIT vs AST canonical parity, `cmd/validate`, and `cmd/bench -compare` / `-accuracy`). |
-| [`pre-commit.sh`](pre-commit.sh) | `make install-hooks` | Git pre-commit hook enforcing binary/artifact hygiene, `go vet`, `golangci-lint`, and **100.0% statement coverage** (`PRECOMMIT_MIN_COVERAGE=100.0`). |
+| [`verify.sh`](verify.sh) | `make makehooks` / `make verify` | Canonical Git pre-commit & verification hook enforcing binary/artifact hygiene, `go vet`, `golangci-lint`, `gosec`, fast oracle accuracy gate, **100.0% statement coverage** (`PRECOMMIT_MIN_COVERAGE=100.0`), and optional CPU/memory profiling (`--with-profile`). |
+| [`pre-commit.sh`](pre-commit.sh) | `make install-hooks` | Synchronized mirror of `verify.sh` installed into `.git/hooks/pre-commit`. |
 | [`generate_mpfr_vectors.c`](generate_mpfr_vectors.c) | — | C generator using GNU MPFR 4.2.2 (`MPFR_RNDN`) to emit exact `binary64` (53-bit) and `binary32` (24-bit) reference vectors to `internal/accuracyvectors/mpfr-vectors.csv`. |
 | [`run_validation.sh`](run_validation.sh) | — | Wrapper around `cmd/validate` supporting type filtering (`-t`), verbose output (`-v`), and post-run binary cleanup (`-c`). |
 | [`run_benchmark.sh`](run_benchmark.sh) | — | Wrapper around `cmd/bench` supporting feature parity (`-c`), ULP accuracy (`-a`), regression checks (`-r`), and CSV/JSON export (`-o`, `-f`). |

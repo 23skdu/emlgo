@@ -188,10 +188,19 @@ func (e *encoder) callFunc(fn jitFunc, argReg byte) {
 		e.restoreD(0, callSaveOffset+uint32(argReg)*8)
 	}
 
+	// Save g.stackguard0 (16(R28)) to [sp+272] and set 16(R28) = g.stack.lo (0(R28))
+	e.emit32(0xF9400B89) // LDR X9, [X28, #16]
+	e.saveX(9, 272)
+	e.emit32(0xF9400389) // LDR X9, [X28, #0]
+	e.emit32(0xF9000B89) // STR X9, [X28, #16]
+
 	off := len(e.code)
 	e.ptrFixups = append(e.ptrFixups, poolFixup{poolIdx: idx, codeOff: off})
 	e.emit32(0x58000008) // LDR X8, label
 	e.emit32(0xD63F0100) // BLR X8
+
+	e.restoreX(9, 272)
+	e.emit32(0xF9000B89) // STR X9, [X28, #16]
 
 	for i := byte(1); i < 16; i++ {
 		e.restoreD(i, callSaveOffset+uint32(i)*8)
@@ -214,10 +223,19 @@ func (e *encoder) callFunc2(fn jitFunc2, arg0, arg1 byte) {
 	e.restoreD(0, callSaveOffset+uint32(arg0)*8)
 	e.restoreD(1, callSaveOffset+uint32(arg1)*8)
 
+	// Save g.stackguard0 (16(R28)) to [sp+272] and set 16(R28) = g.stack.lo (0(R28))
+	e.emit32(0xF9400B89) // LDR X9, [X28, #16]
+	e.saveX(9, 272)
+	e.emit32(0xF9400389) // LDR X9, [X28, #0]
+	e.emit32(0xF9000B89) // STR X9, [X28, #16]
+
 	off := len(e.code)
 	e.ptrFixups = append(e.ptrFixups, poolFixup{poolIdx: idx, codeOff: off})
 	e.emit32(0x58000008) // LDR X8, label
 	e.emit32(0xD63F0100) // BLR X8
+
+	e.restoreX(9, 272)
+	e.emit32(0xF9000B89) // STR X9, [X28, #16]
 
 	for i := byte(1); i < 16; i++ {
 		e.restoreD(i, callSaveOffset+uint32(i)*8)
@@ -494,4 +512,3 @@ func compileToCode(n Node) ([]byte, error) {
 	}
 	return g.enc.code, nil
 }
-

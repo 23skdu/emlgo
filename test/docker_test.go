@@ -232,6 +232,11 @@ func TestDockerExecutionIfAvailable(t *testing.T) {
 		t.Skip("Docker daemon not running; skipping container runtime validation")
 	}
 
+	// Verify that ghcr.io/23skdu/emlgo:cpu is present locally before attempting container execution
+	if err := exec.Command(dockerPath, "image", "inspect", "ghcr.io/23skdu/emlgo:cpu").Run(); err != nil {
+		t.Skip("Docker image ghcr.io/23skdu/emlgo:cpu not built/pulled locally; skipping container runtime validation")
+	}
+
 	t.Run("CPU Container Demo Execution", func(t *testing.T) {
 		out, err := exec.Command(dockerPath, "run", "--rm", "ghcr.io/23skdu/emlgo:cpu", "demo").CombinedOutput()
 		if err != nil {

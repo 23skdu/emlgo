@@ -1,13 +1,11 @@
 package eml
 
-import "math"
-
 // one is the default value used for single-argument variants.
 const one = 1.0
 
 // Eml returns Exp(x) - Log(y).
 func Eml(x, y float64) float64 {
-	return math.Exp(x) - math.Log(y)
+	return nativeExp(x) - nativeLog(y)
 }
 
 // One returns Eml(x, 1).

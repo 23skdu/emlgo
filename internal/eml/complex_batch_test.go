@@ -248,6 +248,11 @@ func TestComplexBatchEmptyInputs(t *testing.T) {
 	}
 	dst := make([]complex128, 0)
 	ComplexExpBatchTo(nil, dst)
+	ComplexSinBatchTo(nil, dst)
+	ComplexCosBatchTo(nil, dst)
+	dst64 := make([]complex64, 0)
+	ComplexSinBatchToC64(nil, dst64)
+	ComplexCosBatchToC64(nil, dst64)
 	ComplexBatch(nil, nil, nil)
 }
 

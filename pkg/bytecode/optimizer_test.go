@@ -174,3 +174,56 @@ func FuzzOptimizerDifferential(f *testing.F) {
 		}
 	})
 }
+
+func FuzzEvalBatchColumnarDifferential(f *testing.F) {
+	f.Add(int64(42), float64(0.5), float64(1.25))
+	f.Add(int64(99), float64(-0.75), float64(2.5))
+	f.Fuzz(func(t *testing.T, seed int64, x0, x1 float64) {
+		if math.IsNaN(x0) || math.IsNaN(x1) || math.IsInf(x0, 0) || math.IsInf(x1, 0) {
+			return
+		}
+		if math.Abs(x0) > 10 || math.Abs(x1) > 10 {
+			return
+		}
+		rng := rand.New(rand.NewSource(seed))
+		p := RandomProgram(2, 3, 11, rng)
+		colData := [][]float64{{x0, x1}, {x1, x0}}
+		rowData := [][]float64{{x0, x1}, {x1, x0}}
+		colDst := make([]float64, 2)
+		rowDst := make([]float64, 2)
+		scratch := NewBatchScratch(p, 8)
+		p.EvalBatchColumnarScratch(colData, colDst, &scratch)
+		p.EvalBatch(rowData, rowDst)
+		for i := range colDst {
+			if math.IsNaN(colDst[i]) && math.IsNaN(rowDst[i]) {
+				continue
+			}
+			if math.IsInf(colDst[i], 0) && math.IsInf(rowDst[i], 0) && math.Signbit(colDst[i]) == math.Signbit(rowDst[i]) {
+				continue
+			}
+			scale := math.Max(1.0, math.Abs(rowDst[i]))
+			if math.Abs(colDst[i]-rowDst[i]) > 1e-6*scale {
+				t.Fatalf("EvalBatchColumnarScratch[%d]=%v != EvalBatch[%d]=%v for %s", i, colDst[i], i, rowDst[i], p)
+			}
+		}
+	})
+}
+
+func TestOracleBytecodeVMAndOptimizer(t *testing.T) {
+	p := NewProgram()
+	p.Ops = []OpCode{OpVar, OpConst, OpEML, OpConst, OpAdd}
+	p.Consts = []float64{1.0, 0.0}
+	p.VarIndices = []uint16{0}
+	p.CalculateMaxStackDepth()
+
+	opt := Optimize(p)
+	xs := []float64{-1.0, 0.0, 0.5, 1.0, 2.0}
+	colOut := make([]float64, len(xs))
+	opt.EvalBatchColumnar([][]float64{xs}, colOut)
+	for i, x := range xs {
+		want := p.Eval([]float64{x}, nil)
+		if math.Abs(colOut[i]-want) > 1e-6*math.Max(1.0, math.Abs(want)) {
+			t.Fatalf("TestOracleBytecodeVMAndOptimizer[%d]: got %v, want %v", i, colOut[i], want)
+		}
+	}
+}
