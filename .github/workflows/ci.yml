@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go-version: ['1.27.2']
+        go-version: ['1.27.4']
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -29,16 +29,16 @@ jobs:
       - name: Test
         run: go test -race -count=1 ./...
       - name: Test with coverage
-        if: matrix.go-version == '1.27.2'
+        if: matrix.go-version == '1.27.4'
         run: go test -coverprofile=coverage.out -covermode=atomic ./...
       - name: Upload coverage
-        if: matrix.go-version == '1.27.2'
+        if: matrix.go-version == '1.27.4'
         uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
         with:
           files: coverage.out
           fail_ci_if_error: false
       - name: Fuzz (short burst)
-        if: matrix.go-version == '1.27.2'
+        if: matrix.go-version == '1.27.4'
         run: |
           go test -run='^$' -fuzz='^FuzzParseNoPanic$' -fuzztime=10s ./internal/jit/...
           go test -run='^$' -fuzz='^FuzzEval$' -fuzztime=10s ./internal/jit/...
@@ -86,7 +86,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
-          go-version: '1.27.2'
+          go-version: '1.27.4'
       - name: Build ${{ matrix.target }}
         env:
           GOOS: ${{ matrix.goos }}
@@ -101,7 +101,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
-          go-version: '1.27.2'
+          go-version: '1.27.4'
       - name: Golangci-lint
         uses: golangci/golangci-lint-action@55c2c1448f86e01eaae002a5a3a9624417608d84 # v6.5.2
         with:
@@ -128,7 +128,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
-          go-version: '1.27.2'
+          go-version: '1.27.4'
       - name: Run platform tests
         if: matrix.name != 'js/wasm'
         run: go test -count=1 ./...
@@ -153,7 +153,7 @@ jobs:
           path: baseline
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
-          go-version: '1.27.2'
+          go-version: '1.27.4'
       - name: Benchmark base revision
         working-directory: baseline
         run: go test -run='^$' -bench='^(BenchmarkSIMD|BenchmarkExpSIMD|BenchmarkLogSIMD|BenchmarkAddSIMD)$' -benchmem -benchtime=250ms -count=10 ./internal/eml > "$RUNNER_TEMP/bench-base.txt"

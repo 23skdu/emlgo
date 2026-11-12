@@ -40,6 +40,12 @@ func FreeExecutableMemory(ptr unsafe.Pointer, size int) error {
 		return nil
 	}
 	pageSize := unix.Getpagesize()
+	// munmap requires a page-aligned base address; reject unaligned
+	// pointers without constructing an unsafe slice, which would trip
+	// the runtime's checkptr validation under -race/-d=checkptr.
+	if uintptr(ptr)%uintptr(pageSize) != 0 {
+		return fmt.Errorf("munmap: invalid argument")
+	}
 	allocSize := ((size + pageSize - 1) / pageSize) * pageSize
 	data := unsafe.Slice((*byte)(ptr), allocSize) // #nosec G103 -- audited low-level mmap/munmap interface
 	return unix.Munmap(data)

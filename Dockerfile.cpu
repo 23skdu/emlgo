@@ -5,7 +5,7 @@
 # and connects emlgo's hand-crafted AVX2 SIMD assembly kernels.
 # ==============================================================================
 
-ARG GO_VERSION=1.27.2
+ARG GO_VERSION=1.27.4
 FROM golang:${GO_VERSION}-bookworm AS builder
 
 # Set compiler to target x86-64-v3 (AVX, AVX2, BMI1, BMI2, FMA)

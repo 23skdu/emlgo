@@ -10,7 +10,7 @@
 #   docker build --target cuda -t emlgo:cuda .
 # ==============================================================================
 
-ARG GO_VERSION=1.27.2
+ARG GO_VERSION=1.27.4
 ARG CUDA_VERSION=12.6.3
 ARG CUDA_ARCH=sm_89
 

@@ -43,7 +43,7 @@ func TestDockerfileCPUStructure(t *testing.T) {
 		name     string
 		contains string
 	}{
-		{"Go Version 1.27.2", "ARG GO_VERSION=1.27.2"},
+		{"Go Version 1.27.4", "ARG GO_VERSION=1.27.4"},
 		{"Builder stage", "FROM golang:${GO_VERSION}-bookworm AS builder"},
 		{"CGO disabled for static build", "ENV CGO_ENABLED=0"},
 		{"GOAMD64 v3 microarchitecture", "ENV GOAMD64=v3"},
@@ -86,7 +86,7 @@ func TestDockerfileCUDAStructure(t *testing.T) {
 		contains string
 	}{
 		{"CUDA 12.6.3 default version", "ARG CUDA_VERSION=12.6.3"},
-		{"Go 1.27.2 default version", "ARG GO_VERSION=1.27.2"},
+		{"Go 1.27.4 default version", "ARG GO_VERSION=1.27.4"},
 		{"Default CUDA architecture sm_89", "ARG CUDA_ARCH=sm_89"},
 		{"Go toolchain provider stage", "FROM golang:${GO_VERSION}-bookworm AS go-toolchain"},
 		{"CUDA devel builder stage", "FROM nvidia/cuda:${CUDA_VERSION}-devel-ubuntu24.04 AS builder"},

@@ -69,7 +69,7 @@ numerical correctness; report performance and accuracy evidence separately.
 The following baseline metrics were collected locally on a reference hybrid platform:
 - **CPU**: Intel Core i7-12650H (6 P-cores + 4 E-cores, 16 threads, AVX2 + FMA, no AVX-512)
 - **GPU**: NVIDIA GeForce RTX 4060 Laptop GPU (8 GB GDDR6, SM 8.9 / Ada Lovelace, Driver 580.178.04, CUDA 13.0 / 12.6)
-- **OS / Runtime**: Linux 6.8.0-55-generic x86_64, Go 1.27.2
+- **OS / Runtime**: Linux 6.8.0-55-generic x86_64, Go 1.27.4
 
 ### 1. CPU AVX2 Batch Kernels (`cmd/bench -device cpu`)
 
@@ -131,7 +131,7 @@ The following baseline metrics were collected on a dedicated Intel Xeon compute 
 - **CPU**: Intel(R) Xeon(R) CPU @ 2.80GHz (Cascade Lake, Family 6, Model 85, Stepping 7, 8 physical cores, 16 vCPUs / threads)
 - **Configuration**: 16 vCPUs, 128 GB RAM, Ubuntu 24.04 LTS
 - **OS / Kernel**: Linux x86_64
-- **Toolchain**: Go 1.27.2 linux/amd64
+- **Toolchain**: Go 1.27.4 linux/amd64
 - **SIMD Capabilities Active**: AVX-512 Foundation (`avx512f`), Conflict Detection (`avx512cd`), Byte/Word (`avx512bw`), Doubleword/Quadword (`avx512dq`), Vector Length Extensions (`avx512vl`), Vector Neural Network Instructions (`avx512_vnni`), AVX2, FMA.
 
 ### 1. CPU AVX-512 Batch Kernels (`cmd/bench -device cpu -n 1000000`)

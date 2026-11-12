@@ -2,12 +2,12 @@
 # Dockerfile.cuda: EMLGo CUDA GPU Build
 #
 # Multi-stage container build targeting NVIDIA GPUs (sm_70 through sm_90).
-# Uses Go 1.27.2 toolchain + CUDA 12.6 devel compiler to build libeml_capi.so
+# Uses Go 1.27.4 toolchain + CUDA 12.6 devel compiler to build libeml_capi.so
 # and link the Go bridge via CGO.
 # ==============================================================================
 
 ARG CUDA_VERSION=12.6.3
-ARG GO_VERSION=1.27.2
+ARG GO_VERSION=1.27.4
 ARG CUDA_ARCH=sm_89
 
 # Stage 1: Go Toolchain provider

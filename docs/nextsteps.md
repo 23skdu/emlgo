@@ -112,7 +112,7 @@ The remaining open work is consolidated, prioritized, and tracked below:
 All prior roadmap steps (1–8, 11–30, 31–50, and AVX-512 optimization items) have been completed, verified, and archived:
 - **v0.4**: Bytecode VM expanded to 27 functions, Genetic Algorithm symbolic recovery driver, zero-alloc batch evaluation, and pipeline memory reuse.
 - **v0.5**: JIT register clobber fixes, 100% statement coverage across packages, `purego` portability across all architectures, subnormal accuracy oracles, 14 native ARM64 NEON kernels, and WebAssembly browser benchmark harness (`cmd/wasmbench`).
-- **v0.6**: Automated GHCR package publishing, Go 1.27.2 toolchain, CPU AVX2 & CUDA multi-stage Docker containers, supply chain security attestations (SLSA provenance, SPDX SBOM, Govulncheck).
+- **v0.6**: Automated GHCR package publishing, Go 1.27.4 toolchain, CPU AVX2 & CUDA multi-stage Docker containers, supply chain security attestations (SLSA provenance, SPDX SBOM, Govulncheck).
 - **v0.7 (AVX-512 & VNNI Optimization)**:
   - **36 AVX-512 Assembly Kernels in `simd_amd64.s`**:
     - 17 elementwise float64 kernels (`add`, `sub`, `mul`, `div`, `addScalar`, `mulScalar`, `sqrt`, `fma`, `abs`, `neg`, `inv`, `floor`, `ceil`, `trunc`, `round`, `max`, `min`) unrolled 2x (16 elements / 128 bytes per iteration) with 8-element odd tail.

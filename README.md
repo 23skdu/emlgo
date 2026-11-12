@@ -32,7 +32,7 @@ Based on the research of **Andrzej Odrzywołek**: [All elementary functions from
 go get github.com/23skdu/emlgo
 ```
 
-Requires **Go 1.27.2+**.
+Requires **Go 1.27.4+**.
 
 ## Quick Start
 
