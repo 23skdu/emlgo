@@ -12,7 +12,7 @@ Thank you for your interest in contributing to emlgo!
 
 2. Install development dependencies:
    ```bash
-   go install github.com/securego/gosec/v2/cmd/gosec@latest
+   go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0
    go install golang.org/x/vuln/cmd/govulncheck@latest
    ```
 
@@ -37,9 +37,9 @@ go test -bench=. ./...
 
 ## Security Scanning
 
-Run gosec (use the same invocation as the Makefile and CI):
+Run gosec (via `golangci-lint` using `.golangci.yml`, matching `make gosec` and `scripts/verify.sh`):
 ```bash
-gosec -exclude-generated -tags purego ./...
+golangci-lint run --enable-only=gosec ./...
 ```
 
 Run govulncheck:

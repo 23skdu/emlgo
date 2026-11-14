@@ -9,6 +9,9 @@ import (
 	"golang.org/x/sys/windows"
 )
 
+// AllocateExecutableMemory commits a page-aligned region with VirtualAlloc
+// (MEM_COMMIT|MEM_RESERVE), copies code into it and changes its protection to
+// PAGE_EXECUTE_READ with VirtualProtect, returning the region's base address.
 func AllocateExecutableMemory(code []byte) (unsafe.Pointer, error) {
 	if len(code) == 0 {
 		return nil, fmt.Errorf("cannot allocate 0 bytes")

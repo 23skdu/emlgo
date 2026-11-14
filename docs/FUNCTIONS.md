@@ -310,11 +310,12 @@ Core EML operator and SIMD utilities (internal).
 | Complex | `func Complex(x, y complex128) complex128` | Complex EML: cmplx.Exp(x) - cmplx.Log(y) |
 | ComplexOne | `func ComplexOne(x complex128) complex128` | Complex EML(x, 1) = cmplx.Exp(x) |
 | ComplexBatch | `func ComplexBatch(x, y, result []complex128)` | Batch complex EML operation |
-| ComplexExpBatch | `func ComplexExpBatch(x []complex128) []complex128` | Batch complex exponential |
-| ComplexLogBatch | `func ComplexLogBatch(x []complex128) []complex128` | Batch complex logarithm |
-| ComplexSinBatch | `func ComplexSinBatch(x []complex128) []complex128` | Batch complex sine |
-| ComplexCosBatch | `func ComplexCosBatch(x []complex128) []complex128` | Batch complex cosine |
-| ComplexTanBatch | `func ComplexTanBatch(x []complex128) []complex128` | Batch complex tangent |
+| ComplexExpBatch | `func ComplexExpBatch(x []complex128) []complex128` | Batch complex exponential (`*BatchTo`, `*BatchC64`, `*BatchToC64` also provided) |
+| ComplexLogBatch | `func ComplexLogBatch(x []complex128) []complex128` | Batch complex logarithm (`*BatchTo`, `*BatchC64`, `*BatchToC64` also provided) |
+| ComplexSinBatch | `func ComplexSinBatch(x []complex128) []complex128` | Batch complex sine (`*BatchTo`, `*BatchC64`, `*BatchToC64` also provided) |
+| ComplexCosBatch | `func ComplexCosBatch(x []complex128) []complex128` | Batch complex cosine (`*BatchTo`, `*BatchC64`, `*BatchToC64` also provided) |
+| ComplexTanBatch | `func ComplexTanBatch(x []complex128) []complex128` | Batch complex tangent (`*BatchTo`, `*BatchC64`, `*BatchToC64` also provided) |
+| ComplexSqrtBatch | `func ComplexSqrtBatch(x []complex128) []complex128` | Batch complex square root (`*BatchTo`, `*BatchC64`, `*BatchToC64` also provided) |
 
 ### Worker Pool
 
@@ -351,7 +352,7 @@ Arbitrary-precision EML operations using `math/big.Float`.
 
 ## Package: internal/jit
 
-JIT compiler for math expressions (amd64 only).
+JIT compiler for math expressions (`amd64` and `arm64` native codegen; AST interpreter fallback on `js/wasm`).
 
 ### Compiler Functions
 
@@ -449,6 +450,14 @@ JIT compiler for math expressions (amd64 only).
 | floor | `floor(x)` | Floor |
 | trunc | `trunc(x)` | Truncate |
 | round | `round(x)` | Round to nearest integer |
+| sinh | `sinh(x)` | Hyperbolic sine |
+| cosh | `cosh(x)` | Hyperbolic cosine |
+| tanh | `tanh(x)` | Hyperbolic tangent |
+| asinh | `asinh(x)` | Inverse hyperbolic sine |
+| acosh | `acosh(x)` | Inverse hyperbolic cosine |
+| atanh | `atanh(x)` | Inverse hyperbolic tangent |
+| erf | `erf(x)` | Error function |
+| gamma | `gamma(x)` | Gamma function |
 
 ---
 
@@ -554,8 +563,8 @@ The core EML operator `eml(x,y) = exp(x) - ln(y)` serves as the theoretical foun
 - **Scalar operations**: Direct implementations using `math.*` functions or hand-coded assembly (AVX2/AVX512 on AMD64).
 - **Batch operations**: SIMD-vectorized kernels that process 4-8 elements per cycle using architecture-specific assembly.
 - **FastMath**: FMA-optimized polynomial approximations with relaxed IEEE 754 compliance.
-- **JIT compiler**: x86-64 machine-code codegen for math expressions parsed from strings, supporting 25 built-in functions, non-integer exponents (via `exp(y*log(x))`), and variable exponents.
-- **Complex numbers**: `math/cmplx`-based element-wise operations on `complex128` slices (serial).
+- **JIT compiler**: AMD64 (SSE2) and ARM64 (AArch64) machine-code codegen for math expressions parsed from strings, supporting 25 built-in functions, non-integer exponents (via `exp(y*log(x))`), and variable exponents.
+- **Complex numbers**: `math/cmplx` and SIMD-accelerated de-interleaved operations on `complex128` and `complex64` slices via `ForEachChunk`.
 - **Arbitrary precision**: `math/big.Float` Taylor series for symbolic verification at 256-bit precision.
 - **Arena allocator**: Zero-allocation JIT parse/eval paths using bump-pointer allocation.
 - **Canonical EML trees**: Normalize any expression to minimal EML form for comparison and optimization.

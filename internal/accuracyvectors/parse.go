@@ -1,3 +1,8 @@
+// Package accuracyvectors parses MPFR-derived reference vectors used by the
+// oracle accuracy gate (scripts/oracle_accuracy_gate.sh).
+//
+// It is repository-internal test infrastructure: downstream modules cannot
+// import internal/ packages.
 package accuracyvectors
 
 import (
@@ -6,6 +11,8 @@ import (
 	"strings"
 )
 
+// ErrInvalidFixture reports a malformed MPFR vector fixture header, as
+// detected when the CSV records lack the expected "operation" header row.
 var ErrInvalidFixture = errors.New("invalid MPFR vector fixture header")
 
 // Rows returns the MPFR CSV records after the provenance line and header.

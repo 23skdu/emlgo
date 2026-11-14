@@ -133,6 +133,8 @@ type ParseError struct {
 	Msg   string // human-readable message
 }
 
+// Error returns the parse error as a message containing the byte position,
+// the offending token when one is known, and the reason.
 func (e *ParseError) Error() string {
 	if e.Token != "" {
 		return fmt.Sprintf("parse error at pos %d (token %q): %s", e.Pos, e.Token, e.Msg)
@@ -405,22 +407,35 @@ func (p *parser) parseBase() (Node, error) {
 	}
 }
 
+// String renders the value in shortest-form "g" notation.
 func (n Number) String() string {
 	return strconv.FormatFloat(n.Value, 'g', -1, 64)
 }
+
+// String renders the variable name, or "x" when Name is empty.
 func (v Variable) String() string {
 	if v.Name == "" {
 		return "x"
 	}
 	return v.Name
 }
-func (n UnaryOp) String() string      { return fmt.Sprintf("(-%s)", n.Operand) }
-func (n BinaryOp) String() string     { return fmt.Sprintf("(%s %c %s)", n.Left, n.Op, n.Right) }
+
+// String renders the operation as (-operand).
+func (n UnaryOp) String() string { return fmt.Sprintf("(-%s)", n.Operand) }
+
+// String renders the operation as the s-expression (left op right).
+func (n BinaryOp) String() string { return fmt.Sprintf("(%s %c %s)", n.Left, n.Op, n.Right) }
+
+// String renders the call as name(arg).
 func (n FunctionCall) String() string { return fmt.Sprintf("%s(%s)", n.Name, n.Arg) }
+
+// FormatAST renders n as a human-readable s-expression via its String method.
 func FormatAST(n Node) string {
 	return n.String()
 }
 
+// FormatExpr renders n as an infix expression, adding only the parentheses
+// required by operator precedence.
 func FormatExpr(n Node) string {
 	return formatExprDepth(n, 0)
 }

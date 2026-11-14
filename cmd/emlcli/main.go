@@ -1,3 +1,5 @@
+// Command emlcli is an interactive CLI demo for the EML packages, including
+// expression evaluation and the EML decompiler.
 package main
 
 import (

@@ -35,7 +35,7 @@ The remaining open work is consolidated, prioritized, and tracked below:
   - Quadratic ($P_2$): **26.5x faster** than AST evaluation
   - Cubic ($P_3$): **17.0x faster** than AST evaluation
   - Average JIT compilation overhead: ~45–54 µs.
-- `internal/jit/codegen_amd64.go` is currently amd64-only. On all other architectures, `codegen_stub.go` returns `"JIT codegen requires amd64"`, causing ARM64 environments (Apple Silicon M-series, AWS Graviton, Ampere Altra) to fall back to the AST interpreter.
+- `internal/jit/codegen.go` was previously amd64-only, causing ARM64 environments (Apple Silicon M-series, AWS Graviton, Ampere Altra) to fall back to the AST interpreter; `internal/jit/codegen_arm64.go` now implements native AArch64 codegen.
 - Executable memory management (`AllocateExecutableMemory`) already supports `linux/arm64` and `darwin/arm64` using `unix.Mmap` and `unix.Mprotect`. Only the instruction encoder is missing.
 
 **Change:**
@@ -63,7 +63,7 @@ The remaining open work is consolidated, prioritized, and tracked below:
 
 ### Step 2 — Float32 ARM64 NEON Assembly Acceleration (P1)
 
-**Status:** Open
+**Status:** Completed & Verified (`internal/eml/simd_arm64_f32.s`, `internal/eml/simd_dispatch_arm64.go`)
 
 **Evidence & Context:**
 - Float32 precision is critical for machine learning workloads, neural network layers, and computer vision pipelines.
@@ -85,7 +85,7 @@ The remaining open work is consolidated, prioritized, and tracked below:
 
 ### Step 3 — GPU CUDA Stream Overlap & Pinned Host Memory Optimization (P2)
 
-**Status:** Open
+**Status:** Completed & Verified (`internal/gpu/bridge.go`)
 
 **Evidence & Context:**
 - Empirical benchmarks in `docs/performance.md` show GPU speedups of 1.10x–2.1x over 16-thread CPU execution for large vectors ($N \ge 16,384$).

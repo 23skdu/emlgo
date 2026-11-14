@@ -28,7 +28,7 @@ The library uses a dual-path design:
 - **float64 fast path**: All scalar `float64` operations use native EML + SIMD paths (AVX2/AVX512/NEON/WASM).
 - **complex128 path**: Uses `math/cmplx` for `Exp`, `Log`, `Sin`, `Cos`, `Tan` on complex arguments.
 
-Batch complex operations (`ComplexBatch`, `ComplexExpBatch`, etc.) process slices of `complex128` element-wise in a single serial loop.
+Batch complex operations (`ComplexBatch`, `ComplexExpBatch`, `ComplexSinBatch`, `ComplexCosBatch`, etc.) support both `complex128` (`*Batch` / `*BatchTo`) and `complex64` (`*BatchC64` / `*BatchToC64`). Work is distributed across the shared worker pool (`ForEachChunk`); `ComplexExpBatchTo`, `ComplexSinBatchTo`, `ComplexCosBatchTo`, and their `complex64` counterparts de-interleave real and imaginary parts into chunks and dispatch to real SIMD kernels (`Exp`, `SinCos`, `Sinh`/`Cosh`), while `ComplexBatch`, `ComplexLogBatch`, `ComplexTanBatch`, and `ComplexSqrtBatch` evaluate via `math/cmplx` across pool chunks.
 
 ## Batch Operations
 
@@ -81,6 +81,16 @@ Returns the complex tangent of each element:
 ```go
 func ComplexTanBatch(x []complex128) []complex128
 ```
+
+### ComplexSqrtBatch
+
+Returns the complex square root of each element:
+
+```go
+func ComplexSqrtBatch(x []complex128) []complex128
+```
+
+Zero-allocation `*BatchTo` variants (`ComplexExpBatchTo`, `ComplexLogBatchTo`, `ComplexSinBatchTo`, `ComplexCosBatchTo`, `ComplexTanBatchTo`, `ComplexSqrtBatchTo`) and `complex64` variants (`*BatchC64`, `*BatchToC64`) are also provided in `internal/eml/complex_batch.go`.
 
 ## Trigonometric Identity Verification
 
@@ -203,5 +213,5 @@ The `internal/constants` package provides complex constants:
 ## Notes
 
 - All complex batch operations panic on slice length mismatch.
-- Complex operations use `math/cmplx` which handles branch cuts per IEEE 754.
-- Complex batch operations are serial; the worker pool is not used on this path.
+- Complex operations use `math/cmplx` and SIMD-accelerated real/imaginary decompositions that handle branch cuts and non-finite inputs per IEEE 754.
+- Complex batch operations distribute chunks across the shared worker pool (`ForEachChunk`).

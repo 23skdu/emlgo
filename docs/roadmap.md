@@ -494,7 +494,7 @@ In `internal/eml/simd_amd64.s`, both `sinAVX2` (lines 1106–1139) and `cosAVX2`
 
 ## 3. Unit & Fuzz Testing Scope Expansion (100.0% Statement Coverage)
 
-Statement coverage across all 17 non-test packages in `emlgo` is enforced at **100.0%** (`PRECOMMIT_MIN_COVERAGE=100.0`). In addition to unit and edge-case suites, the fuzzing matrix has been expanded to **41 fuzz targets** across all 11 core and internal packages:
+Statement coverage across all 17 non-test packages in `emlgo` is enforced at **100.0%** (`PRECOMMIT_MIN_COVERAGE=100.0`). In addition to unit and edge-case suites, the fuzzing matrix has been expanded to **64 fuzz targets** across all 11 core and internal packages:
 
 | Package | Statement Coverage | Fuzz Targets (`go test -fuzz=...`) | Oracle & Differential Invariants Tested |
 | :--- | :---: | :--- | :--- |
@@ -549,7 +549,11 @@ The repository enforces a 5-stage automated numerical oracle gate via `./scripts
 | **Memory Profiling** | `make profile-mem` | Generates `mem.prof` on SIMD, `Pipeline`, and `Complex` batch kernels and prints top 20 allocation sites via `go tool pprof -top -alloc_space`. |
 | **Allocation Benchmark** | `make bench-mem` | Runs `go test -bench=. -benchmem` across `./internal/eml/...` and `./pkg/...`. |
 | **Oracle Accuracy Gate** | `make oracle-gate` (alias: `make accuracy-gate`) | Executes the 5-stage numerical accuracy gate `./scripts/oracle_accuracy_gate.sh`. |
-| **Fuzz Testing** | `make fuzz` | Runs all 30 anchored fuzz targets across `internal/jit`, `internal/eml`, `internal/eml/bigmath`, `internal/gpu`, and `pkg/*` (`FUZZTIME ?= 30s`). |
+| **Fuzz Testing** | `make fuzz` | Runs all 32 anchored fuzz targets across `internal/jit`, `internal/eml`, `internal/eml/bigmath`, `internal/gpu`, and `pkg/*` (`FUZZTIME ?= 30s`). |
+| **Artifact Cleanup** | `make clean` | Removes build, test, coverage, profiling, WASM, Node, and Python venv/`__pycache__` artifacts. |
+| **Docker Cleanup** | `make clean-docker` | Removes tagged `$(IMAGE_REPO)` Docker images and prunes the Docker build cache. |
+| **Test Cache Cleanup** | `make clean-cache` | Clears the Go test cache (`go clean -testcache`). |
+| **Full Cleanup** | `make clean-all` | Runs `clean`, `clean-docker`, and `clean-cache`. |
 
 The `help` target is self-maintaining: it greps the trailing `## <description>`
 annotation on each target line of the Makefile and prints the results in file

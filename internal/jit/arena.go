@@ -12,6 +12,9 @@ const (
 	kindFuncCall
 )
 
+// ArenaNode is a fixed-size, arena-allocated representation of an AST node.
+// Kind selects the node kind, Op/Value/Name hold its payload and Left/Right
+// point at its children.
 type ArenaNode struct {
 	Kind  nodeKind
 	Op    rune
@@ -22,6 +25,8 @@ type ArenaNode struct {
 	_     [7]byte
 }
 
+// Arena is a bump allocator for ArenaNodes. It hands out consecutive nodes
+// from a backing slice and doubles the slice when it is exhausted.
 type Arena struct {
 	buf []ArenaNode
 	off int

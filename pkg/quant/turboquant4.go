@@ -1,3 +1,9 @@
+// Package quant provides memory-efficient vector quantization and distance
+// search, centered on TurboQuant4: a 4-bit polar tree quantizer that encodes
+// a float32 vector into packed angle indices plus a 1-bit QJL residual.
+//
+// Encoding is approximate by design; see docs/accuracy.md for the measured
+// round-trip error budgets and bit rates.
 package quant
 
 import (

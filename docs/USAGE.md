@@ -256,7 +256,7 @@ import (
 func main() {
     // Parse and canonicalize
     ast, _ := jit.Parse("x^2")
-node := jit.Canonicalize(ast)
+    node := jit.Canonicalize(ast)
 
     // Differentiate: d/dx x² = 2x
     dx := jit.Diff(node)
@@ -287,26 +287,26 @@ import (
 func main() {
     // Constant folding
     sumAst, _ := jit.Parse("2 + 3")
-node := jit.Simplify(jit.Canonicalize(sumAst))
+    node := jit.Simplify(jit.Canonicalize(sumAst))
     fmt.Printf("2 + 3 = %s\n", jit.Decompile(node)) // 5.0
 
     // Identity reduction
     zeroAst, _ := jit.Parse("x + 0")
-node2 := jit.Simplify(jit.Canonicalize(zeroAst))
+    node2 := jit.Simplify(jit.Canonicalize(zeroAst))
     fmt.Printf("x + 0 = %s\n", jit.Decompile(node2)) // x
 
     // Double negation
     negAst, _ := jit.Parse("-(-x)")
-node3 := jit.Simplify(jit.Canonicalize(negAst))
+    node3 := jit.Simplify(jit.Canonicalize(negAst))
     fmt.Printf("-(-x) = %s\n", jit.Decompile(node3)) // x
 
     // Multiplication identities
     mulOneAst, _ := jit.Parse("x * 1")
-node4 := jit.Simplify(jit.Canonicalize(mulOneAst))
+    node4 := jit.Simplify(jit.Canonicalize(mulOneAst))
     fmt.Printf("x * 1 = %s\n", jit.Decompile(node4)) // x
 
     mulZeroAst, _ := jit.Parse("x * 0")
-node5 := jit.Simplify(jit.Canonicalize(mulZeroAst))
+    node5 := jit.Simplify(jit.Canonicalize(mulZeroAst))
     fmt.Printf("x * 0 = %s\n", jit.Decompile(node5)) // 0.0
 }
 ```
@@ -324,7 +324,7 @@ import (
 func main() {
     // Parse and canonicalize
     emlAst, _ := jit.Parse("sin(x)^2 + cos(x)^2")
-emlNode := jit.Canonicalize(emlAst)
+    emlNode := jit.Canonicalize(emlAst)
 
     // Infix notation
     fmt.Println("Infix:", jit.Decompile(emlNode))

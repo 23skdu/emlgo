@@ -8,10 +8,13 @@ import (
 	"unsafe"
 )
 
+// Func is a compiled expression callable as a single-variable function.
 type Func func(float64) float64
 
+// Compiler compiles expression strings and ASTs into native machine code.
 type Compiler struct{}
 
+// NewCompiler returns a new Compiler.
 func NewCompiler() *Compiler {
 	return &Compiler{}
 }
@@ -71,11 +74,14 @@ func (c *Compiler) CompileWithHandle(expr string) (Func, *CodeHandle, error) {
 	return c.CompileAST(ast)
 }
 
+// Compile parses and compiles expr into a callable Func, discarding the
+// CodeHandle that owns the executable memory.
 func (c *Compiler) Compile(expr string) (Func, error) {
 	fn, _, err := c.CompileWithHandle(expr)
 	return fn, err
 }
 
+// MakeFunc converts a pointer to native machine code into a callable Func.
 func MakeFunc(ptr unsafe.Pointer) Func {
 	fv := &struct{ fn uintptr }{fn: uintptr(ptr)}
 	return *(*Func)(unsafe.Pointer(&fv)) // #nosec G103

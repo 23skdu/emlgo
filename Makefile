@@ -1,4 +1,4 @@
-.PHONY: build test test-short test-race test-docker test-scripts test-cover bench bench-mem bench-stat profile profile-cpu profile-mem lint vet fmt-check fuzz clean wasm security gosec govulncheck oracle-gate accuracy-gate verify check makehooks install-hooks docker docker-build docker-build-cpu docker-build-cuda docker-push docker-push-cpu docker-push-cuda help
+.PHONY: build test test-short test-race test-docker test-scripts test-cover bench bench-mem bench-stat profile profile-cpu profile-mem lint vet fmt-check fuzz clean clean-docker clean-cache clean-all wasm security gosec govulncheck oracle-gate accuracy-gate verify check makehooks install-hooks docker docker-build docker-build-cpu docker-build-cuda docker-push docker-push-cpu docker-push-cuda help
 
 build: ## Compile all packages
 	go build ./...
@@ -68,7 +68,7 @@ vet: ## Run go vet
 	go vet ./...
 
 lint: fmt-check vet ## fmt-check + vet + golangci-lint
-	@command -v golangci-lint >/dev/null 2>&1 || go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+	@command -v golangci-lint >/dev/null 2>&1 || go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0
 	golangci-lint run ./...
 
 # ==============================================================================
@@ -116,7 +116,7 @@ fuzz: ## Run all fuzz tests (override duration with FUZZTIME=60s)
 # ==============================================================================
 
 gosec: ## Run gosec static analysis
-	@command -v golangci-lint >/dev/null 2>&1 || go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+	@command -v golangci-lint >/dev/null 2>&1 || go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0
 	golangci-lint run --enable-only=gosec ./...
 
 govulncheck: ## Check dependencies for known vulnerabilities
@@ -147,7 +147,7 @@ makehooks: ## Install the git pre-commit hook
 install-hooks: makehooks ## Alias for makehooks
 
 IMAGE_REPO ?= ghcr.io/23skdu/emlgo
-TAG ?= 0.6
+TAG ?= v0.8.0
 CUDA_ARCH ?= sm_89
 
 docker-build-cpu: ## Build the CPU Docker image
@@ -182,9 +182,36 @@ docker-push-cuda: ## Push the CUDA Docker image tags
 
 docker-push: docker-push-cpu docker-push-cuda ## Push all Docker image tags
 
-clean: ## Remove build artifacts and generated files
-	rm -f bench validate emlcli wasmbench coverage.out *.out *.test *.prof *.cov
-	rm -rf dist/ wasm/emlgo.wasm wasm/wasm_exec.js wasm/run.js node_modules/ .playwright/ playwright-report/ test-results/
+# ==============================================================================
+# Cleanup Targets
+# ==============================================================================
+#
+# `clean` deliberately performs no Docker or network work: the CUDA Dockerfiles
+# run `make clean` inside their build stage, so it must stay a pure
+# filesystem cleanup. Docker images/caches live in `clean-docker`.
+
+clean: ## Remove test, build, coverage, profiling and Python venv artifacts
+	rm -f bench validate emlcli wasmbench coverage.out *.out *.test *.prof *.cov *.coverprofile
+	rm -f *.o *.a *.bin test_*.o
+	rm -f cuda/*.o cuda/*.a cuda/libeml_capi.so cuda/eml_cuda_example
+	rm -rf dist/ bin/ wasm/emlgo.wasm wasm/wasm_exec.js wasm/run.js
+	rm -rf node_modules/ .playwright/ playwright/ playwright-report/ test-results/
+	rm -rf .venv/ venv/ env/ .pytest_cache/ .mypy_cache/ *.egg-info/
+	find . -path ./.git -prune -o -name '__pycache__' -type d -prune -exec rm -rf {} +
+	find . -path ./.git -prune -o -name '*.pyc' -type f -delete
+
+clean-docker: ## Remove this repository's tagged Docker images and the build cache
+	@command -v docker >/dev/null 2>&1 || { echo "docker not found; nothing to clean"; exit 0; }
+	@docker images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null \
+		| grep -F "$(IMAGE_REPO):" \
+		| while read -r img; do docker rmi -f "$$img" || true; done
+	@docker builder prune -f || true
+	@docker image prune -f || true
+
+clean-cache: ## Remove the Go test cache
+	go clean -testcache
+
+clean-all: clean clean-docker clean-cache ## Remove artifacts, venvs, Docker images and caches
 
 # ==============================================================================
 # Help
@@ -199,5 +226,5 @@ help: ## List all available targets and variables
 	@echo "Variables (override on the command line):"
 	@echo "  FUZZTIME=$(FUZZTIME)          Duration per fuzz test (default 30s)"
 	@echo "  IMAGE_REPO=$(IMAGE_REPO)      Docker image repository (default ghcr.io/23skdu/emlgo)"
-	@echo "  TAG=$(TAG)                    Docker image tag (default 0.6)"
+	@echo "  TAG=$(TAG)                    Docker image tag (default v0.8.0)"
 	@echo "  CUDA_ARCH=$(CUDA_ARCH)        CUDA arch for cuda images (default sm_89)"

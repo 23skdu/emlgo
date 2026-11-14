@@ -1,3 +1,5 @@
+// Command bench runs the EML microbenchmark suite and reports throughput for
+// the scalar, SIMD, and batch kernels.
 package main
 
 // This is benchmark code - math/rand is acceptable for test data generation
@@ -46,6 +48,9 @@ func init() {
 	flag.BoolVar(&checkRegressionFlag, "regression", false, "Check for performance regression against baseline")
 }
 
+// BenchmarkResult records one benchmark run: the tested type and function name,
+// emlgo and standard-library run times in seconds, their ratio (emlgo/math),
+// and whether the run passed.
 type BenchmarkResult struct {
 	Type      string
 	Name      string

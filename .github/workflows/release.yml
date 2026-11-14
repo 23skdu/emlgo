@@ -4,7 +4,6 @@ on:
   push:
     tags:
       - 'v*'
-      - '[0-9]+.*'
 
 permissions:
   contents: write
@@ -48,7 +47,7 @@ jobs:
 
       - name: Generate checksums
         run: |
-          cd dist && sha256sum * > checksums.txt
+          cd dist && sha256sum -- * > checksums.txt
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2

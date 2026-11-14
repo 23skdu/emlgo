@@ -1,6 +1,6 @@
 # JIT Compiler
 
-emlgo includes a JIT (Just-In-Time) compiler that generates AMD64 machine code from mathematical expression strings, plus symbolic differentiation, expression simplification, and an EML decompiler.
+emlgo includes a JIT (Just-In-Time) compiler that generates native AMD64 and ARM64 machine code from mathematical expression strings, plus symbolic differentiation, expression simplification, and an EML decompiler.
 
 ## Pipeline Overview
 
@@ -17,12 +17,12 @@ flowchart LR
 
 ## Overview
 
-The JIT compiler (`internal/jit`) parses a mathematical expression string, builds an AST, and emits native AMD64 SSE2 machine code that can be called as a regular Go function. Performance depends on the expression and target; this project makes no portable JIT speedup claim.
+The JIT compiler (`internal/jit`) parses a mathematical expression string, builds an AST, and emits native machine code (AMD64 SSE2 or ARM64 AArch64 scalar FP) that can be called as a regular Go function. Performance depends on the expression and target; this project makes no portable JIT speedup claim.
 
 `internal/jit` is restricted by Go to this module and cannot be imported by
 downstream modules. The examples below document repository-internal APIs.
 
-**Platform**: `amd64` uses codegen; `js/wasm` falls back to the AST interpreter (`jit_wasm.go`); all other targets return an error from `Compile`.
+**Platform**: `amd64` and `arm64` use native codegen; `js/wasm` falls back to the AST interpreter (`jit_wasm.go`); all other targets return an error from `Compile`.
 
 ## Supported Expressions
 
@@ -418,7 +418,7 @@ JIT-compiled functions are called through indirect calls using ABIInternal calli
 
 ## Limitations
 
-- Native code generation is available on AMD64 (uses SSE2); JS/WASM uses an interpreter, and other targets do not provide native JIT codegen.
+- Native code generation is available on AMD64 (SSE2) and ARM64 (AArch64); JS/WASM uses an AST interpreter, and other targets do not provide native JIT codegen.
 - Maximum 14 allocatable live temporaries (expressions with more will fail to compile)
 - Function names limited to 15 characters
 - No support for user-defined functions

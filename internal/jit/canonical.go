@@ -14,12 +14,17 @@ type EMLNode struct {
 	Right *EMLNode
 }
 
+// EMLNodeKind discriminates the kind of an EMLNode.
 type EMLNodeKind uint8
 
 const (
+	// EMLConst marks a constant node whose value is held in Value.
 	EMLConst EMLNodeKind = iota
+	// EMLVar marks a variable node whose name is held in Name.
 	EMLVar
+	// EMLOp marks the canonical binary form eml(Left, Right) = exp(Left) - log(Right).
 	EMLOp
+	// EMLFunc marks a function application node: Name is the function and Left its argument.
 	EMLFunc
 )
 

@@ -58,7 +58,7 @@ The library provides first-class `complex128` support via `internal/eml/complex_
 - **Real path (float64)**: Scalar operations use the package's Go math wrappers and selected low-level kernels; batch acceleration varies by operation and target.
 - **Complex path (complex128)**: Uses `math/cmplx` for `Exp`, `Log`, `Sin`, `Cos`, `Tan` on complex arguments. The complex EML operator is defined as `Complex(x, y) = cmplx.Exp(x) - cmplx.Log(y)`.
 
-Batch operations (`ComplexBatch`, `ComplexExpBatch`, etc.) apply `math/cmplx` element-wise in a single serial loop. The worker pool is used by the real-valued fused and parallel batch paths, not by the complex ones.
+Batch operations (`ComplexBatch`, `ComplexExpBatch`, etc.) support both `complex128` and `complex64` slices via `ForEachChunk` on the shared worker pool, with de-interleaved real SIMD kernels for `Exp`, `Sin`, and `Cos` and `math/cmplx` fallback on non-finite lanes.
 
 ## 5. Arbitrary Precision Backend (`internal/eml/bigmath`)
 
@@ -154,7 +154,7 @@ parallel and was previously serial.
 
 ## 14. JIT Compiler (`internal/jit`)
 
-The JIT compiler generates native AMD64 machine code from string expressions; JS/WASM uses an AST interpreter, while other targets do not provide native code generation. JIT performance depends on the expression and platform; no portable speedup is claimed.
+The JIT compiler generates native AMD64 and ARM64 machine code from string expressions; JS/WASM uses an AST interpreter, while other targets do not provide native code generation. JIT performance depends on the expression and platform; no portable speedup is claimed.
 
 - **25 supported functions**: sin, cos, exp, log, sqrt, tan, asin, acos, atan, abs, cbrt, log2, log10, ceil, floor, trunc, round, sinh, cosh, tanh, asinh, acosh, atanh, erf, gamma
 - All three dispatch paths (codegen, tree evaluator, arena interpreter) share the single table in `internal/jit/functab.go`
@@ -185,11 +185,13 @@ docs/nextsteps.md for the measured limit.
 
 ## 16. Package Structure
 
-- **`pkg/arithmetic`**: Basic operations (Add, Sub, Mul, Div, Sqrt, Pow, FMA).
+- **`pkg/arithmetic`**: Basic operations (Add, Sub, Mul, Div, Sqrt, Pow, FMA, GCD, LCM, integer/batch ops).
 - **`pkg/logexp`**: Exponential and Logarithmic functions.
 - **`pkg/trig`**: Trigonometric, Inverse Trigonometric, and Hyperbolic functions.
 - **`pkg/hyper`**: Hyperbolic functions (dedicated package).
-- **`pkg/fastmath`**: High-performance scalar alternatives with relaxed IEEE 754 compliance.
+- **`pkg/fastmath`**: High-performance scalar alternatives with relaxed IEEE 754 compliance and domain guardrails.
+- **`pkg/bytecode`**: SoA RPN bytecode VM, optimizer, and genetic-programming symbolic regression (`Search`).
+- **`pkg/quant`**: TurboQuant4 4-bit polar-quantized vector encoding and distance.
 - **`internal/eml/bigmath`**: Arbitrary-precision backend.
 - **`internal/jit`**: JIT compiler, arena allocator, canonical trees, Diff, Simplify, Decompile, Cache.
 - **`internal/gpu`**: CUDA and Metal GPU backends.

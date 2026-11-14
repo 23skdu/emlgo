@@ -37,6 +37,8 @@ func ComplexExpBatch(x []complex128) []complex128 {
 	return result
 }
 
+// ComplexExpBatchTo computes the complex exponential of each element of x and
+// writes it into result (complex128, SIMD exp and sin/cos kernels).
 func ComplexExpBatchTo(x, result []complex128) {
 	if len(x) != len(result) {
 		panic("slice length mismatch")
@@ -60,12 +62,16 @@ func ComplexExpBatchTo(x, result []complex128) {
 	})
 }
 
+// ComplexExpBatchC64 returns a newly allocated complex64 slice holding the
+// complex exponential of each element of x.
 func ComplexExpBatchC64(x []complex64) []complex64 {
 	result := make([]complex64, len(x))
 	ComplexExpBatchToC64(x, result)
 	return result
 }
 
+// ComplexExpBatchToC64 computes the complex exponential of each element of x
+// and writes it into result (complex64, via the float64 SIMD kernels).
 func ComplexExpBatchToC64(x, result []complex64) {
 	if len(x) != len(result) {
 		panic("slice length mismatch")
@@ -96,6 +102,8 @@ func ComplexLogBatch(x []complex128) []complex128 {
 	return result
 }
 
+// ComplexLogBatchTo computes the complex logarithm of each element of x and
+// writes it into result (complex128, via cmplx.Log).
 func ComplexLogBatchTo(x, result []complex128) {
 	if len(x) != len(result) {
 		panic("slice length mismatch")
@@ -107,12 +115,16 @@ func ComplexLogBatchTo(x, result []complex128) {
 	})
 }
 
+// ComplexLogBatchC64 returns a newly allocated complex64 slice holding the
+// complex logarithm of each element of x.
 func ComplexLogBatchC64(x []complex64) []complex64 {
 	result := make([]complex64, len(x))
 	ComplexLogBatchToC64(x, result)
 	return result
 }
 
+// ComplexLogBatchToC64 computes the complex logarithm of each element of x and
+// writes it into result (complex64, via cmplx.Log).
 func ComplexLogBatchToC64(x, result []complex64) {
 	if len(x) != len(result) {
 		panic("slice length mismatch")
@@ -131,6 +143,8 @@ func ComplexSinBatch(x []complex128) []complex128 {
 	return result
 }
 
+// ComplexSinBatchTo computes the complex sine of each element of x and writes
+// it into result (complex128, SIMD sin/cos kernels).
 func ComplexSinBatchTo(x, result []complex128) {
 	if len(x) != len(result) {
 		panic("slice length mismatch")
@@ -152,12 +166,16 @@ func ComplexSinBatchTo(x, result []complex128) {
 	})
 }
 
+// ComplexSinBatchC64 returns a newly allocated complex64 slice holding the
+// complex sine of each element of x.
 func ComplexSinBatchC64(x []complex64) []complex64 {
 	result := make([]complex64, len(x))
 	ComplexSinBatchToC64(x, result)
 	return result
 }
 
+// ComplexSinBatchToC64 computes the complex sine of each element of x and
+// writes it into result (complex64, via the float64 SIMD kernels).
 func ComplexSinBatchToC64(x, result []complex64) {
 	if len(x) != len(result) {
 		panic("slice length mismatch")
@@ -186,6 +204,8 @@ func ComplexCosBatch(x []complex128) []complex128 {
 	return result
 }
 
+// ComplexCosBatchTo computes the complex cosine of each element of x and
+// writes it into result (complex128, SIMD sin/cos kernels).
 func ComplexCosBatchTo(x, result []complex128) {
 	if len(x) != len(result) {
 		panic("slice length mismatch")
@@ -207,12 +227,16 @@ func ComplexCosBatchTo(x, result []complex128) {
 	})
 }
 
+// ComplexCosBatchC64 returns a newly allocated complex64 slice holding the
+// complex cosine of each element of x.
 func ComplexCosBatchC64(x []complex64) []complex64 {
 	result := make([]complex64, len(x))
 	ComplexCosBatchToC64(x, result)
 	return result
 }
 
+// ComplexCosBatchToC64 computes the complex cosine of each element of x and
+// writes it into result (complex64, via the float64 SIMD kernels).
 func ComplexCosBatchToC64(x, result []complex64) {
 	if len(x) != len(result) {
 		panic("slice length mismatch")
@@ -241,6 +265,8 @@ func ComplexTanBatch(x []complex128) []complex128 {
 	return result
 }
 
+// ComplexTanBatchTo computes the complex tangent of each element of x and
+// writes it into result (complex128, via cmplx.Tan).
 func ComplexTanBatchTo(x, result []complex128) {
 	if len(x) != len(result) {
 		panic("slice length mismatch")
@@ -252,12 +278,16 @@ func ComplexTanBatchTo(x, result []complex128) {
 	})
 }
 
+// ComplexTanBatchC64 returns a newly allocated complex64 slice holding the
+// complex tangent of each element of x.
 func ComplexTanBatchC64(x []complex64) []complex64 {
 	result := make([]complex64, len(x))
 	ComplexTanBatchToC64(x, result)
 	return result
 }
 
+// ComplexTanBatchToC64 computes the complex tangent of each element of x and
+// writes it into result (complex64, via cmplx.Tan).
 func ComplexTanBatchToC64(x, result []complex64) {
 	if len(x) != len(result) {
 		panic("slice length mismatch")
@@ -276,6 +306,8 @@ func ComplexSqrtBatch(x []complex128) []complex128 {
 	return result
 }
 
+// ComplexSqrtBatchTo computes the complex square root of each element of x and
+// writes it into result (complex128, via cmplx.Sqrt).
 func ComplexSqrtBatchTo(x, result []complex128) {
 	if len(x) != len(result) {
 		panic("slice length mismatch")
@@ -287,12 +319,16 @@ func ComplexSqrtBatchTo(x, result []complex128) {
 	})
 }
 
+// ComplexSqrtBatchC64 returns a newly allocated complex64 slice holding the
+// complex square root of each element of x.
 func ComplexSqrtBatchC64(x []complex64) []complex64 {
 	result := make([]complex64, len(x))
 	ComplexSqrtBatchToC64(x, result)
 	return result
 }
 
+// ComplexSqrtBatchToC64 computes the complex square root of each element of x
+// and writes it into result (complex64, via cmplx.Sqrt).
 func ComplexSqrtBatchToC64(x, result []complex64) {
 	if len(x) != len(result) {
 		panic("slice length mismatch")

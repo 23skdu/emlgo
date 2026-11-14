@@ -115,7 +115,7 @@ go vet ./...
 
 echo "[verify 2/5] Running golangci-lint (formatting, staticcheck, govet, errcheck, misspell)..."
 if ! command -v golangci-lint >/dev/null 2>&1; then
-    go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+    go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0
 fi
 golangci-lint run ./...
 

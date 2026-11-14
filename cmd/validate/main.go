@@ -1,3 +1,5 @@
+// Command validate checks EML identities and numerical accuracy against the
+// bundled MPFR reference vectors.
 package main
 
 import (
@@ -30,6 +32,8 @@ func init() {
 	flag.StringVar(&typeFilter, "type", "", "Filter by type (int, uint, float, complex, fastmath, quant, batch)")
 }
 
+// ValidationResult records one validation check: the tested type and function,
+// whether the check passed, and a message describing the outcome.
 type ValidationResult struct {
 	Type     string
 	Function string

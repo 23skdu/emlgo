@@ -1,5 +1,9 @@
 # emlgo
 
+[![CI](https://github.com/23skdu/emlgo/actions/workflows/ci.yml/badge.svg)](https://github.com/23skdu/emlgo/actions/workflows/ci.yml)
+[![Release](https://github.com/23skdu/emlgo/actions/workflows/release.yml/badge.svg)](https://github.com/23skdu/emlgo/actions/workflows/release.yml)
+[![Go Reference](https://pkg.go.dev/badge/github.com/23skdu/emlgo.svg)](https://pkg.go.dev/github.com/23skdu/emlgo)
+
 A mathematical library for Go built around the EML (Exp-Minus-Log) operator, with scalar and batch APIs, architecture-specific kernels, expression tooling, and experimental GPU and arbitrary-precision components.
 
 The public scalar wrappers generally delegate to Go's `math` and `math/cmplx` packages; see each API for its semantics. EML provides the theoretical foundation and related implementation: canonical expression trees, identity reductions, symbolic differentiation, and an AMD64 JIT compiler. Approximate `fastmath` functions and backend-specific batch paths have distinct accuracy behavior; this project does not claim universal correct rounding or performance wins. See [numerical accuracy](docs/accuracy.md) and [benchmark methodology](docs/performance.md).
@@ -11,7 +15,7 @@ Based on the research of **Andrzej Odrzywołek**: [All elementary functions from
 - **EML Operator**: `eml(x, y) = exp(x) - ln(y)` — single primitive from which all elementary functions derive
 - **Batch Operations**: Architecture-specific kernels for selected operations, with portable Go fallbacks
 - **float32 Batch Operations**: Dedicated `float32` APIs for memory-constrained workloads
-- **JIT Compiler**: AMD64 machine-code generation for math expressions (25 functions, non-integer/variable exponents); `js/wasm` uses an AST interpreter
+- **JIT Compiler**: AMD64 and ARM64 machine-code generation for math expressions (25 functions, non-integer/variable exponents); `js/wasm` uses an AST interpreter
 - **JIT Expression Cache**: LRU cache with `CompileCached` for repeated compilations
 - **GPU Backends**: Optional CUDA and Metal implementations; require supported hardware and platform-specific setup
 - **Complex Numbers**: First-class `complex128` support via `math/cmplx`
@@ -313,10 +317,17 @@ make build                                  # Build all packages
 make test                                   # Run tests
 make test-race                              # Race detection
 make test-cover                             # Coverage report
+make verify                                 # Pre-commit verification gate (100% coverage, lint, gosec, quick oracle)
+make oracle-gate                            # Full 5-stage oracle accuracy gate
+make check                                  # Full CI quality gate (vet, fmt, lint, security, oracle-gate, coverage)
 make bench                                  # Run benchmarks
-make lint                                   # golangci-lint
+make lint                                   # fmt-check + vet + golangci-lint
 make fuzz                                   # Fuzz testing (30s per target)
 make gosec                                  # Security scan
+make docker-build                           # Build CPU and CUDA Docker images
+make clean                                  # Remove build, test, coverage, and Python venv artifacts
+make clean-docker                           # Remove tagged Docker images and build cache
+make clean-all                              # Full cleanup (artifacts, venvs, Docker images, caches)
 make help                                   # List all targets and variables
 ./scripts/bench-compare.sh                  # Benchmark regression
 ```

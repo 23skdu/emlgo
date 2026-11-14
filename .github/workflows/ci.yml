@@ -5,40 +5,46 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  test:
+  verify:
+    name: Verify, Lint, Security & Coverage
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        go-version: ['1.27.4']
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
+
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
-          go-version: ${{ matrix.go-version }}
-      - name: Build
-        run: go build ./...
-      - name: Vet
-        run: go vet ./...
-      - name: Test
+          go-version: '1.27.4'
+
+      - name: Install golangci-lint v2
+        run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0
+
+      - name: Run verification gate (vet, lint, gosec, quick oracle, 100% coverage)
+        run: ./scripts/verify.sh
+
+      - name: Run race detector tests
         run: go test -race -count=1 ./...
-      - name: Test with coverage
-        if: matrix.go-version == '1.27.4'
+
+      - name: Generate coverage profile
         run: go test -coverprofile=coverage.out -covermode=atomic ./...
+
       - name: Upload coverage
-        if: matrix.go-version == '1.27.4'
         uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
         with:
           files: coverage.out
           fail_ci_if_error: false
+
+      - name: Check vulnerabilities (govulncheck)
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
       - name: Fuzz (short burst)
-        if: matrix.go-version == '1.27.4'
         run: |
           go test -run='^$' -fuzz='^FuzzParseNoPanic$' -fuzztime=10s ./internal/jit/...
           go test -run='^$' -fuzz='^FuzzEval$' -fuzztime=10s ./internal/jit/...
@@ -46,15 +52,24 @@ jobs:
           go test -run='^$' -fuzz='^FuzzExpSIMD$' -fuzztime=10s ./internal/eml
           go test -run='^$' -fuzz='^FuzzSinSIMD$' -fuzztime=10s ./internal/eml
           go test -run='^$' -fuzz='^FuzzPow$' -fuzztime=10s ./pkg/arithmetic
-      - name: Gosec
-        run: |
-          go install github.com/securego/gosec/v2/cmd/gosec@v2.29.0
-          gosec -exclude-generated -tags purego ./...
-      - name: Govulncheck
-        run: |
-          go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
+  accuracy-gate:
+    name: Oracle Accuracy Gate (Full 5-Stage)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        with:
+          go-version: '1.27.4'
+
+      - name: Run full 5-stage oracle accuracy gate
+        run: ./scripts/oracle_accuracy_gate.sh --verbose
 
   cross-build:
+    name: Cross-Build (${{ matrix.target }})
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -84,30 +99,19 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
+
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
           go-version: '1.27.4'
+
       - name: Build ${{ matrix.target }}
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
         run: go build ./...
 
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          persist-credentials: false
-      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
-        with:
-          go-version: '1.27.4'
-      - name: Golangci-lint
-        uses: golangci/golangci-lint-action@55c2c1448f86e01eaae002a5a3a9624417608d84 # v6.5.2
-        with:
-          version: latest
-
   platform-test:
+    name: Platform Test (${{ matrix.name }})
     strategy:
       fail-fast: false
       matrix:
@@ -120,18 +124,20 @@ jobs:
             runner: windows-latest
           - name: js/wasm
             runner: ubuntu-latest
-    name: Test (${{ matrix.name }})
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
+
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
           go-version: '1.27.4'
+
       - name: Run platform tests
         if: matrix.name != 'js/wasm'
         run: go test -count=1 ./...
+
       - name: Run WebAssembly tests
         if: matrix.name == 'js/wasm'
         env:
@@ -139,25 +145,94 @@ jobs:
           GOARCH: wasm
         run: go test -exec="$(go env GOROOT)/lib/wasm/go_js_wasm_exec" -count=1 ./...
 
+  docker:
+    name: Docker Package (CPU & CUDA)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        with:
+          go-version: '1.27.4'
+
+      - name: Build CPU and CUDA Docker images
+        env:
+          IMAGE_REPO: ghcr.io/23skdu/emlgo
+          TAG: main
+        run: |
+          make docker-build-cpu IMAGE_REPO="${IMAGE_REPO}" TAG="${TAG}"
+          make docker-build-cuda IMAGE_REPO="${IMAGE_REPO}" TAG="${TAG}"
+          SHA_TAG="sha-${GITHUB_SHA::7}"
+          docker tag "${IMAGE_REPO}:main-cpu" "${IMAGE_REPO}:${SHA_TAG}-cpu"
+          docker tag "${IMAGE_REPO}:main-cuda" "${IMAGE_REPO}:${SHA_TAG}-cuda"
+
+      - name: Run Docker container integration tests
+        run: make test-docker
+
+      - name: Export CPU Docker image package artifact
+        run: |
+          mkdir -p dist
+          docker save ghcr.io/23skdu/emlgo:main-cpu | gzip > dist/emlgo-cpu-linux-amd64.tar.gz
+
+      - name: Upload Docker image package artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: emlgo-docker-cpu
+          path: dist/emlgo-cpu-linux-amd64.tar.gz
+          retention-days: 14
+
+      - name: Log in to GitHub Container Registry
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push Docker images to GHCR
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          IMAGE_REPO: ghcr.io/23skdu/emlgo
+        run: |
+          SHA_TAG="sha-${GITHUB_SHA::7}"
+          docker push "${IMAGE_REPO}:main"
+          docker push "${IMAGE_REPO}:main-cpu"
+          docker push "${IMAGE_REPO}:cpu"
+          docker push "${IMAGE_REPO}:${SHA_TAG}-cpu"
+          docker push "${IMAGE_REPO}:main-cuda"
+          docker push "${IMAGE_REPO}:cuda"
+          docker push "${IMAGE_REPO}:${SHA_TAG}-cuda"
+
   benchmark-regression:
+    name: Benchmark Regression
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
+
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
           ref: ${{ github.event.pull_request.base.sha }}
           path: baseline
+
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
           go-version: '1.27.4'
+
       - name: Benchmark base revision
         working-directory: baseline
         run: go test -run='^$' -bench='^(BenchmarkSIMD|BenchmarkExpSIMD|BenchmarkLogSIMD|BenchmarkAddSIMD)$' -benchmem -benchtime=250ms -count=10 ./internal/eml > "$RUNNER_TEMP/bench-base.txt"
+
       - name: Benchmark pull request revision
         run: go test -run='^$' -bench='^(BenchmarkSIMD|BenchmarkExpSIMD|BenchmarkLogSIMD|BenchmarkAddSIMD)$' -benchmem -benchtime=250ms -count=10 ./internal/eml > "$RUNNER_TEMP/bench-current.txt"
+
       - name: Check statistically significant regressions
         run: python3 scripts/check_bench_regression.py "$RUNNER_TEMP/bench-base.txt" "$RUNNER_TEMP/bench-current.txt" --max-regression 0.10

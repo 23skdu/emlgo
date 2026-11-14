@@ -11,6 +11,9 @@ import (
 
 var mprotectFn = unix.Mprotect
 
+// AllocateExecutableMemory mmaps a page-aligned anonymous region large enough
+// for code, copies code into it and mprotects it read/execute, returning the
+// region's base address.
 func AllocateExecutableMemory(code []byte) (unsafe.Pointer, error) {
 	if len(code) == 0 {
 		return nil, fmt.Errorf("cannot allocate 0 bytes")
