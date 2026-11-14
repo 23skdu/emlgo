@@ -198,7 +198,7 @@ clean: ## Remove test, build, coverage, profiling and Python venv artifacts
 	rm -rf node_modules/ .playwright/ playwright/ playwright-report/ test-results/
 	rm -rf .venv/ venv/ env/ .pytest_cache/ .mypy_cache/ *.egg-info/
 	find . -path ./.git -prune -o -name '__pycache__' -type d -prune -exec rm -rf {} +
-	find . -path ./.git -prune -o -name '*.pyc' -type f -delete
+	find . -path ./.git -prune -o -name '*.pyc' -type f -exec rm -f {} +
 
 clean-docker: ## Remove this repository's tagged Docker images and the build cache
 	@command -v docker >/dev/null 2>&1 || { echo "docker not found; nothing to clean"; exit 0; }
