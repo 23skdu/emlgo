@@ -495,6 +495,9 @@ func TestPreCommitHookScript(t *testing.T) {
 		if _, err := os.Stat(filepath.Join(root, ".git")); os.IsNotExist(err) {
 			t.Skip(".git directory not present")
 		}
+		if _, err := os.Stat(hookPath); os.IsNotExist(err) && os.Getenv("CI") != "" {
+			t.Skip(".git/hooks/pre-commit not installed in CI checkout")
+		}
 		scriptBytes, err := os.ReadFile(scriptPath)
 		if err != nil {
 			t.Fatalf("Failed to read %s: %v", scriptPath, err)
@@ -553,6 +556,9 @@ func TestVerifyHookScript(t *testing.T) {
 	t.Run("GitHookInstalledAndSyncedWithVerify", func(t *testing.T) {
 		if _, err := os.Stat(filepath.Join(root, ".git")); os.IsNotExist(err) {
 			t.Skip(".git directory not present")
+		}
+		if _, err := os.Stat(hookPath); os.IsNotExist(err) && os.Getenv("CI") != "" {
+			t.Skip(".git/hooks/pre-commit not installed in CI checkout")
 		}
 		scriptBytes, err := os.ReadFile(scriptPath)
 		if err != nil {

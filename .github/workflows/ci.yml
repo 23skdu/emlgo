@@ -26,6 +26,9 @@ jobs:
       - name: Install golangci-lint v2
         run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0
 
+      - name: Install git pre-commit hook for hook-sync tests
+        run: make makehooks
+
       - name: Run verification gate (vet, lint, gosec, quick oracle, 100% coverage)
         run: ./scripts/verify.sh
 
@@ -119,7 +122,7 @@ jobs:
           - name: linux/arm64
             runner: ubuntu-24.04-arm
           - name: darwin/arm64
-            runner: macos-14
+            runner: macos-15
           - name: windows/amd64
             runner: windows-latest
           - name: js/wasm
