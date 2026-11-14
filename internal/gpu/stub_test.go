@@ -10,8 +10,8 @@ import (
 )
 
 func TestStubGetDevices(t *testing.T) {
-	if runtime.GOOS == "js" {
-		t.Skip("GPU support is unavailable on js/wasm")
+	if runtime.GOOS != "linux" && runtime.GOOS != "windows" {
+		t.Skip("CUDA stub assumes Linux or Windows; unsupported OS tested by TestStubGetDevicesUnsupportedOS")
 	}
 	devices, err := GetDevices()
 	if err != nil {
@@ -37,8 +37,8 @@ func TestStubGetDevicesUnsupportedOS(t *testing.T) {
 }
 
 func TestStubStatus(t *testing.T) {
-	if runtime.GOOS == "js" {
-		t.Skip("GPU support is unavailable on js/wasm")
+	if runtime.GOOS != "linux" && runtime.GOOS != "windows" {
+		t.Skip("CUDA stub assumes Linux or Windows; unsupported OS tested by TestStubStatusError")
 	}
 	s := Status()
 	if s == "" {
