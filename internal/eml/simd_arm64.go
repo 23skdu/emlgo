@@ -87,11 +87,6 @@ func addSatInt8NEON(a, b, result []int8)
 //go:noescape
 func subSatInt8NEON(a, b, result []int8)
 
-// addSVE is retained as a stub for backwards-compatibility with test suites
-func addSVE(a, b, result []float64) {
-	_, _, _ = a, b, result
-}
-
 func detectARM64SIMD() {
 	hasSSE4 = false
 	hasAVX2 = false

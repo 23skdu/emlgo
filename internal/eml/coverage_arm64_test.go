@@ -133,7 +133,6 @@ func TestARM64NEONFloat64KernelsExact(t *testing.T) {
 	negNEON(nil, nil)
 	invNEON(nil, nil)
 	fmaNEON(nil, nil, nil, nil)
-	addSVE(nil, nil, nil)
 
 	// fmaScalar
 	if got, want := fmaScalar(1.5, 2.5, 3.25), math.FMA(1.5, 2.5, 3.25); got != want {

@@ -111,8 +111,7 @@ func TestNativeWrappersAndStubs(t *testing.T) {
 	nativeMin(5, math.NaN())
 	nativeMin(10, 5)
 
-	// SVE stubs
-	addSVE(nil, nil, nil)
+	// SVE probe
 	detectSVE()
 
 	// SIMD wrappers

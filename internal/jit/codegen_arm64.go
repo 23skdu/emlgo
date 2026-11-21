@@ -113,10 +113,6 @@ func (e *encoder) fdiv(dst, lhs, rhs byte) {
 	e.emit32(0x1E601800 | (uint32(rhs&31) << 16) | (uint32(lhs&31) << 5) | uint32(dst&31))
 }
 
-func (e *encoder) fmadd(dst, mul1, mul2, addend byte) {
-	e.emit32(0x1F400000 | (uint32(mul2&31) << 16) | (uint32(addend&31) << 10) | (uint32(mul1&31) << 5) | uint32(dst&31))
-}
-
 func (e *encoder) fsqrt(dst, src byte) {
 	e.emit32(0x1E61C000 | (uint32(src&31) << 5) | uint32(dst&31))
 }

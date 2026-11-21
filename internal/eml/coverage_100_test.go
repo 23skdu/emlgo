@@ -95,8 +95,6 @@ func TestPipelineEdgeCases(t *testing.T) {
 }
 
 func TestSIMDEdgeCases(t *testing.T) {
-	addSVE(nil, nil, nil)
-
 	oldFMA := hasFMA
 	hasFMA = false
 	fmaRes := FmaScalar(2, 3, 4)

@@ -21,9 +21,9 @@ func ExamplePow() {
 
 func ExamplePow_numericalStability() {
 	// Pow near x=1 uses Log1p for numerical stability
-	result := arithmetic.Pow(1.0+1e-15, 1e6)
-	fmt.Printf("Pow(1+1e-15, 1e6) = %.6f\n", result)
-	_ = result // approximately 1.001
+	result := arithmetic.Pow(1.0+1e-9, 1e6)
+	fmt.Printf("Pow(1+1e-9, 1e6) = %.6f\n", result)
+	// Output: Pow(1+1e-9, 1e6) = 1.001001
 }
 
 func ExampleSqrt() {

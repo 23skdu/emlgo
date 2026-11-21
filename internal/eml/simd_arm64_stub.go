@@ -17,10 +17,6 @@ func fmaNEON(a, b, c, result []float64)                      { _, _, _, _ = a, b
 func addSatInt8NEON(a, b, result []int8)                     { _, _, _ = a, b, result }
 func subSatInt8NEON(a, b, result []int8)                     { _, _, _ = a, b, result }
 
-func addSVE(a, b, result []float64) {
-	_, _, _ = a, b, result
-}
-
 func detectARM64SIMD() {
 	_ = 0
 }

@@ -20,6 +20,5 @@ func TestArm64DispatchStubs(t *testing.T) {
 	fmaNEON(nil, nil, nil, nil)
 	addSatInt8NEON(nil, nil, nil)
 	subSatInt8NEON(nil, nil, nil)
-	addSVE(nil, nil, nil)
 	detectARM64SIMD()
 }

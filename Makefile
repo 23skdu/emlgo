@@ -1,4 +1,4 @@
-.PHONY: build test test-short test-race test-metal test-arm64-simd test-docker test-scripts test-cover bench bench-mem bench-stat profile profile-cpu profile-mem lint lint-shell lint-docker lint-workflows lint-yaml lint-docs lint-tools brew-tools vet fmt-check fuzz fuzz-metal clean clean-docker clean-cache clean-all wasm security gosec govulncheck oracle-gate accuracy-gate verify check makehooks install-hooks docker docker-build docker-build-cpu docker-build-cuda docker-push docker-push-cpu docker-push-cuda help
+.PHONY: build test test-short test-race test-metal metal-shaders test-arm64-simd test-docker test-scripts test-cover bench bench-mem bench-stat profile profile-cpu profile-mem lint deadcode lint-shell lint-docker lint-workflows lint-yaml lint-docs lint-tools brew-tools vet fmt-check fuzz fuzz-metal clean clean-docker clean-cache clean-all wasm security gosec govulncheck oracle-gate accuracy-gate verify check makehooks install-hooks docker docker-build docker-build-cpu docker-build-cuda docker-push docker-push-cpu docker-push-cuda help
 
 build: ## Compile all packages
 	go build ./...
@@ -18,7 +18,13 @@ test-short: ## Run fast tests only (skips long convergence runs)
 test-race: ## Run tests with the race detector
 	go test -race -count=1 ./...
 
+metal-shaders: ## Compile and validate Metal shaders with strict IEEE-754 flags (macOS)
+	$(MAKE) -C metal all
+
 test-metal: ## Run Apple Metal GPU unit & numerical accuracy tests (darwin/arm64, -tags metal)
+	@if command -v xcrun >/dev/null 2>&1 && xcrun -sdk macosx metal --version >/dev/null 2>&1; then \
+		$(MAKE) -C metal all && $(MAKE) -C metal clean; \
+	fi
 	go test -tags metal -race -count=1 -coverprofile=coverage-metal.out -covermode=atomic ./internal/gpu
 	go tool cover -func=coverage-metal.out | tail -n 1
 	rm -f coverage-metal.out
@@ -79,6 +85,25 @@ vet: ## Run go vet
 lint: fmt-check vet ## fmt-check + vet + golangci-lint
 	@command -v golangci-lint >/dev/null 2>&1 || go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0
 	golangci-lint run ./...
+
+deadcode: ## Check for unreachable functions across packages and tests
+	@DEADCODE="$$(command -v deadcode 2>/dev/null || echo "$$(go env GOPATH)/bin/deadcode")"; \
+	if [ ! -x "$$DEADCODE" ]; then go install golang.org/x/tools/cmd/deadcode@latest; fi; \
+	out="$$("$$DEADCODE" -test ./...)"; \
+	if [ -n "$$out" ]; then \
+		echo "ERROR: Unreachable functions detected:"; \
+		echo "$$out"; \
+		exit 1; \
+	fi; \
+	if [ "$$(uname -s)" = "Darwin" ] && [ "$$(uname -m)" = "arm64" ]; then \
+		out="$$("$$DEADCODE" -test -tags metal ./internal/gpu)"; \
+		if [ -n "$$out" ]; then \
+			echo "ERROR: Unreachable Metal functions detected:"; \
+			echo "$$out"; \
+			exit 1; \
+		fi; \
+	fi; \
+	echo "PASS: 0 unreachable functions detected"
 
 lint-shell: ## Lint shell scripts with shellcheck and shfmt
 	@command -v shellcheck >/dev/null 2>&1 || { echo "shellcheck not installed (run 'make brew-tools')"; exit 1; }

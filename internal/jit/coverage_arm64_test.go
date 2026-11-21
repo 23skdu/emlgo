@@ -18,7 +18,6 @@ func TestNodeSigilARM64(t *testing.T) {
 
 func TestCodegenARM64EdgeCases100(t *testing.T) {
 	var enc encoder
-	enc.fmadd(0, 1, 2, 3)
 	enc.push16(0)
 	enc.pop16(0)
 	if len(enc.code) == 0 {
