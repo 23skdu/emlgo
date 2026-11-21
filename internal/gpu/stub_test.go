@@ -1,18 +1,17 @@
-//go:build !cuda || !cgo
-// +build !cuda !cgo
+//go:build (!cuda && !(darwin && arm64 && metal)) || !cgo
 
 package gpu
 
 import (
-	"runtime"
 	"strings"
 	"testing"
 )
 
 func TestStubGetDevices(t *testing.T) {
-	if runtime.GOOS != "linux" && runtime.GOOS != "windows" {
-		t.Skip("CUDA stub assumes Linux or Windows; unsupported OS tested by TestStubGetDevicesUnsupportedOS")
-	}
+	saved := cudaSupportedOS
+	cudaSupportedOS = func() bool { return true }
+	defer func() { cudaSupportedOS = saved }()
+
 	devices, err := GetDevices()
 	if err != nil {
 		t.Fatalf("GetDevices() should not error on linux/windows: %v", err)
@@ -37,9 +36,10 @@ func TestStubGetDevicesUnsupportedOS(t *testing.T) {
 }
 
 func TestStubStatus(t *testing.T) {
-	if runtime.GOOS != "linux" && runtime.GOOS != "windows" {
-		t.Skip("CUDA stub assumes Linux or Windows; unsupported OS tested by TestStubStatusError")
-	}
+	saved := cudaSupportedOS
+	cudaSupportedOS = func() bool { return true }
+	defer func() { cudaSupportedOS = saved }()
+
 	s := Status()
 	if s == "" {
 		t.Fatal("Status() returned empty string")

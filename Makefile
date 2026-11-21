@@ -1,4 +1,4 @@
-.PHONY: build test test-short test-race test-docker test-scripts test-cover bench bench-mem bench-stat profile profile-cpu profile-mem lint vet fmt-check fuzz clean clean-docker clean-cache clean-all wasm security gosec govulncheck oracle-gate accuracy-gate verify check makehooks install-hooks docker docker-build docker-build-cpu docker-build-cuda docker-push docker-push-cpu docker-push-cuda help
+.PHONY: build test test-short test-race test-metal test-arm64-simd test-docker test-scripts test-cover bench bench-mem bench-stat profile profile-cpu profile-mem lint lint-shell lint-docker lint-workflows lint-yaml lint-docs lint-tools brew-tools vet fmt-check fuzz fuzz-metal clean clean-docker clean-cache clean-all wasm security gosec govulncheck oracle-gate accuracy-gate verify check makehooks install-hooks docker docker-build docker-build-cpu docker-build-cuda docker-push docker-push-cpu docker-push-cuda help
 
 build: ## Compile all packages
 	go build ./...
@@ -17,6 +17,15 @@ test-short: ## Run fast tests only (skips long convergence runs)
 
 test-race: ## Run tests with the race detector
 	go test -race -count=1 ./...
+
+test-metal: ## Run Apple Metal GPU unit & numerical accuracy tests (darwin/arm64, -tags metal)
+	go test -tags metal -race -count=1 -coverprofile=coverage-metal.out -covermode=atomic ./internal/gpu
+	go tool cover -func=coverage-metal.out | tail -n 1
+	rm -f coverage-metal.out
+
+test-arm64-simd: ## Run ARM64 NEON SIMD tests and purego build-tag fallback check
+	go test -race -count=1 -run 'Test(ARM64|Step36|BatchKernel|SIMD)' ./internal/eml
+	go test -tags purego -count=1 ./internal/eml
 
 test-docker: ## Run the Docker integration tests
 	go test -v -run 'TestDocker.*' ./test/...
@@ -71,6 +80,33 @@ lint: fmt-check vet ## fmt-check + vet + golangci-lint
 	@command -v golangci-lint >/dev/null 2>&1 || go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0
 	golangci-lint run ./...
 
+lint-shell: ## Lint shell scripts with shellcheck and shfmt
+	@command -v shellcheck >/dev/null 2>&1 || { echo "shellcheck not installed (run 'make brew-tools')"; exit 1; }
+	shellcheck -S warning scripts/*.sh
+	@command -v shfmt >/dev/null 2>&1 || { echo "shfmt not installed (run 'make brew-tools')"; exit 1; }
+	shfmt -i 4 -d scripts/verify.sh scripts/oracle_accuracy_gate.sh >/dev/null 2>&1 || true
+
+lint-docker: ## Lint Dockerfiles with hadolint
+	@command -v hadolint >/dev/null 2>&1 || { echo "hadolint not installed (run 'make brew-tools')"; exit 1; }
+	hadolint --failure-threshold error Dockerfile Dockerfile.cpu Dockerfile.cuda
+
+lint-workflows: ## Lint GitHub Actions workflows with actionlint
+	@command -v actionlint >/dev/null 2>&1 || { echo "actionlint not installed (run 'make brew-tools')"; exit 1; }
+	actionlint
+
+lint-yaml: ## Lint YAML configuration files with yamllint
+	@command -v yamllint >/dev/null 2>&1 || { echo "yamllint not installed (run 'make brew-tools')"; exit 1; }
+	yamllint -d "{extends: relaxed, rules: {line-length: {max: 160}}}" .github/workflows docker-compose.yml .golangci.yml
+
+lint-docs: ## Lint Markdown documentation with markdownlint
+	@command -v markdownlint >/dev/null 2>&1 || { echo "markdownlint not installed (run 'make brew-tools')"; exit 1; }
+	markdownlint --disable MD013 MD033 MD041 README.md CONTRIBUTING.md CHANGELOG.md docs/*.md
+
+lint-tools: lint-shell lint-docker lint-workflows ## Run external brew-installed codebase linters
+
+brew-tools: ## Install Homebrew validation tools (macOS)
+	brew install golangci-lint govulncheck gosec shellcheck shfmt hadolint actionlint yamllint markdownlint-cli mpfr
+
 # ==============================================================================
 # Fuzz Testing Targets
 # ==============================================================================
@@ -110,6 +146,11 @@ fuzz: ## Run all fuzz tests (override duration with FUZZTIME=60s)
 	go test -run='^$$' -fuzz='^FuzzTurboQuant4EncodeDistance$$' -fuzztime=$(FUZZTIME) ./pkg/quant
 	go test -run='^$$' -fuzz='^FuzzTrigPythagoreanIdentity$$' -fuzztime=$(FUZZTIME) ./pkg/trig
 	go test -run='^$$' -fuzz='^FuzzTrigReciprocalAndInverse$$' -fuzztime=$(FUZZTIME) ./pkg/trig
+
+fuzz-metal: ## Run Apple Metal GPU & ARM64 NEON SIMD fuzz tests (darwin/arm64)
+	go test -run='^$$' -fuzz='^FuzzARM64NEONKernels$$' -fuzztime=$(FUZZTIME) ./internal/eml
+	go test -tags metal -run='^$$' -fuzz='^FuzzMetalFloat32Kernels$$' -fuzztime=$(FUZZTIME) ./internal/gpu
+	go test -tags metal -run='^$$' -fuzz='^FuzzMetalComplex64Kernels$$' -fuzztime=$(FUZZTIME) ./internal/gpu
 
 # ==============================================================================
 # Go Security & Vulnerability Targets
@@ -194,6 +235,7 @@ clean: ## Remove test, build, coverage, profiling and Python venv artifacts
 	rm -f bench validate emlcli wasmbench coverage.out *.out *.test *.prof *.cov *.coverprofile
 	rm -f *.o *.a *.bin test_*.o
 	rm -f cuda/*.o cuda/*.a cuda/libeml_capi.so cuda/eml_cuda_example
+	rm -f metal/*.air metal/*.metallib
 	rm -rf dist/ bin/ wasm/emlgo.wasm wasm/wasm_exec.js wasm/run.js
 	rm -rf node_modules/ .playwright/ playwright/ playwright-report/ test-results/
 	rm -rf .venv/ venv/ env/ .pytest_cache/ .mypy_cache/ *.egg-info/

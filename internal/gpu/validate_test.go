@@ -303,3 +303,71 @@ func BenchmarkVerifyOp(b *testing.B) {
 		_, _, _ = v.VerifyOp("bench", input, result, ref)
 	}
 }
+
+func TestVerifyOpF32AndULPDiffF32(t *testing.T) {
+	v := &BatchVerifier{MaxULP: 1}
+	in := []float32{0.0, 1.0, 2.0}
+	out := []float32{1.0, float32(math.Exp(1.0)), float32(math.Exp(2.0))}
+	maxULP, failed, err := v.VerifyOpF32("Exp", in, out, math.Exp)
+	if err != nil || maxULP != 0 || failed != 0 {
+		t.Fatalf("VerifyOpF32 exact failed: maxULP=%d failed=%d err=%v", maxULP, failed, err)
+	}
+
+	if _, _, mismatchErr := v.VerifyOpF32("Exp", in, out[:2], math.Exp); mismatchErr == nil {
+		t.Fatal("expected length mismatch error")
+	}
+
+	badOut := []float32{1.0, 100.0, float32(math.Exp(2.0))}
+	maxULP, failed, err = v.VerifyOpF32("Exp", in, badOut, math.Exp)
+	if err != nil || failed != 1 || maxULP == 0 {
+		t.Fatalf("VerifyOpF32 failure detection failed: maxULP=%d failed=%d err=%v", maxULP, failed, err)
+	}
+
+	// VerifyBinaryOpF32
+	a := []float32{0.0, 1.0}
+	b := []float32{1.0, 2.0}
+	binRef := func(x, y float64) float64 { return math.Exp(x) - math.Log(y) }
+	binOut := []float32{float32(binRef(0, 1)), float32(binRef(1, 2))}
+	maxULP, failed, err = v.VerifyBinaryOpF32("Eml", a, b, binOut, binRef)
+	if err != nil || maxULP != 0 || failed != 0 {
+		t.Fatalf("VerifyBinaryOpF32 exact failed: maxULP=%d failed=%d err=%v", maxULP, failed, err)
+	}
+	if _, _, mismatchErr := v.VerifyBinaryOpF32("Eml", a, b[:1], binOut, binRef); mismatchErr == nil {
+		t.Fatal("expected VerifyBinaryOpF32 length mismatch error")
+	}
+	binBad := []float32{999.0, float32(binRef(1, 2))}
+	maxULP, failed, err = v.VerifyBinaryOpF32("Eml", a, b, binBad, binRef)
+	if err != nil || failed != 1 || maxULP == 0 {
+		t.Fatalf("VerifyBinaryOpF32 failure detection failed: maxULP=%d failed=%d err=%v", maxULP, failed, err)
+	}
+
+	// ulpDiffF32 exhaustive branches
+	nan32 := float32(math.NaN())
+	pinf32 := float32(math.Inf(1))
+	ninf32 := float32(math.Inf(-1))
+	if ulpDiffF32(nan32, nan32) != 0 {
+		t.Error("NaN vs NaN should be 0")
+	}
+	if ulpDiffF32(nan32, 1.0) != math.MaxUint64 {
+		t.Error("NaN vs 1.0 should be MaxUint64")
+	}
+	if ulpDiffF32(pinf32, pinf32) != 0 {
+		t.Error("+Inf vs +Inf should be 0")
+	}
+	if ulpDiffF32(ninf32, ninf32) != 0 {
+		t.Error("-Inf vs -Inf should be 0")
+	}
+	if ulpDiffF32(pinf32, ninf32) != math.MaxUint64 {
+		t.Error("+Inf vs -Inf should be MaxUint64")
+	}
+	if ulpDiffF32(pinf32, 1.0) != math.MaxUint64 {
+		t.Error("+Inf vs 1.0 should be MaxUint64")
+	}
+	next := math.Nextafter32(1.0, 2.0)
+	if ulpDiffF32(1.0, next) != 1 || ulpDiffF32(next, 1.0) != 1 {
+		t.Error("1 ULP diff failed")
+	}
+	if ulpDiffF32(-1.0, 1.0) == 0 {
+		t.Error("opposite sign diff should be non-zero")
+	}
+}

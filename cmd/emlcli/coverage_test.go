@@ -43,9 +43,15 @@ func TestEmlCli100PercentCoverage(t *testing.T) {
 		})
 	}
 
-	// 4. runGpuStatus with error and with devices
+	// 4. runGpuStatus with error, empty, and devices
 	restore := gpu.SetGetDevicesForTesting(func() ([]gpu.Device, error) {
 		return nil, fmt.Errorf("mock error")
+	})
+	runGpuStatus()
+	restore()
+
+	restore = gpu.SetGetDevicesForTesting(func() ([]gpu.Device, error) {
+		return nil, nil
 	})
 	runGpuStatus()
 	restore()

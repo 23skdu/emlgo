@@ -9,7 +9,10 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-var mprotectFn = unix.Mprotect
+var (
+	mmapFn     = unix.Mmap
+	mprotectFn = unix.Mprotect
+)
 
 // AllocateExecutableMemory mmaps a page-aligned anonymous region large enough
 // for code, copies code into it and mprotects it read/execute, returning the
@@ -21,7 +24,7 @@ func AllocateExecutableMemory(code []byte) (unsafe.Pointer, error) {
 	pageSize := unix.Getpagesize()
 	size := ((len(code) + pageSize - 1) / pageSize) * pageSize
 
-	data, err := unix.Mmap(-1, 0, size, unix.PROT_READ|unix.PROT_WRITE, unix.MAP_ANON|unix.MAP_PRIVATE)
+	data, err := mmapFn(-1, 0, size, unix.PROT_READ|unix.PROT_WRITE, unix.MAP_ANON|unix.MAP_PRIVATE)
 	if err != nil {
 		return nil, fmt.Errorf("mmap failed: %v", err)
 	}

@@ -76,7 +76,6 @@ build_wasm() {
 
 run_wasm_test() {
     local wasm_file="$1"
-    local test_script="${2:-}"
     
     echo "Running: node $WASM_DIR/run.js $WASM_DIR/$wasm_file"
     node "$WASM_DIR/run.js" "$WASM_DIR/$wasm_file"

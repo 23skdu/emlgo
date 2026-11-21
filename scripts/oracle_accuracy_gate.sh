@@ -108,7 +108,8 @@ if [ "$REGEN_CHECK" = true ]; then
         TMP_CSV="$(mktemp)"
         trap 'rm -f "$TMP_BIN" "$TMP_CSV"' EXIT
         if cc -O2 -Wall -Wextra -Werror scripts/generate_mpfr_vectors.c -o "$TMP_BIN" -lmpfr -lgmp 2>/dev/null || \
-           cc -O2 -Wall -Wextra -Werror scripts/generate_mpfr_vectors.c /usr/lib/x86_64-linux-gnu/libmpfr.so.6 -o "$TMP_BIN" 2>/dev/null; then
+           cc -O2 -Wall -Wextra -Werror scripts/generate_mpfr_vectors.c /usr/lib/x86_64-linux-gnu/libmpfr.so.6 -o "$TMP_BIN" 2>/dev/null || \
+           (command -v brew >/dev/null 2>&1 && cc -O2 -Wall -Wextra -Werror -I"$(brew --prefix mpfr)/include" -I"$(brew --prefix gmp)/include" -L"$(brew --prefix mpfr)/lib" -L"$(brew --prefix gmp)/lib" scripts/generate_mpfr_vectors.c -o "$TMP_BIN" -lmpfr -lgmp 2>/dev/null); then
             if "$TMP_BIN" "$TMP_CSV" 2>/dev/null; then
                 if ! diff -u "$MPFR_CSV" "$TMP_CSV"; then
                     echo -e "${RED}FAIL: Regenerated MPFR vectors differ from $MPFR_CSV${NC}" >&2
@@ -167,7 +168,7 @@ VALIDATE_ARGS=()
 if [ "$VERBOSE" = true ]; then
     VALIDATE_ARGS+=("-v")
 fi
-VALIDATE_OUT="$(go run ./cmd/validate "${VALIDATE_ARGS[@]}")"
+VALIDATE_OUT="$(go run ./cmd/validate ${VALIDATE_ARGS[@]+"${VALIDATE_ARGS[@]}"})"
 if [ "$VERBOSE" = true ]; then
     echo "$VALIDATE_OUT"
 fi

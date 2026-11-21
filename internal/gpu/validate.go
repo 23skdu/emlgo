@@ -121,3 +121,78 @@ func (v *BatchVerifier) VerifyBinaryOp(name string, inputA, inputB, gpuResult []
 	}
 	return max, failCount, nil
 }
+
+// VerifyOpF32 compares float32 GPU batch results against a reference CPU function
+// and returns the maximum ULP distance and count of elements exceeding MaxULP.
+func (v *BatchVerifier) VerifyOpF32(name string, input, gpuResult []float32, cpuRef func(float64) float64) (maxULP uint64, failed int, err error) {
+	if len(input) != len(gpuResult) {
+		return 0, 0, fmt.Errorf("input length %d != result length %d", len(input), len(gpuResult))
+	}
+	var max uint64
+	var failCount int
+	for i := range input {
+		cpuVal := float32(cpuRef(float64(input[i])))
+		ulp := ulpDiffF32(gpuResult[i], cpuVal)
+		if ulp > max {
+			max = ulp
+		}
+		if ulp > v.MaxULP {
+			failCount++
+		}
+	}
+	return max, failCount, nil
+}
+
+// VerifyBinaryOpF32 compares float32 binary GPU batch results against a reference CPU function.
+func (v *BatchVerifier) VerifyBinaryOpF32(name string, inputA, inputB, gpuResult []float32, cpuRef func(float64, float64) float64) (maxULP uint64, failed int, err error) {
+	if len(inputA) != len(gpuResult) || len(inputB) != len(gpuResult) {
+		return 0, 0, fmt.Errorf("input length mismatch")
+	}
+	var max uint64
+	var failCount int
+	for i := range inputA {
+		cpuVal := float32(cpuRef(float64(inputA[i]), float64(inputB[i])))
+		ulp := ulpDiffF32(gpuResult[i], cpuVal)
+		if ulp > max {
+			max = ulp
+		}
+		if ulp > v.MaxULP {
+			failCount++
+		}
+	}
+	return max, failCount, nil
+}
+
+func ulpDiffF32(a, b float32) uint64 {
+	if math.IsNaN(float64(a)) || math.IsNaN(float64(b)) {
+		if math.IsNaN(float64(a)) && math.IsNaN(float64(b)) {
+			return 0
+		}
+		return math.MaxUint64
+	}
+	if math.IsInf(float64(a), 0) || math.IsInf(float64(b), 0) {
+		if math.IsInf(float64(a), 1) && math.IsInf(float64(b), 1) {
+			return 0
+		}
+		if math.IsInf(float64(a), -1) && math.IsInf(float64(b), -1) {
+			return 0
+		}
+		return math.MaxUint64
+	}
+	if a == b {
+		return 0
+	}
+	bitsA := uint64(math.Float32bits(a))
+	bitsB := uint64(math.Float32bits(b))
+	magA := bitsA & 0x7fffffff
+	magB := bitsB & 0x7fffffff
+	signA := bitsA >> 31
+	signB := bitsB >> 31
+	if signA == signB {
+		if magA > magB {
+			return magA - magB
+		}
+		return magB - magA
+	}
+	return magA + magB
+}
