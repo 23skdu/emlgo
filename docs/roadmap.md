@@ -44,21 +44,21 @@ Based on deep analysis of the codebase, CI pipeline, and documentation, the foll
 
 ### 3.1 CI/CD Improvements
 
-- **Address Node.js 20 deprecation in GitHub Actions.** All pinned actions (`actions/checkout@v4.2.2`, `actions/setup-go@v5.6.0`, `docker/login-action@v3.7.0`, etc.) target Node.js 20, which GitHub is deprecating. Update to Node.js 24-compatible action versions (e.g., `actions/checkout@v5`, `actions/setup-go@v6`) to eliminate deprecation warnings and future-proof the pipeline.
+- **Address Node.js 20 deprecation in GitHub Actions.** ✅ Done — All actions updated to Node 24-compatible versions: `actions/checkout@v5.0.0`, `actions/setup-go@v6.5.0`, `docker/login-action@v4.0.0`, `softprops/action-gh-release@v3.0.0`, `actions/attest-build-provenance@v4.0.0`, `codecov/codecov-action@v5.0.0`.
 
-- **Upgrade `macos-14` → `macos-15` runner.** Already applied in the current `ci.yml` for the `darwin/arm64` platform test. Ensure all macOS-dependent jobs use `macos-15` or `macos-latest` going forward.
+- **Upgrade `macos-14` → `macos-15` runner.** ✅ Done — Applied in `ci.yml` for `darwin/arm64` platform test.
 
-- **Add an ARM64 Darwin verification job.** The `platform-test` matrix includes `darwin/arm64` on `macos-15`, but NEON assembly execution has not been confirmed. Add a dedicated job that runs `go test -v ./internal/eml/...` on `macos-15` with `-tags` for NEON assembly and reports pass/fail explicitly.
+- **Add an ARM64 Darwin verification job.** ✅ Done — Added `arm64-darwin-verify` job running on `macos-15` with NEON assembly test commands.
 
-- **Pin `golangci-lint` to v2 in CI.** The `verify` job already installs `github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0`. Ensure the `golangci/golangci-lint-action` (if re-added) uses `version: v2.15.0` instead of `latest` to avoid v1/v2 incompatibility with `.golangci.yml` schema v2.
+- **Pin `golangci-lint` to v2 in CI.** ✅ Done — `verify` job installs `golangci-lint/v2@v2.15.0`.
 
 ### 3.2 Code Quality & Documentation
 
 - **Fix roadmap documentation inconsistency.** The Executive Summary table marks IMP-01 and IMP-20 as "Resolved & Verified" while the detailed sections and actual code show arm64 parity is incomplete. Update the Executive Summary to accurately reflect partial resolution (done in this revision).
 
-- **Add `go:generate` or CI check for godoc coverage.** The project enforces 100% statement coverage via `scripts/verify.sh` but has no automated check for exported-symbol documentation coverage. Consider adding a `golangci-lint` `revive` rule (`exported`) or a custom CI step that runs the godoc scanner and fails if any exported symbol lacks a doc comment.
+- **Add `go:generate` or CI check for godoc coverage.** ✅ Done — Added `scripts/check_godoc.sh` (AST-based scanner) and `make check-godoc` target. CI `verify` job runs `make check-godoc` as a gate.
 
-- **Standardize `TAG` default in Makefile.** The `TAG` variable default was updated to `v0.9.0` to match the current release. Ensure `docker-compose.yml` and `Dockerfile` references stay in sync with the latest release tag.
+- **Standardize `TAG` default in Makefile.** ✅ Done — `TAG` default set to `v0.9.0`.
 
 ### 3.3 Performance & Accuracy
 
