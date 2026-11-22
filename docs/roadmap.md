@@ -33,7 +33,7 @@ from this backlog.
 | **FUT-02** | **P2** | ARM64 NEON Rounding & Extrema Assembly | `internal/eml/simd_arm64.s`, `internal/eml/simd_dispatch_arm64.go` | Implement native 2-wide `float64` NEON assembly kernels (`FRINTM.2D`, `FRINTP.2D`, `FRINTZ.2D`, `FRINTN.2D`, `FMAX.2D`, `FMIN.2D` with IEEE 754 `NaN`/signed-zero semantics) for `floorNEON`, `ceilNEON`, `truncNEON`, `roundNEON`, `maxNEON`, and `minNEON`, replacing the current scalar Go loops in `simd_dispatch_arm64.go`. **ARM64 Darwin (Apple Silicon) NEON kernels are unable to be verified at this time** — no ARM64 Darwin CI runner with confirmed NEON assembly execution is available. Marked as **incomplete/unverified** on `darwin/arm64`. |
 | **FUT-03** | **P2** | ARM64 NEON Int8 Dot Product Assembly | `internal/eml/simd_arm64.s`, `internal/eml/simd_dispatch_arm64.go` | Implement `dotInt8NEON(a []uint8, b []int8) int32` using `UXTL`/`SXTL` + `SMLAL`/`SMLAL2` + `ADDV` (and optional `SDOT` when available) to accelerate `dispatchDotInt8SIMD` on `arm64`. |
 | **FUT-04** | **P2** | ARM64 SVE / SVE2 Assembly Kernels | `internal/eml/simd_sve.go`, `internal/eml/simd_sve_arm64.s` | Add predicate-based SVE/SVE2 assembly kernels on `arm64 && linux` once SVE hardware/CI runners are available for end-to-end verification. |
-| **FUT-05** | **P2** | JIT Inline Hardware Math & FMA Fusion | `internal/jit/codegen.go`, `internal/jit/codegen_arm64.go` | Inline `abs` (`ANDPD` on `amd64`), `floor`/`ceil`/`trunc` (`ROUNDSD` on `amd64`, `FRINTM`/`FRINTP`/`FRINTZ` on `arm64`), and fuse `a*b + c` into hardware FMA in the JIT compilers. |
+| **FUT-05** | **P2** | JIT Inline Hardware Math & FMA Fusion | `internal/jit/codegen.go`, `internal/jit/codegen_arm64.go` | ✅ **Partially done** — `abs` (`ANDPD`), `floor` (`ROUNDSD` 0x09), `ceil` (`ROUNDSD` 0x0A), `trunc` (`ROUNDSD` 0x0B) inlined on `amd64`. FMA fusion (`a*b+c` → `VFMADD213SD`) and `arm64` inlining (`FRINTM`/`FRINTP`/`FRINTZ`) still pending. |
 | **FUT-06** | **P2** | Precompiled Metal `.metallib` Fast-Path Loading | `internal/gpu/metal.go`, `internal/gpu/metal_bridge_darwin_arm64.m`, `metal/Makefile` | Support optional ahead-of-time compiled `eml_metal_shaders.metallib` loading with transparent fallback to runtime MSL compilation (`MTLMathModeSafe`). |
 
 ---
@@ -62,11 +62,11 @@ Based on deep analysis of the codebase, CI pipeline, and documentation, the foll
 
 ### 3.3 Performance & Accuracy
 
-- **Verify ARM64 NEON float64 kernels on native hardware.** Once an ARM64 Linux (Graviton) or ARM64 Darwin (Apple Silicon) runner is available, implement and benchmark `floorNEON`, `ceilNEON`, `truncNEON`, `roundNEON`, `maxNEON`, `minNEON` and confirm ≥ 2x speedup over scalar loops.
+- **Verify ARM64 NEON float64 kernels on native hardware.** ⏳ Blocked — Requires ARM64 Linux (Graviton) or ARM64 Darwin (Apple Silicon) runner. `floorNEON`, `ceilNEON`, `truncNEON`, `roundNEON`, `maxNEON`, `minNEON` not yet implemented. No ARM64 CI runner with confirmed NEON assembly execution available.
 
 - **Complete IMP-01 arm64 atomic restore.** ✅ Implemented — `CASAL`-based atomic restore added to `codegen_arm64.go` (`callFunc` and `callFunc2`). Verification under concurrent GC pressure on `linux/arm64` (QEMU or Graviton) still pending.
 
-- **Consider SVE/SVE2 support.** `HasSVE()` currently returns `false` and no SVE kernels exist. For ARM64 servers with SVE (AWS Graviton 3+, Fujitsu A64FX), 4-wide or 8-wide SVE float64 kernels would provide additional throughput. This is a future enhancement, not a blocker.
+- **Consider SVE/SVE2 support.** ⏳ Future — `HasSVE()` currently returns `false` and no SVE kernels exist. For ARM64 servers with SVE (AWS Graviton 3+, Fujitsu A64FX), 4-wide or 8-wide SVE float64 kernels would provide additional throughput. This is a future enhancement, not a blocker. Requires SVE hardware for implementation and verification.
 
 ---
 
