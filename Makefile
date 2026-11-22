@@ -1,4 +1,4 @@
-.PHONY: build test test-short test-race test-metal metal-shaders test-arm64-simd test-docker test-scripts test-cover bench bench-mem bench-stat profile profile-cpu profile-mem lint deadcode lint-shell lint-docker lint-workflows lint-yaml lint-docs lint-tools brew-tools vet fmt-check fuzz fuzz-metal clean clean-docker clean-cache clean-all wasm security gosec govulncheck oracle-gate accuracy-gate verify check makehooks install-hooks docker docker-build docker-build-cpu docker-build-cuda docker-push docker-push-cpu docker-push-cuda actionlint hadolint shellcheck gitleaks trivy gofumpt delve gopls help
+.PHONY: build test test-short test-race test-metal metal-shaders test-arm64-simd test-docker test-scripts test-cover bench bench-mem bench-stat profile profile-cpu profile-mem lint deadcode lint-shell lint-docker lint-workflows lint-yaml lint-docs lint-tools brew-tools vet fmt-check fuzz fuzz-metal clean clean-docker clean-cache clean-all wasm security gosec govulncheck oracle-gate accuracy-gate verify check makehooks install-hooks docker docker-build docker-build-cpu docker-build-cuda docker-push docker-push-cpu docker-push-cuda actionlint hadolint shellcheck gitleaks trivy gofumpt delve gopls check-godoc help
 
 build: ## Compile all packages
 	go build ./...
@@ -126,6 +126,9 @@ lint-yaml: ## Lint YAML configuration files with yamllint
 lint-docs: ## Lint Markdown documentation with markdownlint-cli2
 	@command -v markdownlint-cli2 >/dev/null 2>&1 || { echo "markdownlint-cli2 not installed (run 'make brew-tools')"; exit 1; }
 	markdownlint-cli2 --config .markdownlint.json README.md CONTRIBUTING.md CHANGELOG.md "docs/*.md"
+
+check-godoc: ## Verify all exported symbols have doc comments
+	bash scripts/check_godoc.sh
 
 lint-tools: lint-shell lint-docker lint-workflows ## Run external brew-installed codebase linters
 

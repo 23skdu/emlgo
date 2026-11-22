@@ -8,6 +8,7 @@ import (
 // OpCode represents a virtual machine operation in 1 byte.
 type OpCode uint8
 
+// OpCode constants for the EML bytecode virtual machine.
 const (
 	// OpConst pushes Consts[constIdx++] onto the evaluation stack.
 	OpConst OpCode = iota
