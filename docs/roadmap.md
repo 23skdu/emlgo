@@ -29,7 +29,7 @@ from this backlog.
 
 | ID | Priority | Category | Component / Files | Scope & Acceptance Criteria |
 | :--- | :--- | :--- | :--- | :--- |
-| **FUT-01** | **P0** | ARM64 JIT Atomic Restore | `internal/jit/codegen_arm64.go` | Replace non-atomic `LDR`/`STR` stackguard0 restore with `CASAL` (ARMv8.1+) or `LDXR`/`STXR` retry loop in `callFunc` and `callFunc2`, matching `amd64`'s `LOCK CMPXCHGQ`. Verify under concurrent GC pressure on `linux/arm64`. |
+| **FUT-01** | **P0** | ARM64 JIT Atomic Restore | `internal/jit/codegen_arm64.go` | ✅ **Implemented** — Replaced non-atomic `LDR`/`STR` stackguard0 restore with `CASAL` (ARMv8.1+) in `callFunc` and `callFunc2`, matching `amd64`'s `LOCK CMPXCHGQ`. Encoding verified via clang (`casal x9, x10, [x11]` = `0xC8E9FD6A`). **Verification pending** — requires `linux/arm64` hardware (Graviton/QEMU) under concurrent GC pressure. |
 | **FUT-02** | **P2** | ARM64 NEON Rounding & Extrema Assembly | `internal/eml/simd_arm64.s`, `internal/eml/simd_dispatch_arm64.go` | Implement native 2-wide `float64` NEON assembly kernels (`FRINTM.2D`, `FRINTP.2D`, `FRINTZ.2D`, `FRINTN.2D`, `FMAX.2D`, `FMIN.2D` with IEEE 754 `NaN`/signed-zero semantics) for `floorNEON`, `ceilNEON`, `truncNEON`, `roundNEON`, `maxNEON`, and `minNEON`, replacing the current scalar Go loops in `simd_dispatch_arm64.go`. **ARM64 Darwin (Apple Silicon) NEON kernels are unable to be verified at this time** — no ARM64 Darwin CI runner with confirmed NEON assembly execution is available. Marked as **incomplete/unverified** on `darwin/arm64`. |
 | **FUT-03** | **P2** | ARM64 NEON Int8 Dot Product Assembly | `internal/eml/simd_arm64.s`, `internal/eml/simd_dispatch_arm64.go` | Implement `dotInt8NEON(a []uint8, b []int8) int32` using `UXTL`/`SXTL` + `SMLAL`/`SMLAL2` + `ADDV` (and optional `SDOT` when available) to accelerate `dispatchDotInt8SIMD` on `arm64`. |
 | **FUT-04** | **P2** | ARM64 SVE / SVE2 Assembly Kernels | `internal/eml/simd_sve.go`, `internal/eml/simd_sve_arm64.s` | Add predicate-based SVE/SVE2 assembly kernels on `arm64 && linux` once SVE hardware/CI runners are available for end-to-end verification. |
@@ -64,7 +64,7 @@ Based on deep analysis of the codebase, CI pipeline, and documentation, the foll
 
 - **Verify ARM64 NEON float64 kernels on native hardware.** Once an ARM64 Linux (Graviton) or ARM64 Darwin (Apple Silicon) runner is available, implement and benchmark `floorNEON`, `ceilNEON`, `truncNEON`, `roundNEON`, `maxNEON`, `minNEON` and confirm ≥ 2x speedup over scalar loops.
 
-- **Complete IMP-01 arm64 atomic restore.** Implement `CASAL`-based atomic restore in `codegen_arm64.go` and verify under concurrent GC pressure on `linux/arm64` (QEMU or Graviton). This is the last remaining JIT stability gap.
+- **Complete IMP-01 arm64 atomic restore.** ✅ Implemented — `CASAL`-based atomic restore added to `codegen_arm64.go` (`callFunc` and `callFunc2`). Verification under concurrent GC pressure on `linux/arm64` (QEMU or Graviton) still pending.
 
 - **Consider SVE/SVE2 support.** `HasSVE()` currently returns `false` and no SVE kernels exist. For ARM64 servers with SVE (AWS Graviton 3+, Fujitsu A64FX), 4-wide or 8-wide SVE float64 kernels would provide additional throughput. This is a future enhancement, not a blocker.
 

@@ -195,8 +195,12 @@ func (e *encoder) callFunc(fn jitFunc, argReg byte) {
 	e.emit32(0x58000008) // LDR X8, label
 	e.emit32(0xD63F0100) // BLR X8
 
-	e.restoreX(9, 272)
-	e.emit32(0xF9000B89) // STR X9, [X28, #16]
+	// Atomic restore: only write saved value if g.stackguard0 still equals g.stack.lo
+	// (preserves concurrent GC stackPreempt writes). Uses CASAL (ARMv8.1+).
+	e.emit32(0x9100438B) // ADD X11, X28, #16  (address of g.stackguard0)
+	e.emit32(0xF9400389) // LDR X9, [X28, #0]  (expected = g.stack.lo)
+	e.restoreX(10, 272)   // X10 = saved original stackguard0
+	e.emit32(0xC8E9FD6A) // CASAL X9, X10, [X11]
 
 	for i := byte(1); i < 16; i++ {
 		e.restoreD(i, callSaveOffset+uint32(i)*8)
@@ -230,8 +234,12 @@ func (e *encoder) callFunc2(fn jitFunc2, arg0, arg1 byte) {
 	e.emit32(0x58000008) // LDR X8, label
 	e.emit32(0xD63F0100) // BLR X8
 
-	e.restoreX(9, 272)
-	e.emit32(0xF9000B89) // STR X9, [X28, #16]
+	// Atomic restore: only write saved value if g.stackguard0 still equals g.stack.lo
+	// (preserves concurrent GC stackPreempt writes). Uses CASAL (ARMv8.1+).
+	e.emit32(0x9100438B) // ADD X11, X28, #16  (address of g.stackguard0)
+	e.emit32(0xF9400389) // LDR X9, [X28, #0]  (expected = g.stack.lo)
+	e.restoreX(10, 272)   // X10 = saved original stackguard0
+	e.emit32(0xC8E9FD6A) // CASAL X9, X10, [X11]
 
 	for i := byte(1); i < 16; i++ {
 		e.restoreD(i, callSaveOffset+uint32(i)*8)
