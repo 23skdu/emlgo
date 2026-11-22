@@ -213,7 +213,7 @@ makehooks: ## Install the git pre-commit hook
 install-hooks: makehooks ## Alias for makehooks
 
 IMAGE_REPO ?= ghcr.io/23skdu/emlgo
-TAG ?= v0.8.0
+TAG ?= v0.9.0
 CUDA_ARCH ?= sm_89
 
 docker-build-cpu: ## Build the CPU Docker image
@@ -293,5 +293,5 @@ help: ## List all available targets and variables
 	@echo "Variables (override on the command line):"
 	@echo "  FUZZTIME=$(FUZZTIME)          Duration per fuzz test (default 30s)"
 	@echo "  IMAGE_REPO=$(IMAGE_REPO)      Docker image repository (default ghcr.io/23skdu/emlgo)"
-	@echo "  TAG=$(TAG)                    Docker image tag (default v0.8.0)"
+	@echo "  TAG=$(TAG)                    Docker image tag (default v0.9.0)"
 	@echo "  CUDA_ARCH=$(CUDA_ARCH)        CUDA arch for cuda images (default sm_89)"
