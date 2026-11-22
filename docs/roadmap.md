@@ -1,79 +1,40 @@
 # EML Go Engineering Roadmap: Remaining Work & Recommendations
 
-An evidence-based engineering roadmap for `emlgo` tracking the remaining open items
-after the IMP-01–IMP-20 improvement cycle. All completed improvements (IMP-02 through
-IMP-19) have been verified, merged, and archived in Git history and release notes.
+An evidence-based engineering roadmap for `emlgo` tracking the remaining open items.
+Completed improvements (IMP-02 through IMP-19, and the `amd64` portions of IMP-01 and
+IMP-20) have been verified, merged, and archived in Git history and release notes.
+IMP-01 (ARM64 JIT atomic restore) and IMP-20 (ARM64 NEON `float64` rounding/extrema
+kernels) have **remaining work** detailed below.
 
 ---
 
-## 1. Executive Summary: Remaining Improvements
+## 1. Completed Milestones (Removed)
 
-| ID | Priority | Category | Component / Files | Headline Defect, Bottleneck or Gap & Empirical Evidence |
+All 18 fully-completed items from the v0.8 performance & accuracy audit (IMP-02 through
+IMP-19) — including `//go:noescape` zero-alloc SIMD kernels, AVX-512 `NaN` propagation,
+ARM64 `VFMLA` single-rounding FMA, zero-alloc complex batch kernels, `eml.SIMD`
+vectorization, IEEE 754 `Pow`/`trig`/`hyper`/`bigmath` fixes, `sincosAVX2`, bytecode VM
+& optimizer fixes, `TurboQuant4` pooling, AVX2 `dotInt8AVX2`, pipeline affine
+vectorization, fastmath `NaN` guardrails, float32 `*To` APIs, and the build-tagged
+Apple Metal (`-tags metal`) GPU backend — have been verified 100% complete and removed
+from this backlog.
+
+> **Note:** IMP-01 (`amd64` JIT stackguard0 hardening) and IMP-20 (float32 `*To`
+> variants) are **partially complete** — their `amd64`/cross-platform portions are done,
+> but ARM64-specific work remains open (see FUT-01, FUT-06 below).
+
+---
+
+## 2. Open Future Work
+
+| ID | Priority | Category | Component / Files | Scope & Acceptance Criteria |
 | :--- | :--- | :--- | :--- | :--- |
-| **IMP-01** | **P0** | JIT Stability & Runtime Safety | `internal/jit/codegen.go`, `internal/jit/codegen_arm64.go`, `internal/jit/codegen_test.go` | **Partially resolved:** Hardened indirect `CALL R8` transitions on `amd64` via atomic `g.stackguard0` (`16(R14)`) save/restore (`LOCK CMPXCHGQ`). **`arm64` parity is still pending** — `codegen_arm64.go` uses non-atomic `LDR`/`STR` for the restore, which can clobber concurrent GC `stackPreempt` writes. |
-| **IMP-20** | **P2** | Cross-Platform SIMD Completeness (`arm64` & `float32`) | `internal/eml/simd_arm64.s`, `internal/eml/simd_dispatch_arm64.go`, `internal/eml/simd_f32.go` | **Partially resolved:** Zero-allocation `float32` `*To` variants (`ExpSIMDF32To`, `LogSIMDF32To`, `SinSIMDF32To`, `CosSIMDF32To`, `TanSIMDF32To`) are implemented. **ARM64 NEON `float64` rounding/extrema kernels (`floorNEON`, `ceilNEON`, `truncNEON`, `roundNEON`, `maxNEON`, `minNEON`) are not implemented** — dispatch falls back to scalar Go loops. ARM64 Darwin (Apple Silicon) NEON kernels **cannot be verified at this time** (no ARM64 Darwin CI runner with NEON assembly execution available). |
-
----
-
-## 2. Detailed Technical Specifications
-
-### IMP-01: JIT Go-Call Stack-Unwind Hardening (`fatal error: unknown caller pc`)
-
-**Priority:** P0 | **Category:** JIT Stability & Runtime Safety | **Status:** Resolved on `amd64`; `arm64` atomic restore (CASAL) pending
-
-**Affected Files:**
-- `internal/jit/codegen.go:228-328` (amd64 — completed)
-- `internal/jit/codegen_arm64.go:177-246` (arm64 — pending atomic restore)
-
-**Evidence & Root Cause:**
-When JIT-compiled machine code residing in anonymous `mmap` memory executes an indirect call (`CALL R8` on `amd64`, `BLR X8` on `arm64`) to a Go `math.*` function, the CPU pushes the `mmap` return PC onto the goroutine stack. If concurrent GC mark termination sets `g.stackguard0 = stackPreempt` to shrink or preempt the goroutine stack, the Go `math.*` prologue jumps into `runtime.morestack()` → `runtime.newstack()` → `runtime.shrinkstack()` → `runtime.copystack()`. When `runtime.(*unwinder).next()` encounters the `mmap` return PC (absent from Go's `pclntab`), the runtime aborts with `fatal error: unknown caller pc`.
-
-On `amd64`, this is fixed by saving `g.stackguard0` to the stack, setting it to `g.stack.lo` (NOSPLIT semantics) before `CALL R8`, then atomically restoring via `LOCK CMPXCHGQ` so concurrent `stackPreempt` writes are preserved.
-
-On `arm64`, the save/restore exists but uses non-atomic `LDR`/`STR`, which unconditionally overwrites `g.stackguard0` and can clobber a concurrent `stackPreempt` signal.
-
-**Required Changes:**
-1. In `internal/jit/codegen_arm64.go` (`callFunc` and `callFunc2`), replace the non-atomic restore:
-   ```assembly
-   LDR X9, [sp+272]
-   STR X9, [X28, #16]
-   ```
-   with an atomic compare-and-swap using `CASAL` (ARMv8.1+) or a `LDXR`/`STXR` retry loop:
-   ```assembly
-   // Atomic restore: only write saved value if g.stackguard0 still equals g.stack.lo
-   LDR  X9, [X28, #0]        // X9 = g.stack.lo (expected current value)
-   LDR  X10, [sp+272]        // X10 = saved original stackguard0
-   CASAL X9, X10, [X28, #16] // atomically swap if [X28,#16] == X9
-   ```
-2. Ensure all high-iteration JIT tests (`TestJITDifferentialStep11`, `FuzzJITDifferential`) release executable pages via `handle.Free()`.
-
-**Verification:**
-- `go test -short -count=1 -covermode=atomic ./internal/jit/...` passes 100/100 runs under heavy concurrent GC pressure on `linux/arm64` without stack-unwinder crashes.
-
----
-
-### IMP-20: ARM64 NEON `float64` Rounding/Extrema Kernels & Vectorized `float32` Transcendental `*To` Kernels
-
-**Priority:** P2 | **Category:** Cross-Platform SIMD Completeness (`arm64` & `float32`) | **Status:** Partially resolved — float32 `*To` variants done; ARM64 NEON float64 rounding/extrema pending; ARM64 Darwin NEON kernels unable to be verified
-
-**Affected Files:**
-- `internal/eml/simd_arm64.s` (missing: `floorNEON`, `ceilNEON`, `truncNEON`, `roundNEON`, `maxNEON`, `minNEON`)
-- `internal/eml/simd_dispatch_arm64.go:398-445` (scalar Go loop fallbacks)
-- `internal/eml/simd_f32.go` (float32 `*To` variants — completed)
-
-**Evidence & Root Cause:**
-1. In `internal/eml/simd_dispatch_arm64.go:398-445`, `dispatchFloorSIMDTo`, `dispatchCeilSIMDTo`, `dispatchTruncSIMDTo`, `dispatchRoundSIMDTo`, `dispatchMaxSIMDTo`, and `dispatchMinSIMDTo` execute scalar Go loops on `arm64`, even though ARMv8-A NEON provides single-instruction 2-wide `float64` vector instructions `FRINTM.2D`, `FRINTP.2D`, `FRINTZ.2D`, `FRINTN.2D`, `FMAX.2D`, and `FMIN.2D`.
-2. The `float32` `*To` variants (`ExpSIMDF32To`, `LogSIMDF32To`, `SinSIMDF32To`, `CosSIMDF32To`, `TanSIMDF32To`) have been implemented in `internal/eml/simd_f32.go` and are verified on `amd64`. The ARM64 NEON float32 assembly kernels (`addNEONF32`, `subNEONF32`, `mulNEONF32`, `divNEONF32`, `sqrtNEONF32`, `fmaNEONF32`) are implemented in `internal/eml/simd_arm64_f32.s`.
-3. **ARM64 Darwin (Apple Silicon) NEON kernels cannot be verified at this time** — no ARM64 Darwin CI runner with NEON assembly execution is available in the current GitHub Actions configuration (`macos-15` runners provide ARM64 but NEON assembly verification requires native execution which has not been confirmed).
-
-**Required Changes:**
-1. Implement `floorNEON`, `ceilNEON`, `truncNEON`, `roundNEON`, `maxNEON`, and `minNEON` in `internal/eml/simd_arm64.s` using `FRINTM.2D`, `FRINTP.2D`, `FRINTZ.2D`, `FRINTN.2D`, `FMAX.2D`, `FMIN.2D`.
-2. Wire them into `simd_dispatch_arm64.go` following the SIMD-lanes-then-scalar-tail pattern (process 2-wide NEON lanes, then scalar fallback for the tail).
-3. Verify on ARM64 Linux (Graviton/QEMU) and, when available, on ARM64 Darwin (Apple Silicon).
-
-**Verification:**
-- `go test -bench=. ./internal/eml/...` on ARM64 Linux verifies `0 allocs/op` on the new NEON dispatch paths and ≤ 1 ULP accuracy against `math.Floor`/`math.Ceil`/`math.Trunc`/`math.RoundToEven`/`math.Max`/`math.Min`.
-- ARM64 Darwin NEON verification is **blocked** — no verified ARM64 Darwin test environment available.
+| **FUT-01** | **P0** | ARM64 JIT Atomic Restore | `internal/jit/codegen_arm64.go` | Replace non-atomic `LDR`/`STR` stackguard0 restore with `CASAL` (ARMv8.1+) or `LDXR`/`STXR` retry loop in `callFunc` and `callFunc2`, matching `amd64`'s `LOCK CMPXCHGQ`. Verify under concurrent GC pressure on `linux/arm64`. |
+| **FUT-02** | **P2** | ARM64 NEON Rounding & Extrema Assembly | `internal/eml/simd_arm64.s`, `internal/eml/simd_dispatch_arm64.go` | Implement native 2-wide `float64` NEON assembly kernels (`FRINTM.2D`, `FRINTP.2D`, `FRINTZ.2D`, `FRINTN.2D`, `FMAX.2D`, `FMIN.2D` with IEEE 754 `NaN`/signed-zero semantics) for `floorNEON`, `ceilNEON`, `truncNEON`, `roundNEON`, `maxNEON`, and `minNEON`, replacing the current scalar Go loops in `simd_dispatch_arm64.go`. **ARM64 Darwin (Apple Silicon) NEON kernels are unable to be verified at this time** — no ARM64 Darwin CI runner with confirmed NEON assembly execution is available. Marked as **incomplete/unverified** on `darwin/arm64`. |
+| **FUT-03** | **P2** | ARM64 NEON Int8 Dot Product Assembly | `internal/eml/simd_arm64.s`, `internal/eml/simd_dispatch_arm64.go` | Implement `dotInt8NEON(a []uint8, b []int8) int32` using `UXTL`/`SXTL` + `SMLAL`/`SMLAL2` + `ADDV` (and optional `SDOT` when available) to accelerate `dispatchDotInt8SIMD` on `arm64`. |
+| **FUT-04** | **P2** | ARM64 SVE / SVE2 Assembly Kernels | `internal/eml/simd_sve.go`, `internal/eml/simd_sve_arm64.s` | Add predicate-based SVE/SVE2 assembly kernels on `arm64 && linux` once SVE hardware/CI runners are available for end-to-end verification. |
+| **FUT-05** | **P2** | JIT Inline Hardware Math & FMA Fusion | `internal/jit/codegen.go`, `internal/jit/codegen_arm64.go` | Inline `abs` (`ANDPD` on `amd64`), `floor`/`ceil`/`trunc` (`ROUNDSD` on `amd64`, `FRINTM`/`FRINTP`/`FRINTZ` on `arm64`), and fuse `a*b + c` into hardware FMA in the JIT compilers. |
+| **FUT-06** | **P2** | Precompiled Metal `.metallib` Fast-Path Loading | `internal/gpu/metal.go`, `internal/gpu/metal_bridge_darwin_arm64.m`, `metal/Makefile` | Support optional ahead-of-time compiled `eml_metal_shaders.metallib` loading with transparent fallback to runtime MSL compilation (`MTLMathModeSafe`). |
 
 ---
 
@@ -95,9 +56,9 @@ Based on deep analysis of the codebase, CI pipeline, and documentation, the foll
 
 5. **Fix roadmap documentation inconsistency.** The Executive Summary table marks IMP-01 and IMP-20 as "Resolved & Verified" while the detailed sections and actual code show arm64 parity is incomplete. Update the Executive Summary to accurately reflect partial resolution (done in this revision).
 
-6. **Add `go:generate` or CI check for godoc coverage.** The project enforces 100% statement coverage via `scripts/verify.sh` but has no automated check for exported-symbol documentation coverage. Consider adding a `golangci-lint` `revive` rule (`exported`) or a custom CI step that runs the godoc scanner (`/tmp/opencode/godocscan.go` or equivalent) and fails if any exported symbol lacks a doc comment.
+6. **Add `go:generate` or CI check for godoc coverage.** The project enforces 100% statement coverage via `scripts/verify.sh` but has no automated check for exported-symbol documentation coverage. Consider adding a `golangci-lint` `revive` rule (`exported`) or a custom CI step that runs the godoc scanner and fails if any exported symbol lacks a doc comment.
 
-7. **Standardize `TAG` default in Makefile.** The `TAG` variable default was updated from `0.6` to `v0.9.0` to match the current release. Ensure `docker-compose.yml` and `Dockerfile` references stay in sync with the latest release tag.
+7. **Standardize `TAG` default in Makefile.** The `TAG` variable default was updated to `v0.9.0` to match the current release. Ensure `docker-compose.yml` and `Dockerfile` references stay in sync with the latest release tag.
 
 ### 3.3 Performance & Accuracy
 
@@ -111,7 +72,7 @@ Based on deep analysis of the codebase, CI pipeline, and documentation, the foll
 
 ## 4. Unit & Fuzz Testing Scope (100.0% Statement Coverage)
 
-Statement coverage across all 17 non-test packages is enforced at **100.0%** (`PRECOMMIT_MIN_COVERAGE=100.0`). The fuzzing matrix includes **64 fuzz targets** across all 11 core and internal packages. See `docs/roadmap.md` (Section 3 of the previous version) for the full fuzz target inventory.
+Statement coverage across all 17 non-test packages is enforced at **100.0%** (`PRECOMMIT_MIN_COVERAGE=100.0`). The fuzzing matrix includes **64 fuzz targets** across all 11 core and internal packages.
 
 ---
 
