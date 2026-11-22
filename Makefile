@@ -1,4 +1,4 @@
-.PHONY: build test test-short test-race test-metal metal-shaders test-arm64-simd test-docker test-scripts test-cover bench bench-mem bench-stat profile profile-cpu profile-mem lint deadcode lint-shell lint-docker lint-workflows lint-yaml lint-docs lint-tools brew-tools vet fmt-check fuzz fuzz-metal clean clean-docker clean-cache clean-all wasm security gosec govulncheck oracle-gate accuracy-gate verify check makehooks install-hooks docker docker-build docker-build-cpu docker-build-cuda docker-push docker-push-cpu docker-push-cuda help
+.PHONY: build test test-short test-race test-metal metal-shaders test-arm64-simd test-docker test-scripts test-cover bench bench-mem bench-stat profile profile-cpu profile-mem lint deadcode lint-shell lint-docker lint-workflows lint-yaml lint-docs lint-tools brew-tools vet fmt-check fuzz fuzz-metal clean clean-docker clean-cache clean-all wasm security gosec govulncheck oracle-gate accuracy-gate verify check makehooks install-hooks docker docker-build docker-build-cpu docker-build-cuda docker-push docker-push-cpu docker-push-cuda actionlint hadolint shellcheck gitleaks trivy gofumpt delve gopls help
 
 build: ## Compile all packages
 	go build ./...
@@ -123,14 +123,14 @@ lint-yaml: ## Lint YAML configuration files with yamllint
 	@command -v yamllint >/dev/null 2>&1 || { echo "yamllint not installed (run 'make brew-tools')"; exit 1; }
 	yamllint -d "{extends: relaxed, rules: {line-length: {max: 160}}}" .github/workflows docker-compose.yml .golangci.yml
 
-lint-docs: ## Lint Markdown documentation with markdownlint
-	@command -v markdownlint >/dev/null 2>&1 || { echo "markdownlint not installed (run 'make brew-tools')"; exit 1; }
-	markdownlint --disable MD013 MD033 MD041 README.md CONTRIBUTING.md CHANGELOG.md docs/*.md
+lint-docs: ## Lint Markdown documentation with markdownlint-cli2
+	@command -v markdownlint-cli2 >/dev/null 2>&1 || { echo "markdownlint-cli2 not installed (run 'make brew-tools')"; exit 1; }
+	markdownlint-cli2 --config .markdownlint.json README.md CONTRIBUTING.md CHANGELOG.md "docs/*.md"
 
 lint-tools: lint-shell lint-docker lint-workflows ## Run external brew-installed codebase linters
 
-brew-tools: ## Install Homebrew validation tools (macOS)
-	brew install golangci-lint govulncheck gosec shellcheck shfmt hadolint actionlint yamllint markdownlint-cli mpfr
+brew-tools: ## Install Homebrew validation tools (macOS/Linux)
+	brew install golangci-lint govulncheck gosec shellcheck shfmt hadolint actionlint yamllint markdownlint-cli2 mpfr gofumpt gitleaks trivy delve gopls
 
 # ==============================================================================
 # Fuzz Testing Targets
@@ -279,6 +279,41 @@ clean-cache: ## Remove the Go test cache
 	go clean -testcache
 
 clean-all: clean clean-docker clean-cache ## Remove artifacts, venvs, Docker images and caches
+
+# ==============================================================================
+# CI / Workflow Validation Targets
+# ==============================================================================
+
+actionlint: ## Run actionlint on GitHub Actions workflow files
+	@command -v actionlint >/dev/null 2>&1 || brew install actionlint
+	actionlint .github/workflows/*.yml
+
+hadolint: ## Run hadolint on Dockerfiles
+	@command -v hadolint >/dev/null 2>&1 || brew install hadolint
+	hadolint Dockerfile Dockerfile.cpu Dockerfile.cuda
+
+shellcheck: ## Run shellcheck on shell scripts
+	@command -v shellcheck >/dev/null 2>&1 || brew install shellcheck
+	shellcheck scripts/*.sh
+
+gitleaks: ## Run gitleaks to detect secrets in the repository
+	@command -v gitleaks >/dev/null 2>&1 || brew install gitleaks
+	gitleaks detect --source . --no-git
+
+trivy: ## Run trivy vulnerability scanner on the filesystem
+	@command -v trivy >/dev/null 2>&1 || brew install trivy
+	trivy fs --severity HIGH,CRITICAL .
+
+gofumpt: ## Run gofumpt (stricter gofmt) on all Go files
+	@command -v gofumpt >/dev/null 2>&1 || brew install gofumpt
+	gofumpt -w .
+
+delve: ## Install delve debugger
+	@command -v delve >/dev/null 2>&1 || brew install delve
+	@command -v dlv >/dev/null 2>&1 || brew install delve
+
+gopls: ## Install gopls language server
+	@command -v gopls >/dev/null 2>&1 || brew install gopls
 
 # ==============================================================================
 # Help

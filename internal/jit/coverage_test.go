@@ -28,6 +28,35 @@ func TestEncoderSqrtsd(t *testing.T) {
 	}
 }
 
+func TestEncoderRoundsd(t *testing.T) {
+	for _, mode := range []byte{0x09, 0x0A, 0x0B} {
+		var e encoder
+		e.roundsd(0, 1, mode)
+		if len(e.code) != 6 {
+			t.Fatalf("roundsd emitted %d bytes, want 6", len(e.code))
+		}
+	}
+}
+
+func TestEncoderAndpd(t *testing.T) {
+	var e encoder
+	e.andpd(0, 1)
+	if len(e.code) != 4 {
+		t.Fatalf("andpd emitted %d bytes, want 4", len(e.code))
+	}
+}
+
+func TestGenFuncCallAbsFallback(t *testing.T) {
+	g := &generator{}
+	for i := byte(0); i < 14; i++ {
+		g.used[i] = true
+	}
+	// abs with all registers used triggers the callFunc fallback.
+	if err := g.genFuncCall("abs", Number{Value: -5}, 0); err != nil {
+		t.Fatalf("genFuncCall abs fallback failed: %v", err)
+	}
+}
+
 func TestEncoderAddPoolDedup(t *testing.T) {
 	var e encoder
 	idx0 := e.addPool(3.14)

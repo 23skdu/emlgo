@@ -185,6 +185,15 @@ func (e *encoder) mulsd(dst, src byte)  { e.sse2(0xF2, 0x59, dst, src) }
 func (e *encoder) divsd(dst, src byte)  { e.sse2(0xF2, 0x5E, dst, src) }
 func (e *encoder) sqrtsd(dst, src byte) { e.sse2(0xF2, 0x51, dst, src) }
 func (e *encoder) xorpd(dst, src byte)  { e.sse2(0x66, 0x57, dst, src) }
+func (e *encoder) andpd(dst, src byte)  { e.sse2(0x66, 0x54, dst, src) }
+
+// roundsd emits ROUNDSD with the given rounding mode (imm8).
+// Modes: 0x01=floor, 0x02=ceil, 0x03=trunc (precision exception suppressed: +0x08).
+func (e *encoder) roundsd(dst, src byte, mode byte) {
+	e.emit(0x66, 0x0F, 0x3A, 0x0B)
+	e.emit(e.modrm(3, dst&7, src&7))
+	e.emit(mode)
+}
 
 const (
 	callFrameSize  = 264
@@ -473,6 +482,39 @@ func (g *generator) genFuncCall(name string, arg Node, dst byte) error {
 		g.enc.sqrtsd(dst, dst)
 		return nil
 	}
+	if name == "abs" {
+		// ANDPD with mask 0x7fffffffffffffff (clear sign bit).
+		idx := g.enc.addPool(math.Float64frombits(0x7fffffffffffffff))
+		g.used[dst] = true
+		tmp, err := g.alloc()
+		g.used[dst] = false
+		if err != nil {
+			// Fall back to callFunc if no register available.
+			g.enc.callFunc(fn, dst)
+			if dst != 0 {
+				g.enc.movsdXmmXmm(dst, 0)
+			}
+			return nil
+		}
+		g.enc.loadConstant(tmp, idx)
+		g.enc.andpd(dst, tmp)
+		g.free(tmp)
+		return nil
+	}
+	if name == "floor" {
+		g.enc.roundsd(dst, dst, 0x09)
+		return nil
+	}
+	if name == "ceil" {
+		g.enc.roundsd(dst, dst, 0x0A)
+		return nil
+	}
+	if name == "trunc" {
+		g.enc.roundsd(dst, dst, 0x0B)
+		return nil
+	}
+	// "round" (math.Round, ties away from zero) is not expressible via
+	// ROUNDSD's supported rounding modes, so fall through to callFunc.
 	// Call the function. dst holds the argument; result goes to xmm0.
 	// callFunc saves/restores xmm1-xmm7 but xmm0 gets the return value.
 	g.enc.callFunc(fn, dst)

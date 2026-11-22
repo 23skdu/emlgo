@@ -44,29 +44,29 @@ Based on deep analysis of the codebase, CI pipeline, and documentation, the foll
 
 ### 3.1 CI/CD Improvements
 
-1. **Address Node.js 20 deprecation in GitHub Actions.** All pinned actions (`actions/checkout@v4.2.2`, `actions/setup-go@v5.6.0`, `docker/login-action@v3.7.0`, etc.) target Node.js 20, which GitHub is deprecating. Update to Node.js 24-compatible action versions (e.g., `actions/checkout@v5`, `actions/setup-go@v6`) to eliminate deprecation warnings and future-proof the pipeline.
+- **Address Node.js 20 deprecation in GitHub Actions.** All pinned actions (`actions/checkout@v4.2.2`, `actions/setup-go@v5.6.0`, `docker/login-action@v3.7.0`, etc.) target Node.js 20, which GitHub is deprecating. Update to Node.js 24-compatible action versions (e.g., `actions/checkout@v5`, `actions/setup-go@v6`) to eliminate deprecation warnings and future-proof the pipeline.
 
-2. **Upgrade `macos-14` → `macos-15` runner.** Already applied in the current `ci.yml` for the `darwin/arm64` platform test. Ensure all macOS-dependent jobs use `macos-15` or `macos-latest` going forward.
+- **Upgrade `macos-14` → `macos-15` runner.** Already applied in the current `ci.yml` for the `darwin/arm64` platform test. Ensure all macOS-dependent jobs use `macos-15` or `macos-latest` going forward.
 
-3. **Add an ARM64 Darwin verification job.** The `platform-test` matrix includes `darwin/arm64` on `macos-15`, but NEON assembly execution has not been confirmed. Add a dedicated job that runs `go test -v ./internal/eml/...` on `macos-15` with `-tags` for NEON assembly and reports pass/fail explicitly.
+- **Add an ARM64 Darwin verification job.** The `platform-test` matrix includes `darwin/arm64` on `macos-15`, but NEON assembly execution has not been confirmed. Add a dedicated job that runs `go test -v ./internal/eml/...` on `macos-15` with `-tags` for NEON assembly and reports pass/fail explicitly.
 
-4. **Pin `golangci-lint` to v2 in CI.** The `verify` job already installs `github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0`. Ensure the `golangci/golangci-lint-action` (if re-added) uses `version: v2.15.0` instead of `latest` to avoid v1/v2 incompatibility with `.golangci.yml` schema v2.
+- **Pin `golangci-lint` to v2 in CI.** The `verify` job already installs `github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0`. Ensure the `golangci/golangci-lint-action` (if re-added) uses `version: v2.15.0` instead of `latest` to avoid v1/v2 incompatibility with `.golangci.yml` schema v2.
 
 ### 3.2 Code Quality & Documentation
 
-5. **Fix roadmap documentation inconsistency.** The Executive Summary table marks IMP-01 and IMP-20 as "Resolved & Verified" while the detailed sections and actual code show arm64 parity is incomplete. Update the Executive Summary to accurately reflect partial resolution (done in this revision).
+- **Fix roadmap documentation inconsistency.** The Executive Summary table marks IMP-01 and IMP-20 as "Resolved & Verified" while the detailed sections and actual code show arm64 parity is incomplete. Update the Executive Summary to accurately reflect partial resolution (done in this revision).
 
-6. **Add `go:generate` or CI check for godoc coverage.** The project enforces 100% statement coverage via `scripts/verify.sh` but has no automated check for exported-symbol documentation coverage. Consider adding a `golangci-lint` `revive` rule (`exported`) or a custom CI step that runs the godoc scanner and fails if any exported symbol lacks a doc comment.
+- **Add `go:generate` or CI check for godoc coverage.** The project enforces 100% statement coverage via `scripts/verify.sh` but has no automated check for exported-symbol documentation coverage. Consider adding a `golangci-lint` `revive` rule (`exported`) or a custom CI step that runs the godoc scanner and fails if any exported symbol lacks a doc comment.
 
-7. **Standardize `TAG` default in Makefile.** The `TAG` variable default was updated to `v0.9.0` to match the current release. Ensure `docker-compose.yml` and `Dockerfile` references stay in sync with the latest release tag.
+- **Standardize `TAG` default in Makefile.** The `TAG` variable default was updated to `v0.9.0` to match the current release. Ensure `docker-compose.yml` and `Dockerfile` references stay in sync with the latest release tag.
 
 ### 3.3 Performance & Accuracy
 
-8. **Verify ARM64 NEON float64 kernels on native hardware.** Once an ARM64 Linux (Graviton) or ARM64 Darwin (Apple Silicon) runner is available, implement and benchmark `floorNEON`, `ceilNEON`, `truncNEON`, `roundNEON`, `maxNEON`, `minNEON` and confirm ≥ 2x speedup over scalar loops.
+- **Verify ARM64 NEON float64 kernels on native hardware.** Once an ARM64 Linux (Graviton) or ARM64 Darwin (Apple Silicon) runner is available, implement and benchmark `floorNEON`, `ceilNEON`, `truncNEON`, `roundNEON`, `maxNEON`, `minNEON` and confirm ≥ 2x speedup over scalar loops.
 
-9. **Complete IMP-01 arm64 atomic restore.** Implement `CASAL`-based atomic restore in `codegen_arm64.go` and verify under concurrent GC pressure on `linux/arm64` (QEMU or Graviton). This is the last remaining JIT stability gap.
+- **Complete IMP-01 arm64 atomic restore.** Implement `CASAL`-based atomic restore in `codegen_arm64.go` and verify under concurrent GC pressure on `linux/arm64` (QEMU or Graviton). This is the last remaining JIT stability gap.
 
-10. **Consider SVE/SVE2 support.** `HasSVE()` currently returns `false` and no SVE kernels exist. For ARM64 servers with SVE (AWS Graviton 3+, Fujitsu A64FX), 4-wide or 8-wide SVE float64 kernels would provide additional throughput. This is a future enhancement, not a blocker.
+- **Consider SVE/SVE2 support.** `HasSVE()` currently returns `false` and no SVE kernels exist. For ARM64 servers with SVE (AWS Graviton 3+, Fujitsu A64FX), 4-wide or 8-wide SVE float64 kernels would provide additional throughput. This is a future enhancement, not a blocker.
 
 ---
 
