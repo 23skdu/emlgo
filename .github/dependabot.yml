@@ -1,26 +1,16 @@
 version: 2
-
 updates:
-  - package-ecosystem: github-actions
-    directory: /
+  - package-ecosystem: "gomod"
+    directory: "/"
     schedule:
-      interval: weekly
-    labels:
-      - dependencies
-      - github-actions
-    commit-message:
-      prefix: "ci"
+      interval: "weekly"
 
-  - package-ecosystem: gomod
-    directory: /
+  - package-ecosystem: "docker"
+    directory: "/"
     schedule:
-      interval: weekly
-    labels:
-      - dependencies
-      - go
-    commit-message:
-      prefix: "deps"
-    ignore:
-      # Only update patch versions automatically; minor/major require manual review
-      - dependency-name: "*"
-        update-types: ["version-update:semver-minor", "version-update:semver-major"]
+      interval: "weekly"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
