@@ -342,4 +342,4 @@ and their validation limits are documented in [docs/accuracy.md](docs/accuracy.m
 
 ## License
 
-See LICENSE file.
+This project is released into the public domain under the [Unlicense](https://unlicense.org). See [LICENSE](LICENSE) for details.
